@@ -1,0 +1,40 @@
+{
+  "extends": "@commitlint/config-conventional-changelog",
+  "rules": {
+    "header-max-length": [2, "always", 72],
+    "type-enum": [
+      "error",
+      "always",
+      ["feat", "new feature"],
+      ["fix", "bug fix"],
+      ["docs", "documentation changes"],
+      ["style", "code style changes"],
+      ["refactor", "refactoring"],
+      ["perf", "performance improvements"],
+      ["test", "test additions or fixes"],
+      ["chore", "maintenance tasks"],
+      ["ci", "CI/CD changes"],
+      ["build", "build system changes"],
+      ["revert", "revert changes"],
+      ["security", "security fixes"],
+      ["deps", "dependency updates"]
+    ],
+    "scope-enum": [
+      "hardware",
+      "software",
+      "docs",
+      "tests",
+      "ci",
+      "deps",
+      "build",
+      "perf",
+      "refactor",
+      "style",
+      "feat",
+      "fix",
+      "chore"
+    ],
+    "subject-max-length": [2, "always", 72],
+    "subject-casing": [2, "always", "sentence-case"]
+  }
+}

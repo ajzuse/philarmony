@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+*.package-lock.json
+*.yarn-lock.yaml
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.bundle.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.temp
+
+# Test artifacts
+coverage/
+*.lcov
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node
+npm-debug.log*
+yarn-debug.log*
+yarn.lock
+
+# Documentation
+temp/
+*.md~

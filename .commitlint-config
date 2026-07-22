@@ -1,0 +1,5 @@
+{
+  "name": "conventional commit hook",
+  "command": "npx commitlint --edit",
+  "description": "Validate commit message against conventional commit rules"
+}
