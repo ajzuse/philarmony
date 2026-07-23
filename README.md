@@ -4,7 +4,7 @@
 [![Platform: ESP32](https://img.shields.io/badge/Platform-ESP32-red.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![Language: C/C++](https://img.shields.io/badge/Language-C%2FC%2B%2B-orange.svg)]()
 [![Spec Kit](https://img.shields.io/badge/Spec%20Kit-v0.13.2-green.svg)]()
-[![Constitution](https://img.shields.io/badge/Constitution-v0.2.0-purple.svg)](.specify/memory/constitution.md)
+[![Constitution](https://img.shields.io/badge/Constitution-v0.3.0-purple.svg)](.specify/memory/constitution.md)
 
 ## 📋 Sobre o Projeto
 
@@ -127,7 +127,7 @@ philarmony/
 
 ## 🔄 Sincronização Automática (README Vivo)
 
-> **Constituição v0.2.0 - Princípio: Documentação Sincronizada**
+> **Constituição v0.3.0 - Princípios: Documentação Sincronizada & Memória Compartilhada**
 > 
 > Este README é **automaticamente atualizado** a cada comando Speckit que altere o estado do projeto:
 > - \`/speckit.specify\` → Nova/atualizada spec → Roadmap, tabela de specs, próximos passos

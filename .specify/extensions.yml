@@ -1,8 +1,45 @@
 # Philarmony Spec Kit Extensions
-# Hooks para sincronização automática do README.md conforme Constituição v0.2.0
+# Hooks para sincronização automática do README.md e fluxo Git (Commit Convencional & Branch)
 
 hooks:
-  # Hook executado após /speckit.specify criar/modificar uma spec
+  # Pre-execution hooks (Verificação de troca de projeto ativo / criação de branch)
+  before_specify:
+    - id: check-git-branch-before-specify
+      name: "Verificar Branch ao Iniciar/Mudar Projeto"
+      description: "Questiona se deve ser criada ou alternada uma nova branch git para o projeto ativo"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/extensions/git-workflow/scripts/git-branch-hook.sh --trigger=before_specify"
+      timeout: 30000
+
+  before_plan:
+    - id: check-git-branch-before-plan
+      name: "Verificar Branch antes do Planejamento"
+      description: "Verifica se o projeto ativo corresponde à branch git atual"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/extensions/git-workflow/scripts/git-branch-hook.sh --trigger=before_plan"
+      timeout: 30000
+
+  before_tasks:
+    - id: check-git-branch-before-tasks
+      name: "Verificar Branch antes das Tasks"
+      description: "Verifica se o projeto ativo corresponde à branch git atual"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/extensions/git-workflow/scripts/git-branch-hook.sh --trigger=before_tasks"
+      timeout: 30000
+
+  before_implement:
+    - id: check-git-branch-before-implement
+      name: "Verificar Branch antes da Implementação"
+      description: "Verifica se o projeto ativo corresponde à branch git atual"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/extensions/git-workflow/scripts/git-branch-hook.sh --trigger=before_implement"
+      timeout: 30000
+
+  # Post-execution hooks (Sincronização e Commit Convencional após cada etapa)
   after_specify:
     - id: sync-readme-after-specify
       name: "Sincronizar README após especificação"
@@ -11,8 +48,21 @@ hooks:
       mandatory: true
       command: "bash .specify/scripts/sync-readme.sh --trigger=specify --spec-dir={{SPEC_DIR}}"
       timeout: 30000
+    - id: verify-readme-constitution
+      name: "Verificar conformidade README-Constituição"
+      description: "Valida se README reflete princípios constitucionais atuais"
+      enabled: true
+      mandatory: false
+      command: "bash .specify/scripts/verify-readme-constitution.sh"
+      timeout: 15000
+    - id: git-commit-after-specify
+      name: "Commit Convencional após Especificação"
+      description: "Questiona e gera commit convencional após o término da etapa specify"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=specify"
+      timeout: 30000
 
-  # Hook executado após /speckit.plan gerar plano de implementação
   after_plan:
     - id: sync-readme-after-plan
       name: "Sincronizar README após planejamento"
@@ -21,8 +71,21 @@ hooks:
       mandatory: true
       command: "bash .specify/scripts/sync-readme.sh --trigger=plan --plan-file={{PLAN_FILE}}"
       timeout: 30000
+    - id: verify-readme-constitution-plan
+      name: "Verificar conformidade README-Constituição (plan)"
+      description: "Valida se README reflete princípios constitucionais atuais após plano"
+      enabled: true
+      mandatory: false
+      command: "bash .specify/scripts/verify-readme-constitution.sh"
+      timeout: 15000
+    - id: git-commit-after-plan
+      name: "Commit Convencional após Planejamento"
+      description: "Questiona e gera commit convencional após o término da etapa plan"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=plan"
+      timeout: 30000
 
-  # Hook executado após /speckit.tasks gerar tasks detalhadas
   after_tasks:
     - id: sync-readme-after-tasks
       name: "Sincronizar README após tasks"
@@ -31,27 +94,6 @@ hooks:
       mandatory: true
       command: "bash .specify/scripts/sync-readme.sh --trigger=tasks --tasks-file={{TASKS_FILE}}"
       timeout: 30000
-
-  # Hook opcional: verificação de conformidade constitucional no README
-  after_specify:
-    - id: verify-readme-constitution
-      name: "Verificar conformidade README-Constituição"
-      description: "Valida se README reflete princípios constitucionais atuais (versão, princípios, governance)"
-      enabled: true
-      mandatory: false
-      command: "bash .specify/scripts/verify-readme-constitution.sh"
-      timeout: 15000
-
-  after_plan:
-    - id: verify-readme-constitution-plan
-      name: "Verificar conformidade README-Constituição (plan)"
-      description: "Valida se README reflete princípios constitucionais atuais após plano"
-      enabled: true
-      mandatory: false
-      command: "bash .specify/scripts/verify-readme-constitution.sh"
-      timeout: 15000
-
-  after_tasks:
     - id: verify-readme-constitution-tasks
       name: "Verificar conformidade README-Constituição (tasks)"
       description: "Valida se README reflete princípios constitucionais atuais após tasks"
@@ -59,3 +101,19 @@ hooks:
       mandatory: false
       command: "bash .specify/scripts/verify-readme-constitution.sh"
       timeout: 15000
+    - id: git-commit-after-tasks
+      name: "Commit Convencional após Tasks"
+      description: "Questiona e gera commit convencional após o término da etapa tasks"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=tasks"
+      timeout: 30000
+
+  after_implement:
+    - id: git-commit-after-implement
+      name: "Commit Convencional após Implementação"
+      description: "Questiona e gera commit convencional após o término da etapa implement"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=implement"
+      timeout: 30000

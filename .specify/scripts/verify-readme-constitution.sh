@@ -44,6 +44,7 @@ check_principles_documented() {
         "Workspace de Dependências"
         "Teste Automatizado"
         "Documentação Sincronizada"
+        "Memória Compartilhada"
     )
     
     for principle in "${principles[@]}"; do

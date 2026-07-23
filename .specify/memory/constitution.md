@@ -1,3 +1,18 @@
+<!-- 
+Sync Impact Report:
+Version change: 0.2.0 → 0.3.0 (MINOR - new principle added)
+Modified principles: None renamed
+Added sections: Principle "Memória Compartilhada de Pesquisa e Conhecimento"
+Removed sections: None
+Templates requiring updates: 
+  - .specify/templates/plan-template.md (⚠ pending - add memory catalog reference)
+  - .specify/templates/spec-template.md (⚠ pending - add research data capture)
+  - .specify/templates/tasks-template.md (⚠ pending - add memory persistence tasks)
+Follow-up TODOs: 
+  - TODO(RATIFICATION_DATE): Original adoption date unknown, marked as 2026-07-22
+  - Update plan/spec/tasks templates to reference shared memory catalog
+-->
+
 # Philarmony Constitution
 
 ## Core Principles
@@ -19,6 +34,15 @@ Automation testing pipeline is NON-NEGOTIABLE. Tests represent complete user flo
 
 ### Documentação Sincronizada (README Vivo)
 O arquivo README.md na raiz do projeto DEVE ser mantido automaticamente sincronizado com o estado atual do projeto. Qualquer comando speckit que crie, modifique ou remova especificações (`/speckit.specify`, `/speckit.plan`, `/speckit.tasks`) DEVE atualizar o README para refletir: progresso das fases, especificações completadas/em andamento, roadmap atualizado, stack tecnológico, estrutura do repositório e próximos passos. O README é a "single source of truth" para status do projeto visível a contribuidores e usuários.
+
+### Memória Compartilhada de Pesquisa e Conhecimento
+Todos os dados pesquisados, descobertas técnicas, decisões de arquitetura, referências de APIs, esquemas de hardware, e lições aprendidas DEVEM ser persistidos no catálogo de memória compartilhada da aplicação (shared memory catalog). Este catálogo serve como base de conhecimento única e consultável por agentes IA, desenvolvedores e ferramentas de automação. A escrita no catálogo é obrigatória em:
+- Conclusão de tarefas de pesquisa (`/speckit.research` ou equivalente)
+- Decisões de arquitetura documentadas em specs/plans
+- Descobertas durante debugging ou integração
+- Referências de APIs externas, datasheets, protocolos
+- Padrões de código validados e anti-padrões identificados
+O catálogo deve ser versionado, consultável via query semântica, e sincronizado entre sessões de desenvolvimento.
 
 ## Additional Constraints
 
@@ -72,5 +96,6 @@ Documentação completa em EN-US para contribuições open-source. Utilizada com
 - Complexity must be justified by performance or safety requirements
 - Use README.md in docs/ for runtime development guidance
 - **README Sync Rule**: Todo comando speckit que altere specs/plans/tasks DEVE invocar atualização do README.md como passo obrigatório. Falha na sincronização bloqueia merge. Implementação via hook `after_specify`/`after_plan`/`after_tasks` no `.specify/extensions.yml`.
+- **Memory Catalog Sync Rule**: Toda pesquisa, decisão arquitetural, descoberta técnica ou referência validada DEVE ser registrada no catálogo de memória compartilhada. Falha no registro bloqueia merge de PRs que introduzam novo conhecimento.
 
-**Version**: 0.2.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-23
+**Version**: 0.3.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-23

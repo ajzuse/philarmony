@@ -1,0 +1,38 @@
+id: "git-workflow"
+name: "Git Workflow Extension for Speckit"
+version: "1.0.0"
+description: "Extension that prompts for conventional commits after each SDD stage and branch creation when switching active project/feature."
+author: "Philarmony / Speckit"
+hooks:
+  before_specify:
+    - id: check-git-branch-before-specify
+      name: "Check branch on specify"
+      command: "bash .specify/extensions/git-workflow/scripts/git-branch-hook.sh --trigger=before_specify"
+  before_plan:
+    - id: check-git-branch-before-plan
+      name: "Check branch on plan"
+      command: "bash .specify/extensions/git-workflow/scripts/git-branch-hook.sh --trigger=before_plan"
+  before_tasks:
+    - id: check-git-branch-before-tasks
+      name: "Check branch on tasks"
+      command: "bash .specify/extensions/git-workflow/scripts/git-branch-hook.sh --trigger=before_tasks"
+  before_implement:
+    - id: check-git-branch-before-implement
+      name: "Check branch on implement"
+      command: "bash .specify/extensions/git-workflow/scripts/git-branch-hook.sh --trigger=before_implement"
+  after_specify:
+    - id: git-commit-after-specify
+      name: "Commit after specify"
+      command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=specify"
+  after_plan:
+    - id: git-commit-after-plan
+      name: "Commit after plan"
+      command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=plan"
+  after_tasks:
+    - id: git-commit-after-tasks
+      name: "Commit after tasks"
+      command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=tasks"
+  after_implement:
+    - id: git-commit-after-implement
+      name: "Commit after implement"
+      command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=implement"
