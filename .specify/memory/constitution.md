@@ -1,19 +1,13 @@
 <!--
 Sync Impact Report:
-Version change: 0.5.0 → 0.6.0 (MINOR — elevated explicit commit review/approval into a Core Principle and closed auto-commit loopholes)
-Modified principles:
-  - Development Workflow / Git "Confirmação Explícita de Commit" → promoted & expanded as Core Principle "Revisão e Aprovação Explícita de Commit"
-  - Governance "Commit Approval Rule" → strengthened (no default-yes; review before commit)
-Added sections:
-  - Core Principles: Revisão e Aprovação Explícita de Commit
+Version change: 0.3.0 → 0.4.0 (MINOR - explicit commit approval governance rule)
+Modified principles: Git workflow requirements updated
+Added sections: Explicit Commit Approval Rule
 Removed sections: None
-Templates requiring updates:
-  - .specify/templates/plan-template.md (✅ no structural change required; Constitution Check still points to constitution.md)
-  - .specify/templates/spec-template.md (✅ no change)
-  - .specify/templates/tasks-template.md (✅ no change)
-  - .specify/extensions.yml (✅ git commit hooks set optional)
-  - .specify/extensions/git-workflow/scripts/git-commit-hook.sh (✅ fail-closed: no TTY ⇒ no commit)
-  - .claude/skills/speckit-* (⚠ agents must follow new principle; hook optionality updated via extensions.yml)
+Templates requiring updates: 
+  - .specify/templates/plan-template.md (✅ aligned)
+  - .specify/templates/spec-template.md (✅ aligned)
+  - .specify/templates/tasks-template.md (✅ aligned)
 Follow-up TODOs: None
 -->
 
@@ -85,10 +79,10 @@ O catálogo deve ser versionado, consultável via query semântica, e sincroniza
 
 **Git workflow requirements:**
 - Conventional Commits: All commit messages MUST follow Conventional Commits format with feature scope: `tipo(<feature>): descrição` (ex: `docs(filament-dryer-esp32): Add implementation plan`).
-- Revisão antes do commit: aplica-se o princípio Core "Revisão e Aprovação Explícita de Commit" em todas as etapas Speckit e em qualquer automação Git.
+- Confirmação Explícita de Commit: É PROIBIDO realizar commits automáticos sem a confirmação prévia e explícita do usuário. Após cada ação/etapa, o sistema ou agente DEVE apresentar o resumo das alterações e a mensagem sugerida de commit e aguardar autorização do usuário antes de executar a gravação no Git.
 - Branch strategy: Create new branch (`feature/<nome-do-projeto>`) for each task block before implementation
-- Incremental commits: Make commits between tasks only after validation of tests **and** explicit user authorization following code review opportunity
-- Pull Requests: Open PR at end of each task block execution only when the user requests it
+- Incremental commits: Make commits between tasks after validation of tests and user explicit authorization
+- Pull Requests: Open PR at end of each task block execution
 
 ## Language Support
 
@@ -117,7 +111,6 @@ Documentação completa em EN-US para contribuições open-source. Utilizada com
 - Use README.md in docs/ for runtime development guidance
 - **README Sync Rule**: Todo comando speckit que altere specs/plans/tasks DEVE invocar atualização do README.md como passo obrigatório. Falha na sincronização bloqueia merge. Implementação via hook `after_specify`/`after_plan`/`after_tasks` no `.specify/extensions.yml`.
 - **Memory Catalog Sync Rule**: Toda pesquisa, decisão arquitetural, descoberta técnica ou referência validada DEVE ser registrada no catálogo de memória compartilhada. Falha no registro bloqueia merge de PRs que introduzam novo conhecimento.
-- **Commit Approval Rule**: Nenhum commit MUST ser efetuado sem (1) oportunidade de o usuário revisar o código/diff e (2) aprovação explícita do usuário. Hooks e agentes MUST falhar fechado (não commitar) se a confirmação interativa não for obtida. Default implícito "sim" é PROIBIDO.
-- **Cavemen Compliance Rule**: All agents MUST be reviewed for Cavemen Protocol compliance. PRs introducing verbose preamble, filler acknowledgments, or redundant summaries in agent output MUST be rejected.
+- **Commit Approval Rule**: Nenhum commit será efetuado sem aprovação explícita do usuário via prompt interativo no final de cada ação.
 
-**Version**: 0.6.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-28
+**Version**: 0.4.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-23
