@@ -36,9 +36,23 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean", "default": false },
-        "driver": { "type": "string", "enum": ["ssd1306", "st7789", "ili9341", "auto"] },
+        "driver": {
+          "type": "string",
+          "enum": ["none", "ssd1306", "sh1106", "st7789", "ili9341", "st7735", "gc9a01", "ili9488", "hd44780", "nextion", "auto"]
+        },
+        "bus_type": {
+          "type": "string",
+          "enum": ["i2c", "spi", "parallel_8bit", "uart"]
+        },
         "width": { "type": "integer", "default": 128 },
         "height": { "type": "integer", "default": 64 },
+        "rotation": { "type": "integer", "enum": [0, 90, 180, 270], "default": 0 },
+        "spi_mosi": { "type": "integer" },
+        "spi_sclk": { "type": "integer" },
+        "spi_cs": { "type": "integer" },
+        "dc_pin": { "type": "integer" },
+        "rst_pin": { "type": "integer" },
+        "backlight_pin": { "type": "integer" },
         "fields": {
           "type": "array",
           "items": { "type": "string" }

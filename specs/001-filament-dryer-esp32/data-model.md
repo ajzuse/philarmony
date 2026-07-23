@@ -87,7 +87,25 @@ Configuration for heater MOSFET and exhaust fan.
 | `fan_pwm_freq` | uint32 | Fan PWM frequency in Hz | 100 to 25000 |
 | `cooldown_duration_sec`| uint16| Post-heating fan run time in seconds | 0 to 300 |
 
-### 2.4 FilamentProfile
+### 2.4 DisplayConfig
+Configuration for attached display hardware.
+
+| Field | Type | Description | Values / Examples |
+|-------|------|-------------|-------------------|
+| `enabled` | bool | Enable display rendering loop | true / false |
+| `driver` | string | Display controller driver key | "ssd1306", "sh1106", "st7789", "ili9341", "st7735", "gc9a01", "ili9488", "hd44780", "nextion", "none" |
+| `bus_type` | string | Interface bus | "i2c", "spi", "parallel_8bit", "uart" |
+| `width` | uint16 | Horizontal pixel count | 128, 135, 240, 320, 480 |
+| `height` | uint16 | Vertical pixel count | 32, 64, 128, 240, 320 |
+| `rotation` | uint16 | Display orientation in degrees | 0, 90, 180, 270 |
+| `spi_mosi` | int8 | SPI MOSI GPIO (-1 if I2C) | 19, 13, 23 |
+| `spi_sclk` | int8 | SPI SCK GPIO (-1 if I2C) | 18, 14 |
+| `spi_cs` | int8 | SPI Chip Select GPIO | 5, 15 |
+| `dc_pin` | int8 | Data/Command GPIO | 16, 2 |
+| `rst_pin` | int8 | Hardware Reset GPIO | 23, -1 |
+| `backlight_pin` | int8 | PWM Backlight GPIO | 4, 21, -1 |
+
+### 2.5 FilamentProfile
 Filament preset template.
 
 | Field | Type | Range / Example |

@@ -12,10 +12,6 @@
   - **Core 1**: Critical control loop (sensor acquisition, PID/PWM regulation, safety watchdog, display rendering).
 - **Zero Dynamic Allocation**: Critical control loops use pre-allocated static buffers to prevent heap fragmentation (`FreeHeap` drops) during multi-day drying sessions.
 
-### Alternatives Considered
-- **Rust for ESP32 (`esp-rs`)**: High safety, but library support for diverse displays (LovyanGFX/Adafruit) and Async WebServers is less mature than C++.
-- **MicroPython**: Easy development, but high garbage collection latency penalties (>50ms pauses) that breach the 20ms control loop requirement and consume excessive RAM (~2MB base runtime).
-
 ---
 
 ## 2. Klipper-Inspired Object Architecture & Plugin System
@@ -35,8 +31,8 @@ Inspired by Klipper 3D printer firmware, the system represents hardware and soft
 +------+------+     +------+------+     +------+------+
        |                   |                   |
    +---+---+           +---+---+           +---+---+
-   |SHT31  |           |AOD4184|           |ST7789 |
-   |DS18B20|           |  PWM  |           |SSD1306|
+   |SHT31  |           |AOD4184|           |LovyanGFX|
+   |DS18B20|           |  PWM  |           | (Multi) |
    +-------+           +-------+           +-------+
 ```
 
@@ -50,7 +46,32 @@ Plugins register lifecycle callbacks to extend capabilities without modifying co
 
 ---
 
-## 3. Hardware Support Matrix & Test Hardware Mapping
+## 3. Expanded Display Drivers Architecture & Ecosystem Matrix
+
+To ensure maximum hardware compatibility across the ESP32 maker ecosystem, display rendering uses **LovyanGFX / Adafruit GFX / U8g2 abstraction wrappers**, providing zero-copy SPI DMA memory transfers and hardware-accelerated drawing.
+
+### Supported Display Controllers & Bus Types
+
+| Driver Family | Controller IC | Common Bus Types | Resolutions Supported | Popular Hardware Modules / Examples |
+|---------------|---------------|------------------|-----------------------|-------------------------------------|
+| **OLED Monochrome** | `SSD1306` | I2C / SPI | 128x64, 128x32 | Standard 0.96" / 0.91" I2C OLEDs |
+| **OLED Monochrome** | `SH1106` | I2C / SPI | 128x64 | 1.3" I2C OLED displays |
+| **OLED Monochrome** | `SSD1309` | I2C / SPI | 128x64 | 2.42" large OLED displays |
+| **TFT Small Color** | `ST7789` | SPI | 135x240, 240x240, 170x320 | LilyGo T-Display V1.1, TTGO, T-QT |
+| **TFT Medium Color**| `ILI9341` | SPI / Parallel-8 | 240x320 | ESP32-2432S028 (CYD), Red SPI TFTs |
+| **TFT Compact Color**| `ST7735` | SPI | 128x128, 128x160 | 1.44" / 1.8" Color TFT modules |
+| **Round Color TFT** | `GC9A01` | SPI | 240x240 | 1.28" Round Smartwatch Style TFTs |
+| **TFT Large Color** | `ILI9488` / `ST7796` | SPI / Parallel-8 | 320x480 | 3.5" / 4.0" Color TFT displays |
+| **Character LCD**  | `HD44780` (PCF8574)| I2C | 16x2, 20x4 | Classic 1602 / 2004 LCDs with I2C backpack |
+| **Smart HMI**      | `Nextion` | UART Serial | Customizable | Nextion Basic/Enhanced/Intelligent HMI |
+
+### Display Layout Engine
+- **Layout Auto-Adaptation**: Automatically adjusts font size, icon positioning, and field density according to detected display width and height.
+- **Configurable Display Refresh Rate**: Refresh cycle decoupled from status stream (e.g. 1Hz - 5Hz configurable, default 1Hz).
+
+---
+
+## 4. Hardware Support Matrix & Test Hardware Mapping
 
 ### Test Board Configurations
 1. **ESP32_DEVKITC_V4**:
@@ -67,7 +88,6 @@ Plugins register lifecycle callbacks to extend capabilities without modifying co
 3. **ESP32-2432S028 (Cheap Yellow Display - CYD)**:
    - ESP32 + 2.8" TFT 240x320 Display (ILI9341/ST7789, SPI).
    - Display Pins: MOSI (GPIO13), MISO (GPIO12), SCLK (GPIO14), CS (GPIO15), DC (GPIO2), RST (NC/3.3V), BL (GPIO21).
-   - Integrated XPT2046 touch controller (reserved for future phases).
 
 ### Sensor Drivers
 - **Integrated Temp + Humidity**: SHT31 (I2C `0x44`/`0x45`), SHT30, DHT22 (1-Wire digital), BME280 (I2C `0x76`/`0x77`), AHT10/AHT20.
@@ -82,7 +102,7 @@ Plugins register lifecycle callbacks to extend capabilities without modifying co
 
 ---
 
-## 4. Fault Tolerance & Safety Matrix ("Tolerante a Falhas")
+## 5. Fault Tolerance & Safety Matrix ("Tolerante a Falhas")
 
 ### Safe Abort Principle
 Any anomaly during operation triggers `FAULT_STOPPED`. The heater MOSFET is **immediately forced LOW via hardware register write (<1ms)**. However, the ESP32 platform, WiFi, AsyncWebServer, WebSocket server, display, and logging subsystems **remain 100% operational**.
@@ -99,11 +119,9 @@ Any anomaly during operation triggers `FAULT_STOPPED`. The heater MOSFET is **im
 
 ---
 
-## 5. Dual Logging Subsystem Specification
+## 6. Dual Logging Subsystem Specification
 
 ### Architecture
-To fulfill post-mortem analysis without losing diagnostic state on reboot or fault:
-
 1. **`system.log` (`/littlefs/system.log`)**:
    - Initialized/rotated on boot.
    - Logs boot details, MAC address, assigned IP, WiFi RSSI, sensor initialization, NVS config status, system warnings.
