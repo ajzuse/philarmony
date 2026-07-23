@@ -96,34 +96,35 @@ to_sentence_case() {
 if [ -n "$CUSTOM_MSG" ]; then
     COMMIT_MSG="$CUSTOM_MSG"
 else
+    SCOPE="${CLEAN_FEATURE}"
     case "$STAGE" in
         specify)
-            SUBJ="Add specification for ${CLEAN_FEATURE}"
+            SUBJ="Add specification"
             SUBJ="$(to_sentence_case "$SUBJ")"
-            COMMIT_MSG="docs(docs): ${SUBJ}"
+            COMMIT_MSG="docs(${SCOPE}): ${SUBJ}"
             ;;
         plan)
-            SUBJ="Add implementation plan for ${CLEAN_FEATURE}"
+            SUBJ="Add implementation plan"
             SUBJ="$(to_sentence_case "$SUBJ")"
-            COMMIT_MSG="docs(docs): ${SUBJ}"
+            COMMIT_MSG="docs(${SCOPE}): ${SUBJ}"
             ;;
         tasks)
-            SUBJ="Add tasks breakdown for ${CLEAN_FEATURE}"
+            SUBJ="Add tasks breakdown"
             SUBJ="$(to_sentence_case "$SUBJ")"
-            COMMIT_MSG="docs(docs): ${SUBJ}"
+            COMMIT_MSG="docs(${SCOPE}): ${SUBJ}"
             ;;
         implement)
-            SUBJ="Implement software tasks for ${CLEAN_FEATURE}"
+            SUBJ="Implement software tasks"
             SUBJ="$(to_sentence_case "$SUBJ")"
-            COMMIT_MSG="feat(software): ${SUBJ}"
+            COMMIT_MSG="feat(${SCOPE}): ${SUBJ}"
             ;;
         constitution)
-            COMMIT_MSG="docs(docs): Update project constitution"
+            COMMIT_MSG="docs(constitution): Update project constitution"
             ;;
         *)
-            SUBJ="Complete ${STAGE} stage for ${CLEAN_FEATURE}"
+            SUBJ="Complete ${STAGE} stage"
             SUBJ="$(to_sentence_case "$SUBJ")"
-            COMMIT_MSG="chore(chore): ${SUBJ}"
+            COMMIT_MSG="chore(${SCOPE}): ${SUBJ}"
             ;;
     esac
 fi

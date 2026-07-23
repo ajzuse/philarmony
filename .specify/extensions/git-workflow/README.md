@@ -22,11 +22,11 @@ Extension para o Speckit que automatiza o fluxo Git:
 Executado automaticamente ao final das etapas do Speckit (`after_specify`, `after_plan`, `after_tasks`, `after_implement`).
 
 - Verifica se existem arquivos alterados/não commitados no Git (`git status --porcelain`).
-- Caso haja alterações, sugere uma mensagem de commit no formato Conventional Commits:
-  - `specify` -> `docs(docs): Add specification for <feature>`
-  - `plan` -> `docs(docs): Add implementation plan for <feature>`
-  - `tasks` -> `docs(docs): Add tasks breakdown for <feature>`
-  - `implement` -> `feat(software): Implement software tasks for <feature>`
+- Caso haja alterações, sugere uma mensagem de commit no formato Conventional Commits com a feature como escopo:
+  - `specify` -> `docs(<feature>): Add specification`
+  - `plan` -> `docs(<feature>): Add implementation plan`
+  - `tasks` -> `docs(<feature>): Add tasks breakdown`
+  - `implement` -> `feat(<feature>): Implement software tasks`
 - Pergunta ao usuário se deseja realizar o commit (`[S/n]`).
 - Se confirmado, executa `git add -A` e realiza o commit com a mensagem padronizada.
 

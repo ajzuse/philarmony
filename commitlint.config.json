@@ -21,25 +21,7 @@
         "deps"
       ]
     ],
-    "scope-enum": [
-      2,
-      "always",
-      [
-        "hardware",
-        "software",
-        "docs",
-        "tests",
-        "ci",
-        "deps",
-        "build",
-        "perf",
-        "refactor",
-        "style",
-        "feat",
-        "fix",
-        "chore"
-      ]
-    ],
+    "scope-enum": [0],
     "subject-max-length": [2, "always", 72],
     "subject-case": [2, "always", "sentence-case"]
   }
