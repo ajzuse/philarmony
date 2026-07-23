@@ -67,6 +67,29 @@
 }
 ```
 
+### 1.5 Display Configuration
+**Topic**: `config/display`
+```json
+{
+  "topic": "config/display",
+  "payload": {
+    "enabled": true,
+    "driver": "st7789",
+    "bus_type": "spi",
+    "width": 135,
+    "height": 240,
+    "rotation": 90,
+    "spi_mosi": 19,
+    "spi_sclk": 18,
+    "spi_cs": 5,
+    "dc_pin": 16,
+    "rst_pin": 23,
+    "backlight_pin": 4,
+    "fields": ["chamber_temp_c", "target_temp_c", "humidity_pct", "heater_power_pct", "status"]
+  }
+}
+```
+
 ---
 
 ## 2. Server Broadcasts (ESP32 -> Client)
