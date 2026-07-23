@@ -140,7 +140,7 @@ generate_roadmap() {
     roadmap+="│ FASE                       │ STATUS     │ ENTREGÁVEIS            │  %   │\n"
     roadmap+="├────────────────────────────┼────────────┼────────────────────────┼──────┤\n"
     
-    local phase1_status="�1_status="✅ CONCLUÍDO"
+    local phase1_status="✅ CONCLUÍDO"
     [[ $spec_count -eq 0 ]] && phase1_status="⏳ PENDENTE"
     roadmap+="│ 1. Specification (Speckit) │ ${phase1_status} │ ${spec_count} Specs completas    │ 100% │\n"
     

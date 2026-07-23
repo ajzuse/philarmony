@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FilamentDryerHardwareConfig",
+  "type": "object",
+  "properties": {
+    "sensor": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["sht31", "sht30", "dht22", "ds18b20", "ntc_thermistor", "bme280", "aht20"]
+        },
+        "i2c_bus": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "sda_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+        "scl_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+        "i2c_address": { "type": "integer", "enum": [68, 69, 118, 119] },
+        "gpio_pin": { "type": "integer", "minimum": 0, "maximum": 39 }
+      },
+      "required": ["type"]
+    },
+    "actuators": {
+      "type": "object",
+      "properties": {
+        "heater_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+        "heater_pwm_freq": { "type": "integer", "default": 1000 },
+        "fan_mode": {
+          "type": "string",
+          "enum": ["shared_mosfet", "independent_pwm", "independent_digital"]
+        },
+        "fan_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+        "fan_pwm_freq": { "type": "integer", "default": 5000 }
+      },
+      "required": ["heater_pin", "fan_mode"]
+    },
+    "display": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "driver": { "type": "string", "enum": ["ssd1306", "st7789", "ili9341", "auto"] },
+        "width": { "type": "integer", "default": 128 },
+        "height": { "type": "integer", "default": 64 },
+        "fields": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "required": ["sensor", "actuators"]
+}
