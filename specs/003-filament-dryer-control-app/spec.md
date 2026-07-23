@@ -131,9 +131,13 @@ A cross-platform application (Desktop: Windows/macOS/Linux, Mobile: Android/iOS)
 - Configurable per event type
 
 ### FR-008: Material Profiles (Presets)
-- Predefined profiles: PLA (50°C, 4h), PETG (65°C, 4h), ABS (80°C, 2h), TPU (45°C, 4h), Nylon (70°C, 6h), Custom
-- User can create/edit/delete custom profiles
-- One-tap "Start with Profile" from dashboard
+- Sync with firmware filament profiles via WebSocket (`config/profiles/list`, `config/profiles/get`, `config/profiles/create`, `config/profiles/update`, `config/profiles/delete`, `config/profiles/reset_defaults`)
+- Built-in defaults from firmware: PLA (50°C, 4h, 15% RH), PETG (65°C, 4h, 15% RH), ABS (80°C, 2h, 10% RH), TPU (45°C, 4h, 20% RH), Nylon (70°C, 6h, 10% RH)
+- Each profile has Portuguese and English display names
+- User can create/edit/delete custom profiles (synced to device)
+- One-tap "Start with Profile" from dashboard sends `control/start` with `profile_id`
+- Profile validation: temp 30-80°C, duration 1-1440 min, humidity 5-50%
+- Offline editing queued for sync on next connection
 
 ### FR-009: Localization & Accessibility
 - Languages: Portuguese (BR) primary, English (US) secondary
@@ -208,13 +212,16 @@ A cross-platform application (Desktop: Windows/macOS/Linux, Mobile: Android/iOS)
 - `data_points`: JSON array (timestamp, temp, humidity, heater_pct, fan_pct) - optional, for charts
 
 ### MaterialProfile
-- `id`: UUID
-- `name`: string
+- `id`: string (builtin: pla, petg, abs, tpu, nylon; custom: UUID)
+- `name_pt`: string (Portuguese display name)
+- `name_en`: string (English display name)
 - `target_temp_c`: number
 - `default_duration_min`: number
 - `target_humidity_pct`: number (nullable)
-- `is_builtin`: boolean
-- `created_by_user`: boolean
+- `is_builtin`: boolean (read-only, true for default profiles)
+- `created_at`: timestamp (for custom profiles)
+- `updated_at`: timestamp (for custom profiles)
+- Synced with firmware via WebSocket profile topics
 
 ### DeviceConfig (cached from device)
 - `sensors`: SensorConfig[]

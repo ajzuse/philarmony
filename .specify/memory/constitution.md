@@ -17,6 +17,9 @@ A shared workspace configuration file (.vscode/workspace.json) must be maintaine
 ### Teste Automatizado e Qualidade
 Automation testing pipeline is NON-NEGOTIABLE. Tests represent complete user flows only. CI system MUST fail build if any test fails. Test results cached in memory catalog for AI reference. Only flow tests (not unit tests) are mandatory, each representing complete user journeys.
 
+### Documentação Sincronizada (README Vivo)
+O arquivo README.md na raiz do projeto DEVE ser mantido automaticamente sincronizado com o estado atual do projeto. Qualquer comando speckit que crie, modifique ou remova especificações (`/speckit.specify`, `/speckit.plan`, `/speckit.tasks`) DEVE atualizar o README para refletir: progresso das fases, especificações completadas/em andamento, roadmap atualizado, stack tecnológico, estrutura do repositório e próximos passos. O README é a "single source of truth" para status do projeto visível a contribuidores e usuários.
+
 ## Additional Constraints
 
 **Technology stack requirements, compliance standards, deployment policies, etc.:**
@@ -61,12 +64,13 @@ Documentação completa em EN-US para contribuições open-source. Utilizada com
 
 ## Governance
 
-**All PRs/reviews must verify compliance; Complexity must be justified; Use README.md for runtime development guidance**
+**All PRs/reviews must verify compliance; Complexity must be justified; Use README.md for runtime development guidance; README sync is mandatory on spec changes**
 - Constituição supersedes all other practices; Amendments require documentation, approval, migration plan
 - All PRs must verify constitutional compliance via automated checks
 - GPLv3 license: All contributions must include full license header; source code must be freely redistributable
 - Compliance review mandatory for any new dependencies or tools
 - Complexity must be justified by performance or safety requirements
 - Use README.md in docs/ for runtime development guidance
+- **README Sync Rule**: Todo comando speckit que altere specs/plans/tasks DEVE invocar atualização do README.md como passo obrigatório. Falha na sincronização bloqueia merge. Implementação via hook `after_specify`/`after_plan`/`after_tasks` no `.specify/extensions.yml`.
 
-**Version**: 0.1.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-22
+**Version**: 0.2.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-23

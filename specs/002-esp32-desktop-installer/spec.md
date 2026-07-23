@@ -92,31 +92,39 @@ A desktop application that simplifies initial configuration and firmware install
 - Field selection for status display: checkbox list from firmware status payload (temperature, humidity, heater%, fan%, status, time, CPU%, RAM)
 - Layout preview showing field arrangement
 
-### FR-006: WiFi Credentials
+### FR-006: Filament Drying Profiles Configuration
+- View built-in profiles: PLA (50°C/4h/15%), PETG (65°C/4h/15%), ABS (80°C/2h/10%), TPU (45°C/4h/20%), Nylon (70°C/6h/10%)
+- Create custom profiles: name (PT-BR/EN-US), target temperature (30-80°C), default duration (1-1440 min), target humidity (5-50%)
+- Edit/delete custom profiles (built-in profiles read-only but can be overridden)
+- Profiles synced to firmware NVS during flash
+- Max 20 custom profiles
+- Profile validation on input
+
+### FR-007: WiFi Credentials
 - SSID input (scan for nearby networks optional)
 - Password input with show/hide toggle
 - Optional: Static IP configuration (IP, gateway, netmask, DNS)
 - Credentials embedded in firmware NVS partition at flash time
 
-### FR-007: Firmware Generation & Flashing
+### FR-008: Firmware Generation & Flashing
 - Base firmware binary bundled with installer (versioned)
 - Configuration injected into dedicated NVS partition or appended to binary
 - Flash process: Erase → Write firmware → Write config partition → Verify → Reset
 - Progress bar with stage indicators (erasing, writing, verifying)
 - Support for custom partition tables
 
-### FR-008: Configuration Profiles
+### FR-009: Configuration Profiles
 - Export complete configuration to JSON file
 - Import configuration from JSON file
 - Profile includes: device model, sensors, pins, display, WiFi (password encrypted or placeholder)
 - Version field for forward compatibility
 
-### FR-009: Multi-language Support
+### FR-010: Multi-language Support
 - UI in Portuguese (primary) and English
 - Language selector in application settings
 - All user-facing strings externalized
 
-### FR-010: Logging & Diagnostics
+### FR-011: Logging & Diagnostics
 - Real-time log window during flash process
 - Detailed error messages with suggested fixes
 - Log export for troubleshooting
@@ -186,6 +194,15 @@ A desktop application that simplifies initial configuration and firmware install
 - `ssid`: string
 - `password`: string (encrypted in profile)
 - `static_ip`: object (optional: ip, gateway, netmask, dns)
+
+### FilamentProfile
+- `id`: string (builtin: pla, petg, abs, tpu, nylon; custom: user-defined UUID)
+- `name_pt`: string (Portuguese display name)
+- `name_en`: string (English display name)
+- `target_temp_c`: number (30-80)
+- `default_duration_min`: number (1-1440)
+- `target_humidity_pct`: number (5-50)
+- `is_builtin`: boolean (read-only, true for default profiles)
 
 ### FirmwarePackage
 - `version`: string
@@ -263,6 +280,13 @@ A desktop application that simplifies initial configuration and firmware install
     "i2c_address": 0x3C,
     "fields": ["chamber_temp_c", "humidity_pct", "heater_power_pct", "status", "elapsed_time_sec"]
   },
+  "filament_profiles": [
+    { "id": "pla", "name_pt": "PLA", "name_en": "PLA", "target_temp_c": 50, "default_duration_min": 240, "target_humidity_pct": 15, "is_builtin": true },
+    { "id": "petg", "name_pt": "PETG", "name_en": "PETG", "target_temp_c": 65, "default_duration_min": 240, "target_humidity_pct": 15, "is_builtin": true },
+    { "id": "abs", "name_pt": "ABS", "name_en": "ABS", "target_temp_c": 80, "default_duration_min": 120, "target_humidity_pct": 10, "is_builtin": true },
+    { "id": "tpu", "name_pt": "TPU", "name_en": "TPU", "target_temp_c": 45, "default_duration_min": 240, "target_humidity_pct": 20, "is_builtin": true },
+    { "id": "nylon", "name_pt": "Nylon", "name_en": "Nylon", "target_temp_c": 70, "default_duration_min": 360, "target_humidity_pct": 10, "is_builtin": true }
+  ],
   "wifi": {
     "ssid": "MyNetwork",
     "password": "***ENCRYPTED***",

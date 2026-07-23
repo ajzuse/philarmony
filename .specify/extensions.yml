@@ -1,0 +1,61 @@
+# Philarmony Spec Kit Extensions
+# Hooks para sincronização automática do README.md conforme Constituição v0.2.0
+
+hooks:
+  # Hook executado após /speckit.specify criar/modificar uma spec
+  after_specify:
+    - id: sync-readme-after-specify
+      name: "Sincronizar README após especificação"
+      description: "Atualiza README.md refletindo nova/alterada spec, progresso do roadmap e próximos passos"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/scripts/sync-readme.sh --trigger=specify --spec-dir={{SPEC_DIR}}"
+      timeout: 30000
+
+  # Hook executado após /speckit.plan gerar plano de implementação
+  after_plan:
+    - id: sync-readme-after-plan
+      name: "Sincronizar README após planejamento"
+      description: "Atualiza README.md com plano de implementação, tasks identificadas e fase atual"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/scripts/sync-readme.sh --trigger=plan --plan-file={{PLAN_FILE}}"
+      timeout: 30000
+
+  # Hook executado após /speckit.tasks gerar tasks detalhadas
+  after_tasks:
+    - id: sync-readme-after-tasks
+      name: "Sincronizar README após tasks"
+      description: "Atualiza README.md com breakdown de tasks, estimativas e status de implementação"
+      enabled: true
+      mandatory: true
+      command: "bash .specify/scripts/sync-readme.sh --trigger=tasks --tasks-file={{TASKS_FILE}}"
+      timeout: 30000
+
+  # Hook opcional: verificação de conformidade constitucional no README
+  after_specify:
+    - id: verify-readme-constitution
+      name: "Verificar conformidade README-Constituição"
+      description: "Valida se README reflete princípios constitucionais atuais (versão, princípios, governance)"
+      enabled: true
+      mandatory: false
+      command: "bash .specify/scripts/verify-readme-constitution.sh"
+      timeout: 15000
+
+  after_plan:
+    - id: verify-readme-constitution-plan
+      name: "Verificar conformidade README-Constituição (plan)"
+      description: "Valida se README reflete princípios constitucionais atuais após plano"
+      enabled: true
+      mandatory: false
+      command: "bash .specify/scripts/verify-readme-constitution.sh"
+      timeout: 15000
+
+  after_tasks:
+    - id: verify-readme-constitution-tasks
+      name: "Verificar conformidade README-Constituição (tasks)"
+      description: "Valida se README reflete princípios constitucionais atuais após tasks"
+      enabled: true
+      mandatory: false
+      command: "bash .specify/scripts/verify-readme-constitution.sh"
+      timeout: 15000

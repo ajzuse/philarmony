@@ -119,6 +119,16 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - Support for different resolutions and layouts
 - No touch screen differentiation in this phase
 
+### FR-008: Filament Drying Profiles (Material Templates)
+- Built-in default profiles for common filaments: PLA (50°C, 4h, 15% RH), PETG (65°C, 4h, 15% RH), ABS (80°C, 2h, 10% RH), TPU (45°C, 4h, 20% RH), Nylon (70°C, 6h, 10% RH)
+- Each profile defines: target temperature (°C), default duration (minutes), target humidity (% RH), display name (PT-BR/EN-US)
+- User can create, edit, delete custom profiles via WebSocket
+- Profiles stored in NVS (persists across reboots), max 20 custom profiles
+- Start drying command accepts either explicit parameters OR profile ID
+- WebSocket topics: `config/profiles/list`, `config/profiles/get`, `config/profiles/create`, `config/profiles/update`, `config/profiles/delete`, `config/profiles/reset_defaults`
+- Profile validation: temp 30-80°C, duration 1-1440 min, humidity 5-50%
+- Built-in profiles are read-only (cannot be deleted, but can be overridden by custom profile with same ID)
+
 ## Non-Functional Requirements
 
 ### Performance
@@ -172,6 +182,17 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - `driver`: "ssd1306" | "st7789" | "ili9341" | "auto"
 - `fields`: array of field names from status payload
 
+### FilamentProfile
+- `id`: string (builtin: pla, petg, abs, tpu, nylon; custom: user-defined UUID)
+- `name_pt`: string (Portuguese display name)
+- `name_en`: string (English display name)
+- `target_temp_c`: number (30-80)
+- `default_duration_min`: number (1-1440)
+- `target_humidity_pct`: number (5-50)
+- `is_builtin`: boolean (read-only, true for default profiles)
+- `created_at`: timestamp (for custom profiles)
+- `updated_at`: timestamp (for custom profiles)
+
 ### StatusPayload
 - All fields from FR-006
 
@@ -218,7 +239,6 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - Multiple user accounts / authentication
 - Historical data logging / export
 - Scheduler / delayed start
-- Material profiles (PLA, ABS, PETG, etc. presets)
 - Cloud connectivity / MQTT
 
 ## Appendix: WebSocket Message Examples
@@ -238,7 +258,42 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 { "topic": "config/display", "payload": { "enabled": true, "width": 128, "height": 64, "driver": "ssd1306", "fields": ["chamber_temp_c", "humidity_pct", "heater_power_pct", "status"] } }
 ```
 
-### Start Drying
+### List Filament Profiles
+```json
+{ "topic": "config/profiles/list", "payload": {} }
+```
+
+### Get Filament Profile
+```json
+{ "topic": "config/profiles/get", "payload": { "profile_id": "pla" } }
+```
+
+### Create Custom Filament Profile
+```json
+{ "topic": "config/profiles/create", "payload": { "name_pt": "Meu Filamento", "name_en": "My Filament", "target_temp_c": 55, "default_duration_min": 180, "target_humidity_pct": 12 } }
+```
+
+### Update Filament Profile
+```json
+{ "topic": "config/profiles/update", "payload": { "profile_id": "custom-abc123", "target_temp_c": 60, "default_duration_min": 240 } }
+```
+
+### Delete Filament Profile
+```json
+{ "topic": "config/profiles/delete", "payload": { "profile_id": "custom-abc123" } }
+```
+
+### Reset to Built-in Defaults
+```json
+{ "topic": "config/profiles/reset_defaults", "payload": {} }
+```
+
+### Start Drying (with profile)
+```json
+{ "topic": "control/start", "payload": { "profile_id": "pla" } }
+```
+
+### Start Drying (custom parameters)
 ```json
 { "topic": "control/start", "payload": { "target_temp_c": 50, "max_time_min": 120, "target_humidity_pct": 20 } }
 ```
