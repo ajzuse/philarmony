@@ -1,6 +1,4 @@
-# Data Model & State Machine Specification (Generic Architecture)
-
-> **Tooling note (2026-07-28):** The root `Makefile` add-on introduces **no** runtime entities, NVS keys, or state-machine transitions. Developer-facing target contract lives in `contracts/makefile-targets.md`. Sections below remain the firmware data model of record.
+# Data Model & State Machine Specification
 
 ## 1. System State Machine
 
@@ -35,13 +33,13 @@
 ```
 
 ### States
-- `BOOT`: Initial hardware setup, mounting LittleFS, loading NVS config, driver registry init
-- `WIFI_CONNECT`: Attempting connection to stored WiFi SSID
-- `HOTSPOT`: Access Point active (SSID "philarmony", IP 192.168.4.1) serving HTTP config page
-- `READY`: Connected to WiFi, WebSocket server active, hardware drivers initialized, system idle
-- `DRYING`: Active drying session, PID/control loop running, telemetry streaming at 1Hz
-- `STOPPED`: Session ended normally by user or target reached
-- `FAULT_STOPPED`: Emergency stop triggered by safety supervisor. All actuators disabled (0% PWM), system/network/logs operational
+- `BOOT`: Initial hardware setup, mounting LittleFS, loading NVS config.
+- `WIFI_CONNECT`: Attempting connection to stored WiFi SSID.
+- `HOTSPOT`: Access Point active (SSID "philarmony", IP 192.168.4.1) serving HTTP config page.
+- `READY`: Connected to WiFi, WebSocket server active, system idle.
+- `DRYING`: Active drying session, PID heater control running, telemetry streaming at 1Hz.
+- `STOPPED`: Session ended normally by user or target reached.
+- `FAULT_STOPPED`: Emergency stop triggered by safety supervisor. Heater disabled (0% PWM), system/network/logs operational.
 
 ---
 
@@ -63,142 +61,33 @@ Represents an active or completed drying run.
 | `start_timestamp` | uint32 | Epoch or uptime start time | > 0 |
 | `stop_reason` | string | "running" \| "completed" \| "user_stopped" \| "humidity_reached" \| "over_temp" \| "sensor_error" \| "thermal_runaway" | enum |
 
-### 2.2 SensorConfig (Generic)
+### 2.2 SensorConfig
 Configuration for temperature and humidity sensors.
 
 | Field | Type | Description | Example |
 |-------|------|-------------|---------|
-| `id` | string | Unique sensor identifier | "chamber_temp" |
-| `type` | string | Sensor driver key | "sht3x", "dht22", "ds18b20", "ntc", "bme280", "custom" |
-| `capabilities` | array[string] | Measured quantities | ["temperature", "humidity"] |
-| `bus` | object | Bus configuration | see below |
-| `driver_params` | object | Driver-specific parameters | {"resolution": 12} |
-| `calibration` | object | Per-capability calibration | {"temperature_offset": 0.0} |
+| `type` | string | Sensor driver key ("sht31", "dht22", "ds18b20", "ntc_thermistor", "bme280") | "sht31" |
+| `is_integrated` | bool | True if temp & humidity are in same physical IC | true |
+| `i2c_bus` | uint8 | I2C bus number (0 or 1) | 0 |
+| `i2c_address` | uint8 | I2C address in hex | 0x44 |
+| `gpio_pin` | int8 | GPIO pin for 1-Wire, DHT, or ADC sensor (-1 if I2C) | -1 |
+| `sda_pin` | int8 | I2C SDA GPIO | 21 |
+| `scl_pin` | int8 | I2C SCL GPIO | 22 |
 
-#### Bus Configuration Objects
-
-**I2C:**
-```json
-{ "type": "i2c", "bus": 0, "address": 68, "sda_pin": 21, "scl_pin": 22 }
-```
-
-**SPI:**
-```json
-{ "type": "spi", "mosi_pin": 19, "sclk_pin": 18, "cs_pin": 5, "dc_pin": 16 }
-```
-
-**1-Wire:**
-```json
-{ "type": "onewire", "pin": 4 }
-```
-
-**UART:**
-```json
-{ "type": "uart", "rx_pin": 16, "tx_pin": 17, "baudrate": 9600 }
-```
-
-**ADC:**
-```json
-{ "type": "adc", "pin": 34, "attenuation": "11db" }
-```
-
-### 2.3 ActuatorConfig (Generic)
+### 2.3 ActuatorConfig
 Configuration for heater MOSFET and exhaust fan.
 
 | Field | Type | Description | Validation |
 |-------|------|-------------|------------|
-| `id` | string | Unique actuator identifier | "heater", "exhaust_fan" |
-| `type` | string | Driver type | "mosfet_pwm", "ssr", "fan_pwm", "fan_digital", "shared_mosfet", "custom" |
-| `role` | string | Logical role | "heater", "fan", "custom" |
-| `pins` | object | GPIO assignments | {"pwm": 25} |
-| `control` | object | Control algorithm config | see below |
-| `safety_limits` | object | Hardware protection limits | {"max_temp_c": 80} |
+| `heater_pin` | int8 | GPIO pin for Heater MOSFET PWM | Valid ESP32 output GPIO |
+| `heater_pwm_freq` | uint32 | PWM frequency in Hz | 100 to 5000 |
+| `heater_max_power_pct` | uint8 | Soft safety power limit % | 10 to 100 |
+| `fan_mode` | string | "shared_mosfet" \| "independent_pwm" \| "independent_digital" | enum |
+| `fan_pin` | int8 | GPIO pin for Fan MOSFET/PWM | Valid ESP32 output GPIO |
+| `fan_pwm_freq` | uint32 | Fan PWM frequency in Hz | 100 to 25000 |
+| `cooldown_duration_sec`| uint16| Post-heating fan run time in seconds | 0 to 300 |
 
-#### Control Object (Algorithm-Specific)
-
-**PID:**
-```json
-{
-  "algorithm": "pid",
-  "pwm_freq_hz": 1000,
-  "max_power_pct": 100,
-  "parameters": { "kp": 12.5, "ki": 0.45, "kd": 32.1 }
-}
-```
-
-**Bang-Bang (Hysteresis):**
-```json
-{
-  "algorithm": "bang_bang",
-  "parameters": { "hysteresis_c": 1.0 }
-}
-```
-
-**PWM Feedforward:**
-```json
-{
-  "algorithm": "pwm_feedforward",
-  "pwm_freq_hz": 1000,
-  "parameters": { "base_pwm_pct": 50, "temp_coefficient": 2.5 }
-}
-```
-
-### 2.4 DisplayConfig (Generic)
-Configuration for attached display hardware.
-
-| Field | Type | Description | Values / Examples |
-|-------|------|-------------|-------------------|
-| `enabled` | bool | Enable display rendering | true / false |
-| `driver` | string | Display driver key | "ssd1306", "sh1106", "st7789", "ili9341", "st7735", "gc9a01", "ili9488", "hd44780", "nextion", "auto" |
-| `bus_type` | string | Interface bus | "i2c", "spi", "parallel_8bit", "uart" |
-| `width` | uint16 | Horizontal pixel count | 128, 135, 240, 320, 480 |
-| `height` | uint16 | Vertical pixel count | 32, 64, 128, 240, 320 |
-| `rotation` | uint16 | Display orientation | 0, 90, 180, 270 |
-| `spi_mosi` | int8 | SPI MOSI GPIO | 19, 13, 23 |
-| `spi_sclk` | int8 | SPI SCK GPIO | 18, 14 |
-| `spi_cs` | int8 | SPI Chip Select GPIO | 5, 15 |
-| `dc_pin` | int8 | Data/Command GPIO | 16, 2 |
-| `rst_pin` | int8 | Hardware Reset GPIO | 23, -1 |
-| `backlight_pin` | int8 | PWM Backlight GPIO | 4, 21, -1 |
-| `layout` | object | Field selection & scaling | see below |
-
-#### Layout Object
-```json
-{
-  "fields": ["chamber_temp_c", "target_temp_c", "humidity_pct", "heater_power_pct", "status"],
-  "font_scaling": "auto",
-  "compact_mode": false
-}
-```
-
-### 2.5 ControlConfig (Generic)
-Configuration for temperature control algorithm.
-
-| Field | Type | Description | Default |
-|-------|------|-------------|---------|
-| `algorithm` | string | Control algorithm | "pid" |
-| `parameters` | object | Algorithm-specific params | - |
-| `auto_tune` | bool | Enable auto-tune | false |
-| `safety_limits` | object | Integrated safety limits | - |
-
-#### Algorithm Parameters
-
-**PID:**
-```json
-{ "kp": 12.5, "ki": 0.45, "kd": 32.1 }
-```
-
-**Bang-Bang:**
-```json
-{ "hysteresis_c": 1.0 }
-```
-
-**PWM Feedforward:**
-```json
-{ "base_pwm_pct": 50, "temp_coefficient": 2.5 }
-```
-
-### 2.5 FilamentProfile
+### 2.4 FilamentProfile
 Filament preset template.
 
 | Field | Type | Range / Example |
@@ -207,13 +96,11 @@ Filament preset template.
 | `name_pt` | string | "PLA Premium" |
 | `name_en` | string | "PLA Premium" |
 | `target_temp_c` | float | 50.0 |
-| `default_duration_min` | uint16 | 240 |
+| `default_duration_min`| uint16 | 240 |
 | `target_humidity_pct` | float | 15.0 |
 | `is_builtin` | bool | true |
-| `created_at` | uint32 | 0 |
-| `updated_at` | uint32 | 0 |
 
-### 2.6 LogEntry
+### 2.5 LogEntry
 Formatted log entry line written to `system.log` or `drying.log`.
 
 ```text

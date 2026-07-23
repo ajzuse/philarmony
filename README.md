@@ -60,7 +60,7 @@
 
 | # | Spec | Nome | Status | Última Atualização |
 |---|------|------|--------|-------------------|
-| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ✅ Implementado (firmware + Make/CI) | 2026-07-28   |
+| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | 📋 Planejado | 2026-07-23   |
 | 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | 📝 Especificado | 2026-07-23   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | 📝 Especificado | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
@@ -78,14 +78,29 @@
 | Área | Detalhes |
 |------|----------|
 | **WiFi & Conectividade** | Conexão WiFi com fallback automático para Hotspot "philarmony"/"philarmony" (IP fixo 192.168.4.1) com servidor HTTP para configuração |
-| **WebSocket API** | Servidor WebSocket na porta **80** path `/ws` com tópicos: `config/hardware`, `config/display`, `config/control`, `control/start`, `control/stop`, `control/pid_calibrate`, `status/subscribe`, `status/update`, `config/profiles/*`, `logs/stream`, `status/fault` |
-| **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital, algoritmos PID / bang-bang / feedforward, limite segurança configurável (default 80°C) |
-| **Sensores** | SHT3x, DHT22, DS18B20, NTC, BME280, AHT20 (+ custom) via DriverRegistry |
-| **Display** | SSD1306, SH1106, ST7789, ILI9341, ST7735, GC9A01, ILI9488, HD44780, Nextion — layout auto + refresh 1–5 Hz |
+| **WebSocket API** | Servidor WebSocket na porta 8080 com tópicos: `config/sensors`, `config/pins`, `config/display`, `control/start`, `control/stop`, `status/subscribe`, `config/profiles/*` |
+| **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital, PID opcional, limite segurança 80°C hardcoded |
+| **Sensores** | DHT22, DS18B20, BME280 configuráveis via GPIO |
+| **Display** | SSD1306, SH1106 (I2C), ST7789, ILI9341 (SPI) - resolução configurável, campos selecionáveis |
 | **Perfis de Filamento** | 5 built-in (PLA, PETG, ABS, TPU, Nylon) + até 20 customizados em NVS |
 | **Status Streaming** | 1Hz via WebSocket: temp, humidity, heater%, fan%, CPU%, RAM, uptime, elapsed/remaining, session_id |
 | **Segurança** | Watchdog HW, runaway térmico, validação de sensor, feedback de atuador, fan 30s pós-ciclo (COOLDOWN), NVS atômico |
 | **Tooling** | Root `Makefile` (`make build|test|flash`), CI GitHub Actions, Unity `pio test -e native`, docs PT-BR/EN-US |
+
+#### Entidades Principais
+- `DryingCycle` - Ciclo de secagem com stop_reason
+- `SensorConfig` - Tipo e pinagem de sensores
+- `PinConfig` - Mapeamento GPIOs (heater, fan, sensors, I2C, SPI)
+- `DisplayConfig` - Driver, resolução, campos visíveis
+- `FilamentProfile` - id, name_pt/en, target_temp, duration, target_humidity, is_builtin
+
+#### Fora do Escopo (Fase Atual)
+- Touch screen (spec 004)
+- Multi-zona
+- OTA updates
+- Autenticação/usuários
+- MQTT/Cloud
+- Scheduler/agendamento
 
 #### Entidades Principais
 - `DryingCycle` - Ciclo de secagem com stop_reason
@@ -213,11 +228,11 @@
 ├────────────────────────────┼────────────┼────────────────────────┼──────┤
 │ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 4 Specs completas    │ 100% │
 │ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 1/4  │
-│ 3. Firmware Core           │ ✅ CONCLUÍDO │ ESP32 Base + WS + NVS + Make/CI │ 100% │
+│ 3. Firmware Core           │ ⏳ AGUARDANDO │ ESP32 Base + WS + NVS   │ 0%   │
 │ 4. Touch UI                │ ⏳ AGUARDANDO │ LVGL + Touch Driver     │ 0%   │
 │ 5. Desktop Installer       │ ⏳ AGUARDANDO │ Tauri/Flutter + esptool │ 0%   │
 │ 6. Control App (Multi)     │ ⏳ AGUARDANDO │ Flutter + SQLite + WS   │ 0%   │
-│ 7. Integration & Testing   │ ⏳ FUTURO    │ E2E hardware, Release   │ 0%   │
+│ 7. Integration & Testing   │ ⏳ FUTURO    │ E2E, CI/CD, Release     │ 0%   │
 └────────────────────────────┴────────────┴────────────────────────┴──────┘
 ```
 
@@ -233,45 +248,39 @@
 | **NVS/Storage** | NVS (config) + SPIFFS (fonts/assets) | Wear-leveling, atômico, padrão ESP32 |
 | **Desktop Installer** | Tauri (Rust + Web) ou Flutter Desktop | Binário nativo pequeno, esptool.py integrado |
 | **Control App** | Flutter 3.x (Dart) | Single codebase Desktop+Mobile, SQLite, WS |
-| **Build/CI** | GitHub Actions + PlatformIO + GNU Make | `make build` / `make test` / `make flash` (Phase 20 tasks) |
+| **Build/CI** | GitHub Actions + PlatformIO | Matrix build ESP32 variants, artifact upload |
 | **Docs** | Markdown PT-BR/EN-US em `/docs` | GitHub Pages ready, versionado com código |
 
 ---
 
-## 🛠️ Makefile
-
-```bash
-make help
-make build                 # ENV=esp32devkitc (lilygo_tdisplay_v1 | esp32_2432s028)
-make test                  # pio test -e native
-make flash PORT=/dev/cu.usbserial-*   # precisa ESP32; aliases: upload, install
-```
-
-Contrato: `specs/001-filament-dryer-esp32/contracts/makefile-targets.md`.
-
----
-
-## 📁 Estrutura do Repositório
+## 📁 Estrutura do Repositório (Planejada)
 
 ```
 philarmony/
-├── Makefile                     # Façade pio: build / test / flash
-├── platformio.ini
-├── .specify/                    # Spec Kit + constituição + catálogo
-├── .github/workflows/           # firmware-ci (make build + make test)
-├── .vscode/workspace.json
+├── .specify/                    # Spec Kit configuração
+│   ├── memory/constitution.md   # Constituição do projeto
+│   ├── templates/               # Templates spec/plan/tasks
+│   ├── scripts/                 # Scripts de automação (sync-readme, etc.)
+│   └── extensions.yml           # Hooks para sincronização automática
+├── .vscode/
+│   └── workspace.json
 ├── docs/
 │   ├── PT-BR/
-│   └── EN-US/
-├── include/                     # firmware_version.h, timing_contracts.h
-├── src/                         # Firmware C++ (core, drivers, network, control)
-├── test/                        # Unity native (pio test -e native)
-├── specs/
-│   ├── 001-filament-dryer-esp32/   # ✅ implementado
+│   ├── EN-US/
+├── src/
+│   ├── hardware/
+│   ├── software/
+│   └── lib/
+├── tests/
+│   ├── flow/
+│   └── integration/
+├── examples/
+├── specs/                       # Especificações (4 atuais)
+│   ├── 001-filament-dryer-esp32/
 │   ├── 002-esp32-desktop-installer/
 │   ├── 003-filament-dryer-control-app/
 │   └── 004-esp32-touchscreen-ui/
-├── README.md
+├── README.md                    # Este arquivo (auto-sincronizado)
 └── LICENSE
 ```
 
@@ -350,5 +359,5 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 
 ---
 
-*README auto-gerado e sincronizado pela Constituição Philarmony v0.6.0*
-*Última atualização: 2026-07-28 | Trigger: tasks*
+*README auto-gerado e sincronizado pela Constituição Philarmony v0.3.0*
+*Última atualização: 2026-07-23 | Trigger: plan*
