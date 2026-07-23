@@ -1,16 +1,14 @@
 <!-- 
 Sync Impact Report:
-Version change: 0.2.0 → 0.3.0 (MINOR - new principle added)
-Modified principles: None renamed
-Added sections: Principle "Memória Compartilhada de Pesquisa e Conhecimento"
+Version change: 0.3.0 → 0.4.0 (MINOR - explicit commit approval governance rule)
+Modified principles: Git workflow requirements updated
+Added sections: Explicit Commit Approval Rule
 Removed sections: None
 Templates requiring updates: 
-  - .specify/templates/plan-template.md (⚠ pending - add memory catalog reference)
-  - .specify/templates/spec-template.md (⚠ pending - add research data capture)
-  - .specify/templates/tasks-template.md (⚠ pending - add memory persistence tasks)
-Follow-up TODOs: 
-  - TODO(RATIFICATION_DATE): Original adoption date unknown, marked as 2026-07-22
-  - Update plan/spec/tasks templates to reference shared memory catalog
+  - .specify/templates/plan-template.md (✅ aligned)
+  - .specify/templates/spec-template.md (✅ aligned)
+  - .specify/templates/tasks-template.md (✅ aligned)
+Follow-up TODOs: None
 -->
 
 # Philarmony Constitution
@@ -65,9 +63,10 @@ O catálogo deve ser versionado, consultável via query semântica, e sincroniza
 - Version tagging: Semantic versioning with patch for security bugs, minor for features
 
 **Git workflow requirements:**
-- Conventional Commits: All commit messages MUST follow Conventional Commits format (e.g., "feat: add new sensor driver", "fix: handle sensor timeout")
-- Branch strategy: Create new branch (feature/xxx) for each task block before implementation
-- Incremental commits: Make commits between tasks after validation of tests
+- Conventional Commits: All commit messages MUST follow Conventional Commits format with feature scope: `tipo(<feature>): descrição` (ex: `docs(filament-dryer-esp32): Add implementation plan`).
+- Confirmação Explícita de Commit: É PROIBIDO realizar commits automáticos sem a confirmação prévia e explícita do usuário. Após cada ação/etapa, o sistema ou agente DEVE apresentar o resumo das alterações e a mensagem sugerida de commit e aguardar autorização do usuário antes de executar a gravação no Git.
+- Branch strategy: Create new branch (`feature/<nome-do-projeto>`) for each task block before implementation
+- Incremental commits: Make commits between tasks after validation of tests and user explicit authorization
 - Pull Requests: Open PR at end of each task block execution
 
 ## Language Support
@@ -97,5 +96,6 @@ Documentação completa em EN-US para contribuições open-source. Utilizada com
 - Use README.md in docs/ for runtime development guidance
 - **README Sync Rule**: Todo comando speckit que altere specs/plans/tasks DEVE invocar atualização do README.md como passo obrigatório. Falha na sincronização bloqueia merge. Implementação via hook `after_specify`/`after_plan`/`after_tasks` no `.specify/extensions.yml`.
 - **Memory Catalog Sync Rule**: Toda pesquisa, decisão arquitetural, descoberta técnica ou referência validada DEVE ser registrada no catálogo de memória compartilhada. Falha no registro bloqueia merge de PRs que introduzam novo conhecimento.
+- **Commit Approval Rule**: Nenhum commit será efetuado sem aprovação explícita do usuário via prompt interativo no final de cada ação.
 
-**Version**: 0.3.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-23
+**Version**: 0.4.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-23
