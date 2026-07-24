@@ -105,7 +105,17 @@ Configuration for attached display hardware.
 | `rst_pin` | int8 | Hardware Reset GPIO | 23, -1 |
 | `backlight_pin` | int8 | PWM Backlight GPIO | 4, 21, -1 |
 
-### 2.5 FilamentProfile
+### 2.5 PidConfig
+Configuration for PID heater thermal regulation.
+
+| Field | Type | Description | Default / Example |
+|-------|------|-------------|-------------------|
+| `kp` | float | Proportional gain | 12.5 |
+| `ki` | float | Integral gain | 0.45 |
+| `kd` | float | Derivative gain | 32.1 |
+| `calibrated` | bool | True if set by PID Auto-Tune | true / false |
+
+### 2.6 FilamentProfile
 Filament preset template.
 
 | Field | Type | Range / Example |

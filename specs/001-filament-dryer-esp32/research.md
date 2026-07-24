@@ -135,3 +135,19 @@ Any anomaly during operation triggers `FAULT_STOPPED`. The heater MOSFET is **im
 
 3. **WebSocket Log Streaming**:
    - Topic `logs/stream` broadcasts formatted log lines in real-time to connected web clients.
+
+---
+
+## 7. PID Auto-Calibration Routine (PID_CALIBRATE)
+
+### Algorithm & Method
+Inspired by Klipper's `PID_CALIBRATE` command, the firmware implements the **Ziegler-Nichols Relay Auto-Tuning** method:
+- Cycles the heater PWM output between 0% and 100% (or configured `heater_max_power_pct`) around a target calibration temperature (e.g. 50°C).
+- Measures the temperature oscillation period ($T_u$) and peak-to-peak amplitude ($a$).
+- Calculates ultimate gain $K_u = \frac{4d}{\pi \cdot a}$ (where $d$ is PWM drive step).
+- Derives classical PID coefficients:
+  - $K_p = 0.6 \cdot K_u$
+  - $K_i = \frac{2 \cdot K_p}{T_u}$
+  - $K_d = \frac{K_p \cdot T_u}{8}$
+- Automatically stores $K_p, K_i, K_d$ into NVS memory under `heater.pid` namespace for seamless boot persistence.
+

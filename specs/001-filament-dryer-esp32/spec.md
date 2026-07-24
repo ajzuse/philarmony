@@ -12,6 +12,7 @@
 
 ### Session 2026-07-23
 - Q: What is the behavior when target humidity is reached before max time? → A: Option A (Immediately complete cycle, turn off heater, and run fan for 30s cooldown)
+- Q: Should a PID auto-tuning routine (PID_CALIBRATE) be supported? → A: Option A (Implement automated PID Auto-Tune via WebSocket control/pid_calibrate and store calculated Kp, Ki, Kd in NVS)
 
 ## Executive Summary
 
@@ -134,6 +135,13 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - WebSocket topics: `config/profiles/list`, `config/profiles/get`, `config/profiles/create`, `config/profiles/update`, `config/profiles/delete`, `config/profiles/reset_defaults`
 - Profile validation: temp 30-80°C, duration 1-1440 min, humidity 5-50%
 - Built-in profiles are read-only (cannot be deleted, but can be overridden by custom profile with same ID)
+
+### FR-009: Automated PID Calibration Routine (PID_CALIBRATE)
+- WebSocket command `control/pid_calibrate` initiates Ziegler-Nichols thermal auto-tuning cycle for a given target temperature (e.g. 50°C)
+- System cycles heater PWM output to measure thermal inertia, heating rate, and cooling delay
+- Calculates optimal PID coefficients: `Kp` (proportional), `Ki` (integral), `Kd` (derivative)
+- Saves calculated `Kp`, `Ki`, `Kd` values persistently to NVS upon calibration completion
+- Emits real-time calibration progress and final PID parameters via WebSocket topic `status/pid_calibrate`
 
 ## Non-Functional Requirements
 
