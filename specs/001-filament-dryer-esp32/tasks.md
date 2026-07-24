@@ -111,13 +111,25 @@
 
 ---
 
-## Phase 8: Polish & Cross-Cutting Concerns
+## Phase 8: User Story 6 - Automated PID Calibration Routine (Priority: P2)
+
+**Goal**: Implement Ziegler-Nichols PID auto-tuning (`control/pid_calibrate`) to calculate optimal `Kp`, `Ki`, `Kd` for heater surfaces and save persistently in NVS.
+
+**Independent Test**: Send `control/pid_calibrate` via WebSocket -> Heater cycles PWM to measure thermal response -> Calculated PID coefficients streamed on `status/pid_calibrate` and saved to NVS.
+
+- [ ] T031 [P] [US6] Implement PidAutotuneController Ziegler-Nichols calculation engine in src/core/PidAutotuneController.hpp and src/core/PidAutotuneController.cpp
+- [ ] T032 [US6] Implement WebSocket handlers for control/pid_calibrate and status/pid_calibrate progress stream in src/network/WebSocketServer.cpp
+- [ ] T033 [US6] Save calibrated Kp, Ki, Kd coefficients persistently in NVS under heater.pid in src/core/ConfigManager.cpp
+
+---
+
+## Phase 9: Polish & Cross-Cutting Concerns
 
 **Purpose**: Documentation, memory optimization, and quickstart validation.
 
-- [ ] T031 [P] Update firmware documentation and API references in README.md
-- [ ] T032 Perform memory leak profiling and FreeRTOS stack verification
-- [ ] T033 Execute end-to-end quickstart validation scenarios in specs/001-filament-dryer-esp32/quickstart.md
+- [ ] T034 [P] Update firmware documentation and API references in README.md
+- [ ] T035 Perform memory leak profiling and FreeRTOS stack verification
+- [ ] T036 Execute end-to-end quickstart validation scenarios in specs/001-filament-dryer-esp32/quickstart.md
 
 ---
 
@@ -130,7 +142,8 @@
 5. **Phase 5 (US3)** -> Priority P1
 6. **Phase 6 (US4)** -> Priority P2
 7. **Phase 7 (US5)** -> Priority P2
-8. **Phase 8 (Polish)** -> Final
+8. **Phase 8 (US6)** -> Priority P2
+9. **Phase 9 (Polish)** -> Final
 
 ---
 
@@ -140,4 +153,4 @@
 Complete Setup, Foundational, and User Story 1 (WiFi Setup Hotspot) to produce a bootable, configurable hardware node.
 
 ### Incremental Delivery
-Add US2 (Control & Telemetry) -> Add US3 (Safety Engine & Logs) -> Add US4 (Displays) -> Add US5 (Profiles).
+Add US2 (Control & Telemetry) -> Add US3 (Safety Engine & Logs) -> Add US4 (Displays) -> Add US5 (Profiles) -> Add US6 (PID Calibration).

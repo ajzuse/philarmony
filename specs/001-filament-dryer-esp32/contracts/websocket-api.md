@@ -90,6 +90,18 @@
 }
 ```
 
+### 1.6 Start PID Calibration
+**Topic**: `control/pid_calibrate`
+```json
+{
+  "topic": "control/pid_calibrate",
+  "payload": {
+    "target_temp_c": 50.0,
+    "cycles": 5
+  }
+}
+```
+
 ---
 
 ## 2. Server Broadcasts (ESP32 -> Client)
@@ -140,6 +152,24 @@
   "payload": {
     "target_log": "drying",
     "line": "[2026-07-23 14:35:00][INFO][DRYING] Temperature reached target 50.0C. Regulating PWM."
+  }
+}
+```
+
+### 2.4 PID Calibration Progress & Result
+**Topic**: `status/pid_calibrate`
+```json
+{
+  "topic": "status/pid_calibrate",
+  "payload": {
+    "status": "calibrating",
+    "cycle": 3,
+    "total_cycles": 5,
+    "current_temp_c": 51.4,
+    "kp": 14.2,
+    "ki": 0.52,
+    "kd": 36.8,
+    "saved_to_nvs": true
   }
 }
 ```

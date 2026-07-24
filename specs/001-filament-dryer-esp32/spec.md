@@ -12,6 +12,7 @@
 
 ### Session 2026-07-23
 - Q: What is the behavior when target humidity is reached before max time? → A: Option A (Immediately complete cycle, turn off heater, and run fan for 30s cooldown)
+- Q: Should a PID auto-tuning routine (PID_CALIBRATE) be supported? → A: Option A (Implement automated PID Auto-Tune via WebSocket control/pid_calibrate and store calculated Kp, Ki, Kd in NVS)
 
 ## Executive Summary
 
@@ -156,22 +157,6 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - Calculates optimal PID coefficients: `Kp` (proportional), `Ki` (integral), `Kd` (derivative)
 - Saves calculated `Kp`, `Ki`, `Kd` values persistently to NVS upon calibration completion
 - Emits real-time calibration progress and final PID parameters via WebSocket topic `status/pid_calibrate`
-- Works with any heater configuration (MOSFET, SSR, different thermal masses)
-
-### FR-010: Generic Control Algorithm Framework
-- Supports multiple control algorithms: PID, Bang-Bang (hysteresis), PWM with feedforward, custom algorithms
-- Algorithm selected and parameterized via configuration
-- Auto-tune routine works with any algorithm that exposes PID-like parameters
-- Safety engine integrates with all algorithms (hard limits, sensor validation, watchdog)
-
-### FR-011: Safety & Fault Tolerance (Generic)
-- Hardware watchdog timer enabled
-- Configurable safety limits per actuator type
-- Sensor validation: timeout, range, rate-of-change checks
-- Thermal runaway detection (configurable thresholds)
-- I2C/SPI bus lockup detection and recovery
-- Emergency stop: immediate actuator cutoff, system stays online for diagnostics
-- Fault codes: standardized, extensible
 
 ## Non-Functional Requirements
 
