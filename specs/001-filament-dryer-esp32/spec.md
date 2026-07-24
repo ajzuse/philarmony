@@ -12,7 +12,6 @@
 
 ### Session 2026-07-23
 - Q: What is the behavior when target humidity is reached before max time? → A: Option A (Immediately complete cycle, turn off heater, and run fan for 30s cooldown)
-- Q: Should a PID auto-tuning routine (PID_CALIBRATE) be supported? → A: Option A (Implement automated PID Auto-Tune via WebSocket control/pid_calibrate and store calculated Kp, Ki, Kd in NVS)
 
 ## Executive Summary
 
@@ -128,8 +127,7 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - Stop/interrupt command: immediately stops heater and ventilation
 - Automatic stop when: max time reached, target humidity reached, safety temperature exceeded
 - On completion (target humidity or max time reached): immediately turn off heater PWM and run exhaust fan for 30 seconds cooldown before marking status as "stopped"
-- Safety: hard temperature limit (configurable, default 80°C) cuts heater regardless of target
-- Configurable safety limits per heater type
+- Safety: hard temperature limit (e.g., 80°C) cuts heater regardless of target
 
 ### FR-006: Real-time Status Streaming
 - WebSocket topic `status/subscribe` enables per-second JSON updates
