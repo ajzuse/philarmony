@@ -8,6 +8,11 @@
 **Status**: Draft  
 **Date**: 2026-07-23  
 
+## Clarifications
+
+### Session 2026-07-23
+- Q: What is the behavior when target humidity is reached before max time? → A: Option A (Immediately complete cycle, turn off heater, and run fan for 30s cooldown)
+
 ## Executive Summary
 
 Implement the base firmware structure for an open-source DIY filament dryer running on ESP32. The device controls chamber temperature, humidity, drying time, heater, and exhaust ventilation. It provides WiFi connectivity with automatic fallback to a configuration hotspot, a WebSocket API for real-time control and monitoring, optional display support with configurable layouts, and per-second status updates via WebSocket and optional display.
@@ -93,6 +98,7 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - Start command: target temperature (°C), maximum time (minutes), optional target humidity (%)
 - Stop/interrupt command: immediately stops heater and ventilation
 - Automatic stop when: max time reached, target humidity reached, safety temperature exceeded
+- On completion (target humidity or max time reached): immediately turn off heater PWM and run exhaust fan for 30 seconds cooldown before marking status as "stopped"
 - Safety: hard temperature limit (e.g., 80°C) cuts heater regardless of target
 
 ### FR-006: Real-time Status Streaming
