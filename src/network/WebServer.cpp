@@ -1,32 +1,9 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+/**
+ * WebServer - Implementation
  */
-
 #include "WebServer.hpp"
-
-#include "../core/ConfigManager.hpp"
-#include "../core/LogManager.hpp"
-#include "../core/HardwareConfigParser.hpp"
-#include "../core/StateMachine.hpp"
-#include "WifiManager.hpp"
-#include "firmware_version.h"
-#include "../plugins/IPlugin.hpp"
-#include <WiFi.h>
-#include <Esp.h>
+#include "ConfigManager.hpp"
+#include "LogManager.hpp"
 
 namespace filament_dryer {
 
@@ -39,109 +16,64 @@ WebServer::~WebServer() {
     }
 }
 
-bool WebServer::begin(ConfigManager* config_mgr, LogManager* log_mgr,
-                      HardwareConfigParser* hw_parser,
-                      DriverRegistry* driver_registry,
-                      WifiManager* wifi_mgr,
-                      StateMachine* state_machine) {
+bool WebServer::begin(ConfigManager* config_mgr, LogManager* log_mgr) {
     config_mgr_ = config_mgr;
     log_mgr_ = log_mgr;
-    hw_parser_ = hw_parser;
-    driver_registry_ = driver_registry;
-    wifi_mgr_ = wifi_mgr;
-    state_machine_ = state_machine;
-
-    if (!server_) {
-        server_ = new AsyncWebServer(port_);
-        setupRoutes();
-        server_->begin();
-    }
-
+    
+    server_ = new AsyncWebServer(port_);
+    
+    setupRoutes();
+    
+    server_->begin();
+    
+    Serial.printf("[WebServer] Started on port %d\n", port_);
     return true;
 }
 
-void WebServer::attachWebSocket(AsyncWebSocket* ws) {
-    if (server_ && ws) {
-        server_->addHandler(ws);
-    }
-}
-
 void WebServer::setupRoutes() {
-    if (!server_) {
-        return;
-    }
-
-    server_->on("/", HTTP_GET, [this](AsyncWebServerRequest* request) { handleRoot(request); });
-    server_->on("/info", HTTP_GET, [this](AsyncWebServerRequest* request) { handleInfo(request); });
-    server_->on("/api/info", HTTP_GET, [this](AsyncWebServerRequest* request) { handleInfo(request); });
-    server_->on(
-        "/api/wifi/config", HTTP_POST,
-        [this](AsyncWebServerRequest* request) {
-            auto* stored = static_cast<String*>(request->_tempObject);
-            if (stored) {
-                String body = *stored;
-                delete stored;
-                request->_tempObject = nullptr;
-
-                // Prefer form fields when present; otherwise treat body as JSON
-                if (request->hasParam("ssid", true) || request->hasParam("password", true)) {
-                    handleWifiConfigPost(request);
-                } else if (!body.isEmpty()) {
-                    JsonDocument doc;
-                    if (deserializeJson(doc, body) != DeserializationError::Ok) {
-                        sendError(request, 400, "Invalid JSON body");
-                        return;
-                    }
-                    const String ssid = doc["ssid"] | "";
-                    const String password = doc["password"] | "";
-                    handleWifiConfigApply(request, ssid, password);
-                } else {
-                    handleWifiConfigPost(request);
-                }
-                return;
-            }
-            handleWifiConfigPost(request);
-        },
-        nullptr,
-        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
-            if (index == 0) {
-                auto* body = new String();
-                body->reserve(total);
-                request->_tempObject = body;
-            }
-            auto* body = static_cast<String*>(request->_tempObject);
-            if (!body) {
-                return;
-            }
-            for (size_t i = 0; i < len; ++i) {
-                *body += static_cast<char>(data[i]);
-            }
-        });
-    server_->on("/api/hardware/config", HTTP_GET, [this](AsyncWebServerRequest* request) { handleHardwareConfigGet(request); });
-    server_->on(
-        "/api/hardware/config", HTTP_POST,
-        [](AsyncWebServerRequest* request) {},
-        nullptr,
-        [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t, size_t) {
-            String body;
-            body.reserve(len);
-            for (size_t i = 0; i < len; ++i) {
-                body += static_cast<char>(data[i]);
-            }
-            handleHardwareConfigPostBody(request, body);
-        });
-    server_->on("/log/drying", HTTP_GET, [this](AsyncWebServerRequest* request) { handleLogDownload(request, true); });
-    server_->on("/log/system", HTTP_GET, [this](AsyncWebServerRequest* request) { handleLogDownload(request, false); });
-    // Captive portal detection endpoints (Android/iOS/Windows)
-    auto captive = [this](AsyncWebServerRequest* request) { handleCaptivePortal(request); };
-    server_->on("/generate_204", HTTP_GET, captive);
-    server_->on("/gen_204", HTTP_GET, captive);
-    server_->on("/hotspot-detect.html", HTTP_GET, captive);
-    server_->on("/library/test/success.html", HTTP_GET, captive);
-    server_->on("/connecttest.txt", HTTP_GET, captive);
-    server_->on("/ncsi.txt", HTTP_GET, captive);
-    server_->on("/fwlink", HTTP_GET, captive);
-    server_->onNotFound([this](AsyncWebServerRequest* request) { handleNotFound(request); });
+    // Captive portal detection (Android, iOS, Windows)
+    server_->on("/generate_204", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleCaptivePortal(request);
+    });
+    server_->on("/fwlink", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleCaptivePortal(request);
+    });
+    server_->on("/hotspot-detect.html", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleCaptivePortal(request);
+    });
+    server_->on("/ncsi.txt", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleCaptivePortal(request);
+    });
+    server_->on("/connecttest.txt", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleCaptivePortal(request);
+    });
+    
+    // Main routes
+    server_->on("/", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleRoot(request);
+    });
+    
+    server_->on("/info", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleInfo(request);
+    });
+    
+    server_->on("/api/wifi/config", HTTP_POST, [this](AsyncWebServerRequest* request) {
+        handleWifiConfigPost(request);
+    });
+    
+    // Log download endpoints
+    server_->on("/log/drying", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleLogDownload(request, true);
+    });
+    
+    server_->on("/log/system", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleLogDownload(request, false);
+    });
+    
+    // 404 handler
+    server_->onNotFound([this](AsyncWebServerRequest* request) {
+        handleNotFound(request);
+    });
 }
 
 void WebServer::handleCaptivePortal(AsyncWebServerRequest* request) {
@@ -149,376 +81,237 @@ void WebServer::handleCaptivePortal(AsyncWebServerRequest* request) {
 }
 
 void WebServer::handleRoot(AsyncWebServerRequest* request) {
-    request->send(200, "text/html", getConfigPageHTML());
+    request->send(200, "text/html", getCaptivePortalHTML());
 }
 
 void WebServer::handleInfo(AsyncWebServerRequest* request) {
-    JsonDocument doc;
-    doc["firmware_version"] = FIRMWARE_VERSION;
-    doc["firmware_name"] = FIRMWARE_NAME;
-#if defined(ESP_IDF_VERSION)
-    doc["chip_model"] = ESP.getChipModel();
-    doc["mac_address"] = WiFi.macAddress();
-    doc["free_heap_bytes"] = ESP.getFreeHeap();
-#else
-    doc["chip_model"] = "native";
-    doc["mac_address"] = "00:00:00:00:00:00";
-    doc["free_heap_bytes"] = 0;
-#endif
-    if (wifi_mgr_) {
-        if (wifi_mgr_->isConnected()) doc["system_status"] = "ready";
-        else if (wifi_mgr_->isAPActive()) doc["system_status"] = "hotspot";
-        else if (wifi_mgr_->isConnecting()) doc["system_status"] = "connecting";
-        else doc["system_status"] = "boot";
-    } else {
-        doc["system_status"] = "unknown";
+    if (!config_mgr_) {
+        request->send(500, "application/json", "{\"error\":\"Config manager not available\"}");
+        return;
     }
+    
+    StaticJsonDocument<1024> doc;
+    doc["firmware_version"] = FIRMWARE_VERSION;
+    doc["chip_model"] = ESP.getChipModel();
+    doc["chip_revision"] = ESP.getChipRevision();
+    doc["cpu_freq_mhz"] = ESP.getCpuFreqMHz();
+    doc["mac_address"] = WiFi.macAddress();
+    doc["free_heap"] = ESP.getFreeHeap();
+    doc["heap_size"] = ESP.getHeapSize();
+    doc["system_status"] = "ready";
     doc["active_feature"] = "001-filament-dryer-esp32";
+    
     String json;
     serializeJson(doc, json);
-    sendJson(request, 200, json);
+    request->send(200, "application/json", json);
 }
 
 void WebServer::handleWifiConfigPost(AsyncWebServerRequest* request) {
-    String ssid;
-    String password;
+    if (!config_mgr_) {
+        request->send(500, "application/json", "{\"error\":\"Config manager not available\"}");
+        return;
+    }
+    
+    String ssid, password;
+    
     if (request->hasParam("ssid", true)) {
         ssid = request->getParam("ssid", true)->value();
     }
     if (request->hasParam("password", true)) {
         password = request->getParam("password", true)->value();
     }
-    handleWifiConfigApply(request, ssid, password);
-}
-
-void WebServer::handleWifiConfigApply(AsyncWebServerRequest* request, const String& ssid,
-                                      const String& password) {
-    if (!config_mgr_) {
-        sendError(request, 500, "Config manager unavailable");
+    
+    if (ssid.isEmpty()) {
+        request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"SSID vazio\"}");
         return;
     }
-
-    WifiConfig config = config_mgr_->getWifiConfig();
+    
+    ConfigManager::WifiConfig config;
     config.ssid = ssid;
     config.password = password;
-    config.valid = !config.ssid.isEmpty();
-
-    if (!config_mgr_->setWifiConfig(config)) {
-        sendError(request, 500, "Failed to persist WiFi configuration");
-        return;
+    config.valid = true;
+    
+    if (config_mgr_->setWifiConfig(config)) {
+        String json = "{\"status\":\"success\",\"message\":\"Credenciais salvas. Reiniciando conexao...\"}";
+        request->send(200, "application/json", json);
+        
+        // Restart WiFi with new config after short delay
+        // Note: In practice, this would be handled by the WifiManager
+    } else {
+        request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Falha ao salvar\"}");
     }
-
-    if (wifi_mgr_) {
-        wifi_mgr_->setConfig(config);
-    }
-
-    sendJson(request, 200,
-             "{\"status\":\"success\",\"message\":\"Credenciais salvas. Reiniciando conexao...\"}");
 }
 
 void WebServer::handleLogDownload(AsyncWebServerRequest* request, bool drying_log) {
     if (!log_mgr_) {
-        sendError(request, 500, "Log manager unavailable");
+        request->send(500, "application/json", "{\"error\":\"Log manager not available\"}");
         return;
     }
-
-    String body;
-    const bool ok = drying_log ? log_mgr_->getDryingLog(body) : log_mgr_->getSystemLog(body);
+    
+    String log_content;
+    bool ok = drying_log ? log_mgr_->getDryingLog(log_content) : log_mgr_->getSystemLog(log_content);
+    
     if (!ok) {
-        sendError(request, 404, "Log not available");
+        request->send(404, "application/json", "{\"error\":\"Log nao encontrado\"}");
         return;
     }
-
-    const char* filename = drying_log ? "drying.log" : "system.log";
-    AsyncWebServerResponse* response =
-        request->beginResponse(200, "text/plain; charset=utf-8", body);
-    response->addHeader("Content-Disposition",
-                        String("attachment; filename=\"") + filename + "\"");
+    
+    String filename = drying_log ? "drying.log" : "system.log";
+    
+    AsyncWebServerResponse* response = request->beginResponse(
+        "text/plain", 
+        log_content,
+        [filename](AsyncWebServerRequest* req, const String& data) {
+            // Headers are set in the response
+        }
+    );
+    
+    response->addHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+    response->addHeader("Cache-Control", "no-cache");
+    
     request->send(response);
 }
 
-void WebServer::buildKlipperHardwareConfig(JsonObject& root) {
-    const SensorConfig sensor = config_mgr_->getSensorConfig();
-    const ActuatorConfig actuator = config_mgr_->getActuatorConfig();
-    const DisplayConfig display = config_mgr_->getDisplayConfig();
-
-    JsonArray sensors = root["sensors"].to<JsonArray>();
-
-    if (sensor.is_integrated) {
-        JsonObject primary = sensors.add<JsonObject>();
-        primary["id"] = "chamber_temp";
-        primary["type"] = sensor.type;
-        JsonArray caps = primary["capabilities"].to<JsonArray>();
-        caps.add("temperature");
-        caps.add("humidity");
-        JsonObject bus = primary["bus"].to<JsonObject>();
-        if (sensor.gpio_pin >= 0 &&
-            (sensor.type.indexOf("dht") >= 0 || sensor.type.indexOf("ds18") >= 0 ||
-             sensor.type == "ntc" || sensor.type == "thermistor" || sensor.type == "am2302")) {
-            bus["type"] = "onewire";
-            bus["pin"] = sensor.gpio_pin;
-        } else {
-            bus["type"] = "i2c";
-            bus["bus"] = sensor.i2c_bus;
-            bus["address"] = sensor.i2c_address;
-            bus["sda_pin"] = sensor.sda_pin;
-            bus["scl_pin"] = sensor.scl_pin;
-        }
-        JsonObject cal = primary["calibration"].to<JsonObject>();
-        cal["temperature_offset"] = sensor.temperature_offset;
-        cal["temperature_scale"] = sensor.temperature_scale;
-        cal["humidity_offset"] = sensor.humidity_offset;
-        cal["humidity_scale"] = sensor.humidity_scale;
-    } else {
-        JsonObject temp = sensors.add<JsonObject>();
-        temp["id"] = "chamber_temp";
-        temp["type"] = sensor.type;
-        JsonArray temp_caps = temp["capabilities"].to<JsonArray>();
-        temp_caps.add("temperature");
-        JsonObject temp_bus = temp["bus"].to<JsonObject>();
-        if (sensor.gpio_pin >= 0) {
-            temp_bus["type"] = "onewire";
-            temp_bus["pin"] = sensor.gpio_pin;
-        } else {
-            temp_bus["type"] = "i2c";
-            temp_bus["bus"] = sensor.i2c_bus;
-            temp_bus["address"] = sensor.i2c_address;
-            temp_bus["sda_pin"] = sensor.sda_pin;
-            temp_bus["scl_pin"] = sensor.scl_pin;
-        }
-        JsonObject temp_cal = temp["calibration"].to<JsonObject>();
-        temp_cal["temperature_offset"] = sensor.temperature_offset;
-        temp_cal["temperature_scale"] = sensor.temperature_scale;
-
-        if (!sensor.humidity_type.isEmpty()) {
-            JsonObject hum = sensors.add<JsonObject>();
-            hum["id"] = "chamber_humidity";
-            hum["type"] = sensor.humidity_type;
-            JsonArray hum_caps = hum["capabilities"].to<JsonArray>();
-            hum_caps.add("humidity");
-            JsonObject hum_bus = hum["bus"].to<JsonObject>();
-            if (sensor.humidity_gpio_pin >= 0) {
-                hum_bus["type"] = "onewire";
-                hum_bus["pin"] = sensor.humidity_gpio_pin;
-            } else {
-                hum_bus["type"] = "i2c";
-                hum_bus["bus"] = sensor.i2c_bus;
-                hum_bus["address"] = sensor.humidity_i2c_address;
-                hum_bus["sda_pin"] = sensor.humidity_sda_pin;
-                hum_bus["scl_pin"] = sensor.humidity_scl_pin;
-            }
-            JsonObject hum_cal = hum["calibration"].to<JsonObject>();
-            hum_cal["humidity_offset"] = sensor.humidity_offset;
-            hum_cal["humidity_scale"] = sensor.humidity_scale;
-        }
-    }
-
-    if (!sensor.extra_temp_type.isEmpty()) {
-        JsonObject extra = sensors.add<JsonObject>();
-        extra["id"] = "external_temp";
-        extra["type"] = sensor.extra_temp_type;
-        JsonArray caps = extra["capabilities"].to<JsonArray>();
-        caps.add("temperature");
-        JsonObject bus = extra["bus"].to<JsonObject>();
-        if (sensor.extra_temp_gpio_pin >= 0) {
-            bus["type"] = "onewire";
-            bus["pin"] = sensor.extra_temp_gpio_pin;
-        } else {
-            bus["type"] = "i2c";
-            bus["bus"] = sensor.i2c_bus;
-            bus["address"] = sensor.extra_temp_i2c_address;
-            bus["sda_pin"] = sensor.sda_pin;
-            bus["scl_pin"] = sensor.scl_pin;
-        }
-    }
-
-    JsonArray actuators = root["actuators"].to<JsonArray>();
-    {
-        JsonObject heater = actuators.add<JsonObject>();
-        heater["id"] = "heater";
-        heater["type"] = actuator.heater_type;
-        heater["role"] = "heater";
-        JsonObject pins = heater["pins"].to<JsonObject>();
-        pins["pwm"] = actuator.heater_pin;
-        JsonObject control = heater["control"].to<JsonObject>();
-        control["pwm_freq_hz"] = actuator.heater_pwm_freq;
-        control["max_power_pct"] = actuator.heater_max_power_pct;
-        JsonObject safety = heater["safety_limits"].to<JsonObject>();
-        safety["max_power_pct"] = actuator.heater_max_power_pct;
-    }
-    {
-        JsonObject fan = actuators.add<JsonObject>();
-        fan["id"] = "exhaust_fan";
-        fan["type"] = actuator.fan_type;
-        fan["role"] = "fan";
-        JsonObject pins = fan["pins"].to<JsonObject>();
-        pins["pwm"] = actuator.fan_pin;
-        JsonObject control = fan["control"].to<JsonObject>();
-        control["pwm_freq_hz"] = actuator.fan_pwm_freq;
-        control["cooldown_sec"] = actuator.cooldown_duration_sec;
-        JsonObject safety = fan["safety_limits"].to<JsonObject>();
-        safety["max_power_pct"] = 100;
-    }
-    if (actuator.has_custom) {
-        JsonObject custom = actuators.add<JsonObject>();
-        custom["id"] = "custom";
-        custom["type"] = actuator.custom_type;
-        custom["role"] = "custom";
-        JsonObject pins = custom["pins"].to<JsonObject>();
-        pins["gpio"] = actuator.custom_pin;
-    }
-
-    JsonObject display_obj = root["display"].to<JsonObject>();
-    display_obj["enabled"] = display.enabled;
-    display_obj["driver"] = display.driver;
-    JsonObject bus = display_obj["bus"].to<JsonObject>();
-    bus["type"] = display.bus_type;
-    if (display.bus_type == "spi" || display.spi_mosi >= 0) {
-        bus["mosi"] = display.spi_mosi;
-        bus["sclk"] = display.spi_sclk;
-        bus["cs"] = display.spi_cs;
-        bus["dc"] = display.dc_pin;
-        bus["rst"] = display.rst_pin;
-        bus["bl"] = display.backlight_pin;
-    }
-    JsonObject geometry = display_obj["geometry"].to<JsonObject>();
-    geometry["width"] = display.width;
-    geometry["height"] = display.height;
-    geometry["rotation"] = display.rotation;
-    JsonObject layout = display_obj["layout"].to<JsonObject>();
-    JsonArray fields = layout["fields"].to<JsonArray>();
-    for (const auto& field : display.fields) {
-        fields.add(field);
-    }
-    layout["font_scaling"] = "auto";
-    layout["refresh_rate_hz"] = display.refresh_rate_hz;
-
-    root["control"] = config_mgr_->getObjectConfig("control");
-}
-
-void WebServer::handleHardwareConfigGet(AsyncWebServerRequest* request) {
-    if (!config_mgr_) {
-        sendError(request, 500, "Config manager unavailable");
-        return;
-    }
-
-    JsonDocument doc;
-    JsonObject root = doc.to<JsonObject>();
-    buildKlipperHardwareConfig(root);
-
-    String json;
-    serializeJson(doc, json);
-    sendJson(request, 200, json);
-}
-
-void WebServer::handleHardwareConfigPostBody(AsyncWebServerRequest* request, const String& body) {
-    if (!config_mgr_ || !hw_parser_) {
-        sendError(request, 500, "Hardware parser unavailable");
-        return;
-    }
-
-    if (state_machine_ && (state_machine_->isDrying() || state_machine_->isCoolingDown())) {
-        sendError(request, 409, "Cannot reload hardware while drying or cooling down");
-        return;
-    }
-
-    JsonDocument doc;
-    if (deserializeJson(doc, body) != DeserializationError::Ok) {
-        sendError(request, 400, "Invalid JSON body");
-        return;
-    }
-
-    SensorConfig sensor_cfg;
-    ActuatorConfig actuator_cfg;
-    DisplayConfig display_cfg;
-    ControlConfig control_cfg;
-    auto result = hw_parser_->parse(doc.as<JsonObject>(), sensor_cfg, actuator_cfg, display_cfg, control_cfg);
-    if (!result.valid) {
-        sendError(request, 400, result.errors.empty() ? "Validation failed" : result.errors[0]);
-        return;
-    }
-
-    config_mgr_->setSensorConfig(sensor_cfg);
-    config_mgr_->setActuatorConfig(actuator_cfg);
-    config_mgr_->setDisplayConfig(display_cfg);
-    if (doc["control"].is<JsonObject>()) {
-        config_mgr_->setObjectConfig("control", doc["control"].as<JsonObject>());
-    }
-    config_mgr_->save();
-
-    if (hardware_reload_cb_) {
-        hardware_reload_cb_();
-    }
-
-    sendJson(request, 200, "{\"status\":\"saved\"}");
-}
-
 void WebServer::handleNotFound(AsyncWebServerRequest* request) {
-    if (wifi_mgr_ && wifi_mgr_->isAPActive()) {
-        handleCaptivePortal(request);
+    // If captive portal check, redirect to root
+    if (request->url().indexOf("generate_204") >= 0 ||
+        request->url().indexOf("fwlink") >= 0 ||
+        request->url().indexOf("hotspot") >= 0 ||
+        request->url().indexOf("ncsi") >= 0 ||
+        request->url().indexOf("connecttest") >= 0) {
+        request->redirect("/");
         return;
     }
-    if (plugin_mgr_) {
-        JsonDocument paramsDoc;
-        JsonObject params = paramsDoc.to<JsonObject>();
-        String response;
-        if (plugin_mgr_->callHttpRequest(request->url(), params, response)) {
-            request->send(200, "application/json", response);
-            return;
-        }
-    }
-    sendError(request, 404, "Not found");
-}
-
-void WebServer::sendJson(AsyncWebServerRequest* request, int code, const String& json) {
-    request->send(code, "application/json", json);
-}
-
-void WebServer::sendError(AsyncWebServerRequest* request, int code, const String& error) {
-    JsonDocument doc;
-    doc["error"] = error;
-    String json;
-    serializeJson(doc, json);
-    sendJson(request, code, json);
+    
+    request->send(404, "text/plain", "Not found");
 }
 
 const char* WebServer::getCaptivePortalHTML() {
-    return getConfigPageHTML();
-}
-
-const char* WebServer::getConfigPageHTML() {
-    return R"HTML(<!DOCTYPE html>
-<html lang="pt">
+    return R"rawliteral(
+<!DOCTYPE html>
+<html lang="pt-BR">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Philarmony WiFi</title>
-<style>
-body{font-family:system-ui,sans-serif;margin:0;background:#102018;color:#e8f5e9}
-.wrap{max-width:420px;margin:8vh auto;padding:1.5rem}
-h1{font-size:1.8rem;margin:0 0 .25rem}
-.sub{opacity:.8;margin-bottom:1.5rem}
-label{display:block;margin:.75rem 0 .25rem}
-input{width:100%;padding:.65rem;border:1px solid #2e7d32;border-radius:6px;background:#0b1510;color:#fff;box-sizing:border-box}
-button{margin-top:1.25rem;width:100%;padding:.8rem;border:0;border-radius:6px;background:#43a047;color:#fff;font-weight:600}
-.lang{font-size:.85rem;opacity:.7;margin-top:1rem}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filament Dryer - Configuração WiFi</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .container { 
+            background: white; border-radius: 16px; padding: 40px; 
+            max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .logo { text-align: center; margin-bottom: 30px; }
+        .logo svg { width: 80px; height: 80px; }
+        h1 { color: #1e3c72; text-align: center; margin-bottom: 10px; font-size: 24px; }
+        .subtitle { color: #666; text-align: center; margin-bottom: 30px; font-size: 14px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 500; font-size: 14px; }
+        input { 
+            width: 100%; padding: 14px 16px; border: 2px solid #e0e0e0; 
+            border-radius: 8px; font-size: 16px; transition: border-color 0.2s;
+        }
+        input:focus { outline: none; border-color: #1e3c72; }
+        .btn { 
+            width: 100%; padding: 16px; background: #1e3c72; color: white; 
+            border: none; border-radius: 8px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .btn:hover { background: #2a5298; }
+        .btn:disabled { background: #999; cursor: not-allowed; }
+        .info { 
+            background: #f0f4f8; border-radius: 8px; padding: 16px; 
+            margin-top: 20px; font-size: 13px; color: #555;
+        }
+        .info strong { color: #1e3c72; }
+        .spinner { display: none; width: 20px; height: 20px; border: 3px solid #f3f3f3; 
+            border-top: 3px solid #1e3c72; border-radius: 50%; animation: spin 1s linear infinite; 
+            margin: 0 auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .success { display: none; text-align: center; color: #27ae60; }
+    </style>
 </head>
 <body>
-<div class="wrap">
-<h1>Philarmony</h1>
-<p class="sub">Configurar WiFi / Configure WiFi</p>
-<form method="POST" action="/api/wifi/config">
-<label for="ssid">SSID</label>
-<input id="ssid" name="ssid" required maxlength="32" autocomplete="ssid"/>
-<label for="password">Senha / Password</label>
-<input id="password" name="password" type="password" maxlength="64" autocomplete="current-password"/>
-<button type="submit">Salvar e Conectar / Save &amp; Connect</button>
-</form>
-<p class="lang">PT: Informe a rede local. EN: Enter your local network credentials.</p>
-</div>
+    <div class="container">
+        <div class="logo">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" fill="none" stroke="#1e3c72" stroke-width="4"/>
+                <path d="M30 50 Q50 30 70 50 Q50 70 30 50" fill="none" stroke="#1e3c72" stroke-width="3"/>
+                <circle cx="50" cy="50" r="15" fill="#1e3c72"/>
+            </svg>
+        </div>
+        <h1>Filament Dryer ESP32</h1>
+        <p class="subtitle">Configure a conexão WiFi para iniciar</p>
+        
+        <form id="wifiForm">
+            <div class="form-group">
+                <label for="ssid">Nome da Rede (SSID)</label>
+                <input type="text" id="ssid" name="ssid" required autocomplete="off" placeholder="MinhaRedeWiFi">
+            </div>
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" name="password" autocomplete="new-password" placeholder="Senha da rede">
+            </div>
+            <button type="submit" class="btn" id="submitBtn">Conectar</button>
+            <div class="spinner" id="spinner"></div>
+        </form>
+        
+        <div class="success" id="successMsg">
+            ✓ Credenciais salvas! O dispositivo vai reiniciar a conexão...
+        </div>
+        
+        <div class="info">
+            <strong>Informações:</strong>
+            <ul style="margin: 10px 0 0 20px; padding: 0;">
+                <li>AP padrão: <strong>philarmony</strong> / <strong>philarmony</strong></li>
+                <li>IP do AP: <strong>192.168.4.1</strong></li>
+                <li>Após conectar, acesse via WebSocket no IP do dispositivo</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('wifiForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const spinner = document.getElementById('spinner');
+            const success = document.getElementById('successMsg');
+            
+            btn.disabled = true;
+            btn.textContent = '';
+            spinner.style.display = 'block';
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/api/wifi/config', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    spinner.style.display = 'none';
+                    success.style.display = 'block';
+                    btn.style.display = 'none';
+                } else {
+                    throw new Error(result.message || 'Erro desconhecido');
+                }
+            } catch (err) {
+                alert('Erro: ' + err.message);
+                btn.disabled = false;
+                btn.textContent = 'Conectar';
+                spinner.style.display = 'none';
+            }
+        });
+    </script>
 </body>
-</html>)HTML";
+</html>
+)rawliteral";
 }
-
-}  // namespace filament_dryer

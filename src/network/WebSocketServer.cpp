@@ -1,37 +1,15 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+/**
+ * WebSocketServer - Implementation
  */
-
 #include "WebSocketServer.hpp"
-
-#include "../core/ConfigManager.hpp"
-#include "../core/LogManager.hpp"
-#include "../core/PidAutotuneController.hpp"
-#include "../core/StateMachine.hpp"
-#include "../core/ProfileManager.hpp"
-#include "../core/HardwareConfigParser.hpp"
-#include "../control/ControlEngine.hpp"
-#include "../plugins/IPlugin.hpp"
-
-#include <algorithm>
+#include "ConfigManager.hpp"
+#include "StateMachine.hpp"
+#include "SafetyEngine.hpp"
+#include "LogManager.hpp"
 
 namespace filament_dryer {
 
-WebSocketServer::WebSocketServer(uint16_t port, const char* path)
+WebSocketServer::WebSocketServer(uint16_t port, const char* path) 
     : port_(port), path_(path) {}
 
 WebSocketServer::~WebSocketServer() {
@@ -43,29 +21,20 @@ WebSocketServer::~WebSocketServer() {
 
 bool WebSocketServer::begin(ConfigManager* config_mgr, StateMachine* state_machine,
                             SafetyEngine* safety, LogManager* log_mgr,
-                            PidAutotuneController* pid_autotune,
-                            HardwareConfigParser* hw_parser,
-                            DriverRegistry* driver_registry,
-                            ProfileManager* profile_mgr,
-                            ControlEngine* control_engine) {
+                            PidAutotuneController* pid_autotune) {
     config_mgr_ = config_mgr;
     state_machine_ = state_machine;
     safety_ = safety;
     log_mgr_ = log_mgr;
     pid_autotune_ = pid_autotune;
-    hw_parser_ = hw_parser;
-    driver_registry_ = driver_registry;
-    profile_mgr_ = profile_mgr;
-    control_engine_ = control_engine;
-
-    if (!ws_) {
-        ws_ = new AsyncWebSocket(path_);
-        ws_->onEvent([this](AsyncWebSocket* server, AsyncWebSocketClient* client,
-                            AwsEventType type, void* arg, uint8_t* data, size_t len) {
-            onEvent(server, client, type, arg, data, len);
-        });
-    }
-
+    
+    ws_ = new AsyncWebSocket(path_);
+    ws_->onEvent([this](AsyncWebSocket* server, AsyncWebSocketClient* client, 
+                        AwsEventType type, void* arg, uint8_t* data, size_t len) {
+        onEvent(server, client, type, arg, data, len);
+    });
+    
+    Serial.printf("[WebSocketServer] Started on port %d, path %s\n", port_, path_);
     return true;
 }
 
@@ -77,68 +46,42 @@ void WebSocketServer::loop() {
 
 void WebSocketServer::onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
                               AwsEventType type, void* arg, uint8_t* data, size_t len) {
-    (void)server;
-    (void)arg;
-
-    if (!client) {
-        return;
-    }
-
     switch (type) {
-        case WS_EVT_CONNECT: {
-            ClientInfo info;
-            info.id = client->id();
-            clients_.push_back(info);
+        case WS_EVT_CONNECT:
+            Serial.printf("[WebSocketServer] Client #%u connected from %s\n", 
+                          client->id(), client->remoteIP().toString().c_str());
+            clients_.push_back({client->id(), false, false});
             break;
-        }
+            
         case WS_EVT_DISCONNECT:
+            Serial.printf("[WebSocketServer] Client #%u disconnected\n", client->id());
             clients_.erase(
                 std::remove_if(clients_.begin(), clients_.end(),
-                               [client](const ClientInfo& info) { return info.id == client->id(); }),
-                clients_.end());
+                    [client](const ClientInfo& c) { return c.id == client->id(); }),
+                clients_.end()
+            );
             break;
+            
         case WS_EVT_DATA:
-            handleMessage(client, data, len);
+            handleMessage(client, *reinterpret_cast<JsonObject*>(arg));
             break;
-        case WS_EVT_PING:
+            
         case WS_EVT_PONG:
         case WS_EVT_ERROR:
             break;
     }
 }
 
-void WebSocketServer::handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t len) {
-    if (!client || !data || len == 0) {
+void WebSocketServer::handleMessage(AsyncWebSocketClient* client, const JsonObject& doc) {
+    String topic = doc["topic"] | "";
+    JsonObject payload = doc["payload"] | JsonObject();
+    
+    if (topic.isEmpty()) {
+        sendError(client, "error", "Missing topic");
         return;
     }
-
-    String body;
-    body.reserve(len);
-    for (size_t i = 0; i < len; ++i) {
-        body += static_cast<char>(data[i]);
-    }
-
-    JsonDocument doc;
-    if (deserializeJson(doc, body) != DeserializationError::Ok) {
-        return;
-    }
-
-    dispatchTopic(client, doc.as<JsonObject>());
-}
-
-void WebSocketServer::dispatchTopic(AsyncWebSocketClient* client, const JsonObject& doc) {
-    JsonObject payload = doc["payload"].as<JsonObject>();
-    const String topic = doc["topic"] | "";
-
-    if (topic == "status/subscribe") {
-        handleStatusSubscribe(client, payload);
-    } else if (topic == "status/unsubscribe") {
-        handleStatusUnsubscribe(client, payload);
-    } else if (topic == "logs/subscribe") {
-        handleLogsSubscribe(client, payload);
-    } else if (topic == "logs/unsubscribe") {
-        handleLogsUnsubscribe(client, payload);
-    } else if (topic == "control/start") {
+    
+    if (topic == "control/start") {
         handleControlStart(client, payload);
     } else if (topic == "control/stop") {
         handleControlStop(client, payload);
@@ -146,568 +89,374 @@ void WebSocketServer::dispatchTopic(AsyncWebSocketClient* client, const JsonObje
         handleConfigHardware(client, payload);
     } else if (topic == "config/display") {
         handleConfigDisplay(client, payload);
-    } else if (topic == "config/profiles" || topic.startsWith("config/profiles/")) {
-        handleConfigProfiles(client, payload, topic);
-    } else if (topic == "config/control") {
-        handleConfigControl(client, payload);
+    } else if (topic == "config/profiles/create") {
+        handleConfigProfiles(client, payload);
     } else if (topic == "control/pid_calibrate") {
         handlePidCalibrate(client, payload);
-    } else if (plugin_mgr_) {
-        JsonDocument respDoc;
-        JsonObject response = respDoc.to<JsonObject>();
-        if (plugin_mgr_->callWebSocketCommand(topic, payload, response)) {
-            sendResponse(client, topic + "/response", response);
-        } else {
-            sendError(client, topic, "Unknown topic");
-        }
+    } else if (topic == "status/subscribe") {
+        handleStatusSubscribe(client, payload);
+    } else if (topic == "status/unsubscribe") {
+        handleStatusUnsubscribe(client, payload);
+    } else if (topic == "logs/stream/subscribe") {
+        handleLogsSubscribe(client, payload);
+    } else if (topic == "logs/stream/unsubscribe") {
+        handleLogsUnsubscribe(client, payload);
     } else {
-        sendError(client, topic, "Unknown topic");
+        sendError(client, topic, "Unknown topic: " + topic);
     }
 }
 
 void WebSocketServer::handleControlStart(AsyncWebSocketClient* client, const JsonObject& payload) {
-    if (!state_machine_ || !profile_mgr_) {
+    if (!state_machine_ || !safety_) {
         sendError(client, "control/start", "System not ready");
         return;
     }
-
-    if (!state_machine_->isReady() && state_machine_->getState() != SystemState::STOPPED) {
-        sendError(client, "control/start", "Invalid state for start");
-        return;
+    
+    StateMachine::DryingSession session;
+    session.profile_id = payload["profile_id"] | "";
+    session.target_temp_c = payload["target_temp_c"] | 50.0f;
+    session.max_duration_min = payload["max_duration_min"] | 240;
+    session.target_humidity_pct = payload["target_humidity_pct"] | 0.0f;
+    
+    if (state_machine_->startDrying(session)) {
+        JsonObject response = ws_->makeJsonObject();
+        response["status"] = "started";
+        response["session_id"] = session.session_id;
+        sendResponse(client, "control/start/response", response);
+    } else {
+        sendError(client, "control/start", "Failed to start drying cycle");
     }
-
-    DryingSession session;
-    if (!profile_mgr_->buildSessionFromRequest(payload, session)) {
-        sendError(client, "control/start", "Invalid start parameters");
-        return;
-    }
-
-    if (!state_machine_->startDrying(session)) {
-        sendError(client, "control/start", "Failed to start drying session");
-        return;
-    }
-
-    if (log_mgr_) {
-        log_mgr_->logDryingStart(session.profile_id, session.target_temp_c,
-                                 session.max_duration_min, session.target_humidity_pct);
-    }
-
-    JsonDocument response;
-    JsonObject body = response.to<JsonObject>();
-    body["status"] = "started";
-    body["profile_id"] = session.profile_id;
-    sendResponse(client, "control/start", body);
 }
 
 void WebSocketServer::handleControlStop(AsyncWebSocketClient* client, const JsonObject& payload) {
-    (void)payload;
     if (!state_machine_) {
         sendError(client, "control/stop", "System not ready");
         return;
     }
-
-    if (!state_machine_->isDrying() && !state_machine_->isCoolingDown()) {
-        sendError(client, "control/stop", "No active drying session");
-        return;
-    }
-
-    state_machine_->stopDrying(DryingStopReason::USER_STOPPED);
-    if (actuator_cutoff_cb_) {
-        actuator_cutoff_cb_();
-    }
-    if (log_mgr_) {
-        log_mgr_->logDryingStop(DryingStopReason::USER_STOPPED);
-    }
-
-    JsonDocument response;
-    JsonObject body = response.to<JsonObject>();
-    body["status"] = "stopped";
-    sendResponse(client, "control/stop", body);
+    
+    String reason = payload["reason"] | "user_requested";
+    StateMachine::DryingStopReason stop_reason = StateMachine::DryingStopReason::USER_STOPPED;
+    
+    if (reason == "humidity_reached") stop_reason = StateMachine::DryingStopReason::HUMIDITY_REACHED;
+    else if (reason == "max_time") stop_reason = StateMachine::DryingStopReason::MAX_TIME;
+    else if (reason == "over_temp") stop_reason = StateMachine::DryingStopReason::OVER_TEMP;
+    else if (reason == "sensor_error") stop_reason = StateMachine::DryingStopReason::SENSOR_ERROR;
+    
+    state_machine_->stopDrying(stop_reason);
+    
+    JsonObject response = ws_->makeJsonObject();
+    response["status"] = "stopped";
+    response["reason"] = reason;
+    sendResponse(client, "control/stop/response", response);
 }
 
 void WebSocketServer::handleConfigHardware(AsyncWebSocketClient* client, const JsonObject& payload) {
-    if (!config_mgr_ || !hw_parser_) {
-        sendError(client, "config/hardware", "Hardware parser unavailable");
+    if (!config_mgr_) {
+        sendError(client, "config/hardware", "Config manager not available");
         return;
     }
-
-    if (state_machine_ && (state_machine_->isDrying() || state_machine_->isCoolingDown())) {
-        sendError(client, "config/hardware",
-                  "Cannot reload hardware while drying or cooling down");
-        return;
+    
+    // Sensor config
+    if (payload.containsKey("sensor")) {
+        JsonObject sensor = payload["sensor"];
+        ConfigManager::SensorConfig sc = config_mgr_->getSensorConfig();
+        sc.type = sensor["type"] | sc.type;
+        sc.is_integrated = sensor["is_integrated"] | sc.is_integrated;
+        sc.i2c_bus = sensor["i2c_bus"] | sc.i2c_bus;
+        sc.i2c_address = sensor["i2c_address"] | sc.i2c_address;
+        sc.gpio_pin = sensor["gpio_pin"] | sc.gpio_pin;
+        sc.sda_pin = sensor["sda_pin"] | sc.sda_pin;
+        sc.scl_pin = sensor["scl_pin"] | sc.scl_pin;
+        config_mgr_->setSensorConfig(sc);
     }
-
-    SensorConfig sensor_cfg;
-    ActuatorConfig actuator_cfg;
-    DisplayConfig display_cfg;
-    ControlConfig control_cfg;
-    auto result = hw_parser_->parse(payload, sensor_cfg, actuator_cfg, display_cfg, control_cfg);
-    if (!result.valid) {
-        String message = result.errors.empty() ? "Validation failed" : result.errors[0];
-        sendError(client, "config/hardware", message);
-        return;
+    
+    // Actuator config
+    if (payload.containsKey("actuators")) {
+        JsonObject act = payload["actuators"];
+        ConfigManager::ActuatorConfig ac = config_mgr_->getActuatorConfig();
+        ac.heater_pin = act["heater_pin"] | ac.heater_pin;
+        ac.heater_pwm_freq = act["heater_pwm_freq"] | ac.heater_pwm_freq;
+        ac.heater_max_power_pct = act["heater_max_power_pct"] | ac.heater_max_power_pct;
+        ac.fan_mode = act["fan_mode"] | ac.fan_mode;
+        ac.fan_pin = act["fan_pin"] | ac.fan_pin;
+        ac.fan_pwm_freq = act["fan_pwm_freq"] | ac.fan_pwm_freq;
+        ac.cooldown_duration_sec = act["cooldown_duration_sec"] | ac.cooldown_duration_sec;
+        config_mgr_->setActuatorConfig(ac);
     }
-
-    config_mgr_->setSensorConfig(sensor_cfg);
-    config_mgr_->setActuatorConfig(actuator_cfg);
-    config_mgr_->setDisplayConfig(display_cfg);
-    config_mgr_->setObjectConfig("control", payload["control"].as<JsonObject>());
-    config_mgr_->save();
-
-    if (hardware_reload_cb_) {
-        hardware_reload_cb_();
-    }
-
-    JsonDocument response;
-    JsonObject body = response.to<JsonObject>();
-    body["status"] = "saved";
-    sendResponse(client, "config/hardware/response", body);
+    
+    JsonObject response = ws_->makeJsonObject();
+    response["status"] = "saved";
+    sendResponse(client, "config/hardware/response", response);
 }
 
 void WebSocketServer::handleConfigDisplay(AsyncWebSocketClient* client, const JsonObject& payload) {
     if (!config_mgr_) {
-        sendError(client, "config/display", "Config manager unavailable");
+        sendError(client, "config/display", "Config manager not available");
         return;
     }
-
-    DisplayConfig display_cfg = config_mgr_->getDisplayConfig();
-    display_cfg.enabled = payload["enabled"] | display_cfg.enabled;
-    display_cfg.driver = payload["driver"] | display_cfg.driver;
-    display_cfg.bus_type = payload["bus_type"] | display_cfg.bus_type;
-    display_cfg.width = payload["width"] | display_cfg.width;
-    display_cfg.height = payload["height"] | display_cfg.height;
-    display_cfg.rotation = payload["rotation"] | display_cfg.rotation;
-    display_cfg.spi_mosi = payload["spi_mosi"] | display_cfg.spi_mosi;
-    display_cfg.spi_sclk = payload["spi_sclk"] | display_cfg.spi_sclk;
-    display_cfg.spi_cs = payload["spi_cs"] | display_cfg.spi_cs;
-    display_cfg.dc_pin = payload["dc_pin"] | display_cfg.dc_pin;
-    display_cfg.rst_pin = payload["rst_pin"] | display_cfg.rst_pin;
-    display_cfg.backlight_pin = payload["backlight_pin"] | display_cfg.backlight_pin;
-    display_cfg.i2c_sda = payload["i2c_sda"] | payload["sda_pin"] | display_cfg.i2c_sda;
-    display_cfg.i2c_scl = payload["i2c_scl"] | payload["scl_pin"] | display_cfg.i2c_scl;
-    display_cfg.i2c_address = payload["i2c_address"] | payload["address"] | display_cfg.i2c_address;
-
-    if (payload.containsKey("refresh_rate_hz")) {
-        display_cfg.refresh_rate_hz = payload["refresh_rate_hz"] | display_cfg.refresh_rate_hz;
-        if (display_cfg.refresh_rate_hz < 1) display_cfg.refresh_rate_hz = 1;
-        if (display_cfg.refresh_rate_hz > 5) display_cfg.refresh_rate_hz = 5;
-    }
-
-    if (payload.containsKey("fields") && payload["fields"].is<JsonArray>()) {
-        display_cfg.fields.clear();
-        for (JsonVariant v : payload["fields"].as<JsonArray>()) {
-            display_cfg.fields.push_back(v.as<String>());
+    
+    ConfigManager::DisplayConfig dc = config_mgr_->getDisplayConfig();
+    dc.enabled = payload["enabled"] | dc.enabled;
+    dc.driver = payload["driver"] | dc.driver;
+    dc.bus_type = payload["bus_type"] | dc.bus_type;
+    dc.width = payload["width"] | dc.width;
+    dc.height = payload["height"] | dc.height;
+    dc.rotation = payload["rotation"] | dc.rotation;
+    dc.spi_mosi = payload["spi_mosi"] | dc.spi_mosi;
+    dc.spi_sclk = payload["spi_sclk"] | dc.spi_sclk;
+    dc.spi_cs = payload["spi_cs"] | dc.spi_cs;
+    dc.dc_pin = payload["dc_pin"] | dc.dc_pin;
+    dc.rst_pin = payload["rst_pin"] | dc.rst_pin;
+    dc.backlight_pin = payload["backlight_pin"] | dc.backlight_pin;
+    
+    if (payload.containsKey("fields")) {
+        JsonArray arr = payload["fields"];
+        dc.fields.clear();
+        for (JsonVariant v : arr) {
+            dc.fields.push_back(v.as<String>());
         }
     }
-
-    if (payload["layout"].is<JsonObject>()) {
-        JsonObject layout = payload["layout"].as<JsonObject>();
-        if (layout.containsKey("font_scaling")) {
-            display_cfg.font_scaling = layout["font_scaling"].as<String>();
-        }
-        if (layout.containsKey("compact_mode")) {
-            display_cfg.compact_mode = layout["compact_mode"] | display_cfg.compact_mode;
-        }
-        if (layout.containsKey("fields") && layout["fields"].is<JsonArray>()) {
-            display_cfg.fields.clear();
-            for (JsonVariant v : layout["fields"].as<JsonArray>()) {
-                display_cfg.fields.push_back(v.as<String>());
-            }
-        }
-        if (layout.containsKey("refresh_rate_hz")) {
-            display_cfg.refresh_rate_hz = layout["refresh_rate_hz"] | display_cfg.refresh_rate_hz;
-            if (display_cfg.refresh_rate_hz < 1) display_cfg.refresh_rate_hz = 1;
-            if (display_cfg.refresh_rate_hz > 5) display_cfg.refresh_rate_hz = 5;
-        }
-    }
-    if (payload.containsKey("font_scaling")) {
-        display_cfg.font_scaling = payload["font_scaling"].as<String>();
-    }
-    if (payload.containsKey("compact_mode")) {
-        display_cfg.compact_mode = payload["compact_mode"] | display_cfg.compact_mode;
-    }
-
-    config_mgr_->setDisplayConfig(display_cfg);
-    config_mgr_->save();
-
-    if (hardware_reload_cb_) {
-        hardware_reload_cb_();
-    }
-
-    JsonDocument response;
-    JsonObject body = response.to<JsonObject>();
-    body["status"] = "saved";
-    sendResponse(client, "config/display", body);
+    
+    config_mgr_->setDisplayConfig(dc);
+    
+    JsonObject response = ws_->makeJsonObject();
+    response["status"] = "saved";
+    sendResponse(client, "config/display/response", response);
 }
 
-void WebSocketServer::handleConfigProfiles(AsyncWebSocketClient* client, const JsonObject& payload,
-                                           const String& topic) {
-    if (!profile_mgr_) {
-        sendError(client, topic, "Profile manager unavailable");
+void WebSocketServer::handleConfigProfiles(AsyncWebSocketClient* client, const JsonObject& payload) {
+    if (!config_mgr_) {
+        sendError(client, "config/profiles", "Config manager not available");
         return;
     }
-
-    String action = payload["action"] | "";
-    if (topic == "config/profiles/list") action = "list";
-    else if (topic == "config/profiles/get") action = "get";
-    else if (topic == "config/profiles/create") action = "create";
-    else if (topic == "config/profiles/update") action = "update";
-    else if (topic == "config/profiles/delete") action = "delete";
-    else if (topic == "config/profiles/reset_defaults") action = "reset";
-    else if (action.isEmpty()) action = "list";
-
-    const String response_topic = (topic == "config/profiles") ? String("config/profiles")
-                                                               : (topic + "/response");
-
-    JsonDocument response;
-    JsonObject body = response.to<JsonObject>();
-
+    
+    String action = payload["action"] | "list";
+    
     if (action == "list") {
-        JsonArray profiles = body["profiles"].to<JsonArray>();
-        for (const auto& profile : profile_mgr_->listProfiles()) {
-            JsonObject item = profiles.add<JsonObject>();
-            item["id"] = profile.id;
-            item["name_pt"] = profile.name_pt;
-            item["name_en"] = profile.name_en;
-            item["target_temp_c"] = profile.target_temp_c;
-            item["default_duration_min"] = profile.default_duration_min;
-            item["target_humidity_pct"] = profile.target_humidity_pct;
-            item["is_builtin"] = profile.is_builtin;
-            item["created_at"] = profile.created_at;
-            item["updated_at"] = profile.updated_at;
+        auto profiles = config_mgr_->getProfiles();
+        JsonObject response = ws_->makeJsonObject();
+        JsonArray arr = response.createNestedArray("profiles");
+        for (const auto& p : profiles) {
+            JsonObject obj = arr.createNestedObject();
+            obj["id"] = p.id;
+            obj["name_pt"] = p.name_pt;
+            obj["name_en"] = p.name_en;
+            obj["target_temp_c"] = p.target_temp_c;
+            obj["default_duration_min"] = p.default_duration_min;
+            obj["target_humidity_pct"] = p.target_humidity_pct;
+            obj["is_builtin"] = p.is_builtin;
         }
-        sendResponse(client, response_topic, body);
-        return;
+        sendResponse(client, "config/profiles/list/response", response);
     }
-
-    if (action == "get") {
-        const String id = payload["profile_id"] | payload["id"] | "";
-        FilamentProfile profile = profile_mgr_->getProfile(id);
-        if (profile.id.isEmpty()) {
-            sendError(client, topic, "Profile not found");
+    else if (action == "get") {
+        String pid = payload["profile_id"] | "";
+        auto p = config_mgr_->getProfile(pid);
+        if (!p.id.isEmpty()) {
+            JsonObject response = ws_->makeJsonObject();
+            JsonObject obj = response.createNestedObject("profile");
+            obj["id"] = p.id;
+            obj["name_pt"] = p.name_pt;
+            obj["name_en"] = p.name_en;
+            obj["target_temp_c"] = p.target_temp_c;
+            obj["default_duration_min"] = p.default_duration_min;
+            obj["target_humidity_pct"] = p.target_humidity_pct;
+            obj["is_builtin"] = p.is_builtin;
+            sendResponse(client, "config/profiles/get/response", response);
+        } else {
+            sendError(client, "config/profiles/get", "Profile not found");
+        }
+    }
+    else if (action == "create") {
+        ConfigManager::FilamentProfile p;
+        p.id = "custom-" + String(millis());
+        p.name_pt = payload["name_pt"] | "";
+        p.name_en = payload["name_en"] | "";
+        p.target_temp_c = payload["target_temp_c"] | 50.0f;
+        p.default_duration_min = payload["default_duration_min"] | 240;
+        p.target_humidity_pct = payload["target_humidity_pct"] | 15.0f;
+        p.is_builtin = false;
+        p.created_at = millis();
+        p.updated_at = millis();
+        
+        if (config_mgr_->addProfile(p)) {
+            JsonObject response = ws_->makeJsonObject();
+            response["status"] = "created";
+            response["profile_id"] = p.id;
+            sendResponse(client, "config/profiles/create/response", response);
+        } else {
+            sendError(client, "config/profiles/create", "Failed to create profile");
+        }
+    }
+    else if (action == "update") {
+        String pid = payload["profile_id"] | "";
+        ConfigManager::FilamentProfile p = config_mgr_->getProfile(pid);
+        if (p.id.isEmpty() || p.is_builtin) {
+            sendError(client, "config/profiles/update", "Profile not found or read-only");
             return;
         }
-        JsonObject profile_obj = body["profile"].to<JsonObject>();
-        profile_obj["id"] = profile.id;
-        profile_obj["name_pt"] = profile.name_pt;
-        profile_obj["name_en"] = profile.name_en;
-        profile_obj["target_temp_c"] = profile.target_temp_c;
-        profile_obj["default_duration_min"] = profile.default_duration_min;
-        profile_obj["target_humidity_pct"] = profile.target_humidity_pct;
-        profile_obj["is_builtin"] = profile.is_builtin;
-        profile_obj["created_at"] = profile.created_at;
-        profile_obj["updated_at"] = profile.updated_at;
-        sendResponse(client, response_topic, body);
-        return;
-    }
-
-    if (action == "create" || action == "update") {
-        FilamentProfile profile;
-        profile.id = payload["profile_id"] | payload["id"] | "";
-        profile.name_pt = payload["name_pt"] | profile.id;
-        profile.name_en = payload["name_en"] | profile.id;
-        profile.target_temp_c = payload["target_temp_c"] | 50.0f;
-        profile.default_duration_min = payload["default_duration_min"] | 240;
-        profile.target_humidity_pct = payload["target_humidity_pct"] | 15.0f;
-        profile.is_builtin = false;
-        profile.updated_at = millis();
-
-        const bool ok = (action == "create") ? profile_mgr_->createProfile(profile)
-                                             : profile_mgr_->updateProfile(profile);
-        if (!ok) {
-            sendError(client, topic, "Failed to save profile");
-            return;
+        
+        p.name_pt = payload["name_pt"] | p.name_pt;
+        p.name_en = payload["name_en"] | p.name_en;
+        p.target_temp_c = payload["target_temp_c"] | p.target_temp_c;
+        p.default_duration_min = payload["default_duration_min"] | p.default_duration_min;
+        p.target_humidity_pct = payload["target_humidity_pct"] | p.target_humidity_pct;
+        p.updated_at = millis();
+        
+        if (config_mgr_->updateProfile(p)) {
+            JsonObject response = ws_->makeJsonObject();
+            response["status"] = "updated";
+            sendResponse(client, "config/profiles/update/response", response);
+        } else {
+            sendError(client, "config/profiles/update", "Failed to update profile");
         }
-        body["status"] = (action == "create") ? "created" : "updated";
-        body["profile_id"] = profile.id;
-        sendResponse(client, response_topic, body);
-        return;
     }
-
-    if (action == "delete") {
-        const String id = payload["profile_id"] | payload["id"] | "";
-        if (!profile_mgr_->deleteProfile(id)) {
-            sendError(client, topic, "Failed to delete profile");
-            return;
+    else if (action == "delete") {
+        String pid = payload["profile_id"] | "";
+        if (config_mgr_->deleteProfile(pid)) {
+            JsonObject response = ws_->makeJsonObject();
+            response["status"] = "deleted";
+            sendResponse(client, "config/profiles/delete/response", response);
+        } else {
+            sendError(client, "config/profiles/delete", "Failed to delete profile");
         }
-        body["status"] = "deleted";
-        body["id"] = id;
-        sendResponse(client, response_topic, body);
-        return;
     }
-
-    if (action == "reset") {
-        profile_mgr_->resetToDefaults();
-        body["status"] = "reset";
-        sendResponse(client, response_topic, body);
-        return;
+    else if (action == "reset_defaults") {
+        config_mgr_->resetProfilesToDefaults();
+        JsonObject response = ws_->makeJsonObject();
+        response["status"] = "reset";
+        sendResponse(client, "config/profiles/reset/response", response);
     }
-
-    sendError(client, topic, "Unknown action");
-}
-
-void WebSocketServer::handleConfigControl(AsyncWebSocketClient* client, const JsonObject& payload) {
-    if (!config_mgr_ || !control_engine_) {
-        sendError(client, "config/control", "Control engine unavailable");
-        return;
-    }
-
-    const String algorithm = payload["algorithm"] | "pid";
-    JsonObject parameters = payload["parameters"].as<JsonObject>();
-    if (!control_engine_->setAlgorithm(algorithm, parameters)) {
-        sendError(client, "config/control", "Failed to apply control algorithm");
-        return;
-    }
-
-    config_mgr_->setObjectConfig("control", payload);
-    config_mgr_->save();
-
-    if (safety_refresh_cb_) {
-        safety_refresh_cb_();
-    }
-
-    JsonDocument response;
-    JsonObject body = response.to<JsonObject>();
-    body["status"] = "applied";
-    body["algorithm"] = algorithm;
-    sendResponse(client, "config/control", body);
 }
 
 void WebSocketServer::handlePidCalibrate(AsyncWebSocketClient* client, const JsonObject& payload) {
     if (!pid_autotune_) {
-        sendError(client, "control/pid_calibrate", "PID autotune unavailable");
+        sendError(client, "control/pid_calibrate", "PID auto-tune not available");
         return;
     }
-
-    if (pid_autotune_->isRunning()) {
-        sendError(client, "control/pid_calibrate", "Calibration already running");
-        return;
-    }
-
-    PidAutotuneController::Config cfg;
-    cfg.target_temp = payload["target_temp_c"] | 50.0f;
-    cfg.pwm_step = payload["pwm_step"] | 80.0f;
-    cfg.max_cycles = payload["cycles"] | payload["max_cycles"] | 5;
-    cfg.max_temp = payload["max_temp_c"] | 80.0f;
-    cfg.algorithm = payload["algorithm"] | "pid";
-    if (cfg.algorithm != "pid" && cfg.algorithm != "bang_bang" &&
-        cfg.algorithm != "pwm_feedforward") {
-        cfg.algorithm = "pid";
-    }
-
-  const bool started = pid_autotune_->startCalibration(
-        cfg,
-        pid_progress_cb_ ? pid_progress_cb_
-                         : [](int, int, float, float, float, float, bool) {},
-        pid_complete_cb_ ? pid_complete_cb_
-                         : [](const PidAutotuneController::Result&) {});
-
-    if (!started) {
+    
+    float target = payload["target_temp_c"] | 50.0f;
+    int cycles = payload["cycles"] | 5;
+    
+    // Start async PID auto-tune
+    if (pid_autotune_->startCalibration(target, cycles)) {
+        JsonObject response = ws_->makeJsonObject();
+        response["status"] = "started";
+        response["target_temp_c"] = target;
+        response["cycles"] = cycles;
+        sendResponse(client, "control/pid_calibrate/response", response);
+    } else {
         sendError(client, "control/pid_calibrate", "Failed to start calibration");
-        return;
     }
-
-    JsonDocument response;
-    JsonObject body = response.to<JsonObject>();
-    body["status"] = "started";
-    body["algorithm"] = cfg.algorithm;
-    sendResponse(client, "control/pid_calibrate", body);
 }
 
 void WebSocketServer::handleStatusSubscribe(AsyncWebSocketClient* client, const JsonObject& payload) {
-    (void)payload;
-    for (auto& info : clients_) {
-        if (info.id == client->id()) {
-            info.subscribed = true;
-            return;
+    for (auto& c : clients_) {
+        if (c.id == client->id()) {
+            c.subscribed = true;
+            break;
         }
     }
 }
 
 void WebSocketServer::handleStatusUnsubscribe(AsyncWebSocketClient* client, const JsonObject& payload) {
-    (void)payload;
-    for (auto& info : clients_) {
-        if (info.id == client->id()) {
-            info.subscribed = false;
-            return;
+    for (auto& c : clients_) {
+        if (c.id == client->id()) {
+            c.subscribed = false;
+            break;
         }
     }
 }
 
 void WebSocketServer::handleLogsSubscribe(AsyncWebSocketClient* client, const JsonObject& payload) {
-    (void)payload;
-    for (auto& info : clients_) {
-        if (info.id == client->id()) {
-            info.log_subscribed = true;
-            return;
+    for (auto& c : clients_) {
+        if (c.id == client->id()) {
+            c.log_subscribed = true;
+            break;
         }
     }
 }
 
 void WebSocketServer::handleLogsUnsubscribe(AsyncWebSocketClient* client, const JsonObject& payload) {
-    (void)payload;
-    for (auto& info : clients_) {
-        if (info.id == client->id()) {
-            info.log_subscribed = false;
-            return;
+    for (auto& c : clients_) {
+        if (c.id == client->id()) {
+            c.log_subscribed = false;
+            break;
         }
     }
 }
 
 void WebSocketServer::broadcastTelemetry(const JsonObject& telemetry) {
-    if (!ws_) {
-        return;
-    }
-
-    JsonDocument doc;
-    doc["topic"] = "status/update";
-    doc["payload"] = telemetry;
-
+    if (!ws_) return;
+    
     String json;
-    serializeJson(doc, json);
-    for (const auto& info : clients_) {
-        if (!info.subscribed) {
-            continue;
-        }
-        AsyncWebSocketClient* client = ws_->client(info.id);
-        if (client && client->canSend()) {
-            client->text(json.c_str());
+    serializeJson(telemetry, json);
+    
+    for (auto& c : clients_) {
+        if (c.subscribed) {
+            ws_->textAll(json.c_str(), json.length());
         }
     }
 }
 
 void WebSocketServer::broadcastFault(FaultCode fault, const String& message) {
-    if (!ws_) {
-        return;
-    }
-
-    const char* fault_code = "NONE";
-    switch (fault) {
-        case FaultCode::SENSOR_DISCONNECT: fault_code = "SENSOR_DISCONNECT"; break;
-        case FaultCode::OVER_TEMPERATURE: fault_code = "OVER_TEMPERATURE"; break;
-        case FaultCode::THERMAL_RUNAWAY: fault_code = "THERMAL_RUNAWAY"; break;
-        case FaultCode::I2C_BUS_LOCKUP: fault_code = "I2C_BUS_LOCKUP"; break;
-        case FaultCode::SPI_BUS_ERROR: fault_code = "SPI_BUS_ERROR"; break;
-        case FaultCode::ACTUATOR_FAULT: fault_code = "ACTUATOR_FAULT"; break;
-        case FaultCode::SENSOR_RATE_OF_CHANGE: fault_code = "SENSOR_RATE_OF_CHANGE"; break;
-        case FaultCode::NVS_CORRUPT: fault_code = "NVS_CORRUPT"; break;
-        case FaultCode::WATCHDOG_RESET: fault_code = "WATCHDOG_RESET"; break;
-        default: break;
-    }
-
-    JsonDocument doc;
-    doc["topic"] = "status/fault";
-    JsonObject payload = doc["payload"].to<JsonObject>();
-    payload["fault_code"] = fault_code;
-    payload["fault"] = static_cast<int>(fault);
-    payload["message"] = message;
-    payload["action_taken"] = "Actuators cut off. Platform online.";
-    payload["timestamp_sec"] = millis() / 1000UL;
-
+    if (!ws_) return;
+    
+    JsonObject fault_obj = ws_->makeJsonObject();
+    fault_obj["fault_code"] = static_cast<int>(fault);
+    fault_obj["message"] = message;
+    fault_obj["action_taken"] = "Heater MOSFET PWM cut off to 0%. Platform online.";
+    fault_obj["timestamp_sec"] = millis() / 1000;
+    
     String json;
-    serializeJson(doc, json);
-    ws_->textAll(json.c_str());
+    serializeJson(fault_obj, json);
+    ws_->textAll(json.c_str(), json.length());
 }
 
 void WebSocketServer::broadcastLog(const String& line, bool is_drying_log) {
-    if (!ws_) {
-        return;
-    }
-
-    JsonDocument doc;
-    doc["topic"] = "logs/stream";
-    JsonObject payload = doc["payload"].to<JsonObject>();
-    payload["target_log"] = is_drying_log ? "drying" : "system";
-    payload["line"] = line;
-    payload["drying"] = is_drying_log;
-
+    if (!ws_) return;
+    
+    JsonObject log_obj = ws_->makeJsonObject();
+    log_obj["target_log"] = is_drying_log ? "drying" : "system";
+    log_obj["line"] = line;
+    
     String json;
-    serializeJson(doc, json);
-    for (const auto& info : clients_) {
-        if (!info.log_subscribed) {
-            continue;
-        }
-        AsyncWebSocketClient* client = ws_->client(info.id);
-        if (client && client->canSend()) {
-            client->text(json.c_str());
+    serializeJson(log_obj, json);
+    
+    for (auto& c : clients_) {
+        if (c.log_subscribed) {
+            ws_->text(c.id, json.c_str(), json.length());
         }
     }
 }
 
 void WebSocketServer::broadcastPidCalibrate(const JsonObject& progress) {
-    if (!ws_) {
-        return;
-    }
-
-    JsonDocument doc;
-    doc["topic"] = "status/pid_calibrate";
-    doc["payload"] = progress;
-
+    if (!ws_) return;
+    
     String json;
-    serializeJson(doc, json);
-    ws_->textAll(json.c_str());
-}
-
-void WebSocketServer::buildStatusPayload(JsonObject& payload) {
-    if (!state_machine_) {
-        return;
-    }
-
-    const DryingSession& session = state_machine_->getCurrentSession();
-    payload["status"] = state_machine_->getStatusStreamName();
-    payload["target_temp_c"] = session.target_temp_c;
-    payload["target_humidity_pct"] = session.target_humidity_pct;
-    payload["elapsed_time_sec"] = session.elapsed_sec;
-    payload["remaining_time_sec"] = session.remaining_sec;
-    payload["heater_on"] = session.heater_on;
-    payload["heater_power_pct"] = session.heater_power_pct;
-    payload["exhaust_fan_on"] = session.exhaust_fan_on;
-    payload["exhaust_fan_power_pct"] = session.exhaust_fan_power_pct;
-    payload["chamber_temp_c"] = session.current_temp_c;
-    payload["humidity_pct"] = session.current_humidity_pct;
-
-    if (session.session_id > 0) {
-        payload["session_id"] = session.session_id;
-        payload["stop_reason"] = StateMachine::stopReasonToString(session.stop_reason);
-    }
-
-    if (config_mgr_) {
-        const SensorConfig sensor = config_mgr_->getSensorConfig();
-        payload["sensor_type"] = sensor.type;
-        const ActuatorConfig actuator = config_mgr_->getActuatorConfig();
-        payload["heater_type"] = actuator.heater_type;
-        payload["fan_type"] = actuator.fan_type;
-    }
+    serializeJson(progress, json);
+    ws_->textAll(json.c_str(), json.length());
 }
 
 void WebSocketServer::sendResponse(AsyncWebSocketClient* client, const String& topic, const JsonObject& payload) {
-    if (!client || !client->canSend()) {
-        return;
-    }
-
-    JsonDocument doc;
+    if (!client->canSend()) return;
+    
+    StaticJsonDocument<1024> doc;
     doc["topic"] = topic;
     doc["payload"] = payload;
-
+    
     String json;
     serializeJson(doc, json);
-    client->text(json.c_str());
+    client->text(json.c_str(), json.length());
 }
 
 void WebSocketServer::sendError(AsyncWebSocketClient* client, const String& topic, const String& error) {
-    if (!client || !client->canSend()) {
-        return;
-    }
-
-    JsonDocument doc;
+    StaticJsonDocument<512> doc;
     doc["topic"] = topic + "/error";
-    JsonObject payload = doc["payload"].to<JsonObject>();
-    payload["error"] = error;
-    payload["message"] = error;
-
+    doc["payload"]["error"] = error;
+    
     String json;
     serializeJson(doc, json);
-    client->text(json.c_str());
+    client->text(json.c_str(), json.length());
 }
 
-}  // namespace filament_dryer
+} // namespace filament_dryer

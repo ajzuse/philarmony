@@ -1,28 +1,10 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * ST7789 TFT Display Driver (LilyGo T-Display V1.1, TTGO, T-QT)
  * Uses LovyanGFX for hardware-accelerated rendering
  */
 #pragma once
 
-#include "../interfaces/IDriverInterfaces.hpp"
+#include "IDriverInterfaces.hpp"
 #include <LovyanGFX.hpp>
 
 namespace filament_dryer {
@@ -46,7 +28,7 @@ public:
     void wake() override;
 
 private:
-    lgfx::LGFX_Device* display_ = nullptr;
+    LGFX* display_ = nullptr;
     bool initialized_ = false;
     DisplayMetrics metrics_;
     int8_t mosi_pin_ = 19;

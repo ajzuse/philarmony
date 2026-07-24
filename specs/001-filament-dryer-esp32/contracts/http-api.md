@@ -58,3 +58,26 @@ The HTTP server runs on port 80 when connected to WiFi, or on AP mode fixed IP `
   "active_feature": "001-filament-dryer-esp32"
 }
 ```
+
+### 2.3 Hardware Configuration (GET/POST)
+- **Endpoint**: `GET /api/hardware/config`
+- **Response**: Current hardware configuration as JSON (matching WebSocket config/hardware)
+
+- **Endpoint**: `POST /api/hardware/config`
+- **Request Body**: Hardware configuration JSON (same as WebSocket `config/hardware`)
+- **Response**: `{ "status": "saved" }` or `{ "error": "..." }`
+
+---
+
+## 3. Captive Portal Endpoints (AP Mode)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/` | GET | Captive portal HTML (WiFi config) |
+| `/generate_204` | GET | Android captive portal detection |
+| `/fwlink` | GET | Windows captive portal detection |
+| `/hotspot-detect.html` | GET | iOS/macOS captive portal detection |
+| `/ncsi.txt` | GET | Windows NCSI detection |
+| `/connecttest.txt` | GET | Windows connect test |
+
+All redirect to `/` (captive portal).

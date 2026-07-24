@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * ConfigManager - Implementation
  * NVS and JSON Configuration Manager
@@ -23,7 +5,6 @@
  */
 #include "ConfigManager.hpp"
 #include "firmware_version.h"
-#include <Arduino.h>
 
 namespace filament_dryer {
 
@@ -40,6 +21,7 @@ bool ConfigManager::begin() {
     
     initialized_ = prefs_.begin(NVS_NAMESPACE, false);
     if (!initialized_) {
+        Serial.println("[ConfigManager] ERROR: Failed to initialize Preferences");
         return false;
     }
     
@@ -64,7 +46,7 @@ bool ConfigManager::save() {
 }
 
 // WiFi Configuration
-WifiConfig ConfigManager::getWifiConfig() const {
+ConfigManager::WifiConfig ConfigManager::getWifiConfig() const {
     WifiConfig config;
     if (!initialized_) return config;
     
@@ -80,8 +62,8 @@ WifiConfig ConfigManager::getWifiConfig() const {
     return config;
 }
 
-bool ConfigManager::setWifiConfig(const WifiConfig& config) {
-    if (!initialized_) return false;
+void ConfigManager::setWifiConfig(const WifiConfig& config) {
+    if (!initialized_) return;
     
     JsonDocument doc;
     doc["ssid"] = config.ssid;
@@ -89,11 +71,11 @@ bool ConfigManager::setWifiConfig(const WifiConfig& config) {
     
     String json;
     serializeJson(doc, json);
-    return writeString(KEY_WIFI, json);
+    writeString(KEY_WIFI, json);
 }
 
 // Sensor Configuration
-SensorConfig ConfigManager::getSensorConfig() const {
+ConfigManager::SensorConfig ConfigManager::getSensorConfig() const {
     SensorConfig config;
     if (!initialized_) return config;
     
@@ -108,19 +90,6 @@ SensorConfig ConfigManager::getSensorConfig() const {
             config.gpio_pin = doc["gpio_pin"] | -1;
             config.sda_pin = doc["sda_pin"] | 21;
             config.scl_pin = doc["scl_pin"] | 22;
-            config.temperature_offset = doc["temperature_offset"] | 0.0f;
-            config.temperature_scale = doc["temperature_scale"] | 1.0f;
-            config.humidity_offset = doc["humidity_offset"] | 0.0f;
-            config.humidity_scale = doc["humidity_scale"] | 1.0f;
-            config.is_integrated = doc["is_integrated"] | true;
-            config.humidity_type = doc["humidity_type"] | "";
-            config.humidity_i2c_address = doc["humidity_i2c_address"] | 0;
-            config.humidity_gpio_pin = doc["humidity_gpio_pin"] | -1;
-            config.humidity_sda_pin = doc["humidity_sda_pin"] | 21;
-            config.humidity_scl_pin = doc["humidity_scl_pin"] | 22;
-            config.extra_temp_type = doc["extra_temp_type"] | "";
-            config.extra_temp_gpio_pin = doc["extra_temp_gpio_pin"] | -1;
-            config.extra_temp_i2c_address = doc["extra_temp_i2c_address"] | 0;
         }
     }
     return config;
@@ -137,18 +106,6 @@ void ConfigManager::setSensorConfig(const SensorConfig& config) {
     doc["gpio_pin"] = config.gpio_pin;
     doc["sda_pin"] = config.sda_pin;
     doc["scl_pin"] = config.scl_pin;
-    doc["temperature_offset"] = config.temperature_offset;
-    doc["temperature_scale"] = config.temperature_scale;
-    doc["humidity_offset"] = config.humidity_offset;
-    doc["humidity_scale"] = config.humidity_scale;
-    doc["humidity_type"] = config.humidity_type;
-    doc["humidity_i2c_address"] = config.humidity_i2c_address;
-    doc["humidity_gpio_pin"] = config.humidity_gpio_pin;
-    doc["humidity_sda_pin"] = config.humidity_sda_pin;
-    doc["humidity_scl_pin"] = config.humidity_scl_pin;
-    doc["extra_temp_type"] = config.extra_temp_type;
-    doc["extra_temp_gpio_pin"] = config.extra_temp_gpio_pin;
-    doc["extra_temp_i2c_address"] = config.extra_temp_i2c_address;
     
     String json;
     serializeJson(doc, json);
@@ -156,7 +113,7 @@ void ConfigManager::setSensorConfig(const SensorConfig& config) {
 }
 
 // Actuator Configuration
-ActuatorConfig ConfigManager::getActuatorConfig() const {
+ConfigManager::ActuatorConfig ConfigManager::getActuatorConfig() const {
     ActuatorConfig config;
     if (!initialized_) return config;
     
@@ -164,33 +121,13 @@ ActuatorConfig ConfigManager::getActuatorConfig() const {
     if (prefs_.getString(KEY_ACTUATOR, json)) {
         JsonDocument doc;
         if (deserializeJson(doc, json) == DeserializationError::Ok) {
-            config.heater_type = doc["heater_type"] | "mosfet_pwm";
             config.heater_pin = doc["heater_pin"] | 25;
             config.heater_pwm_freq = doc["heater_pwm_freq"] | 1000;
             config.heater_max_power_pct = doc["heater_max_power_pct"] | 100;
-            config.heater_max_temp_c = doc["heater_max_temp_c"] | 0.0f;
-            config.fan_type = doc["fan_type"] | "fan_pwm";
             config.fan_mode = doc["fan_mode"] | "independent_pwm";
             config.fan_pin = doc["fan_pin"] | 26;
             config.fan_pwm_freq = doc["fan_pwm_freq"] | 5000;
-            config.fan_duty_pct = doc["fan_duty_pct"] | 80.0f;
             config.cooldown_duration_sec = doc["cooldown_duration_sec"] | 30;
-            config.has_custom = doc["has_custom"] | false;
-            config.custom_type = doc["custom_type"] | "";
-            config.custom_pin = doc["custom_pin"] | -1;
-            config.fan_speed_curve.clear();
-            if (doc["fan_speed_curve"].is<JsonArray>()) {
-                for (JsonVariant v : doc["fan_speed_curve"].as<JsonArray>()) {
-                    FanCurvePoint pt;
-                    if (v.is<JsonObject>()) {
-                        pt.temp_c = v["temp_c"] | 0.0f;
-                        pt.power_pct = v["power_pct"] | 80.0f;
-                    } else {
-                        pt.power_pct = v.as<float>();
-                    }
-                    config.fan_speed_curve.push_back(pt);
-                }
-            }
         }
     }
     return config;
@@ -200,26 +137,13 @@ void ConfigManager::setActuatorConfig(const ActuatorConfig& config) {
     if (!initialized_) return;
     
     JsonDocument doc;
-    doc["heater_type"] = config.heater_type;
     doc["heater_pin"] = config.heater_pin;
     doc["heater_pwm_freq"] = config.heater_pwm_freq;
     doc["heater_max_power_pct"] = config.heater_max_power_pct;
-    doc["heater_max_temp_c"] = config.heater_max_temp_c;
-    doc["fan_type"] = config.fan_type;
     doc["fan_mode"] = config.fan_mode;
     doc["fan_pin"] = config.fan_pin;
     doc["fan_pwm_freq"] = config.fan_pwm_freq;
-    doc["fan_duty_pct"] = config.fan_duty_pct;
     doc["cooldown_duration_sec"] = config.cooldown_duration_sec;
-    doc["has_custom"] = config.has_custom;
-    doc["custom_type"] = config.custom_type;
-    doc["custom_pin"] = config.custom_pin;
-    JsonArray curve = doc["fan_speed_curve"].to<JsonArray>();
-    for (const auto& pt : config.fan_speed_curve) {
-        JsonObject obj = curve.add<JsonObject>();
-        obj["temp_c"] = pt.temp_c;
-        obj["power_pct"] = pt.power_pct;
-    }
     
     String json;
     serializeJson(doc, json);
@@ -227,7 +151,7 @@ void ConfigManager::setActuatorConfig(const ActuatorConfig& config) {
 }
 
 // Display Configuration
-DisplayConfig ConfigManager::getDisplayConfig() const {
+ConfigManager::DisplayConfig ConfigManager::getDisplayConfig() const {
     DisplayConfig config;
     if (!initialized_) return config;
     
@@ -247,14 +171,6 @@ DisplayConfig ConfigManager::getDisplayConfig() const {
             config.dc_pin = doc["dc_pin"] | -1;
             config.rst_pin = doc["rst_pin"] | -1;
             config.backlight_pin = doc["backlight_pin"] | -1;
-            config.i2c_sda = doc["i2c_sda"] | 21;
-            config.i2c_scl = doc["i2c_scl"] | 22;
-            config.i2c_address = doc["i2c_address"] | 0x3C;
-            config.refresh_rate_hz = doc["refresh_rate_hz"] | 1;
-            if (config.refresh_rate_hz < 1) config.refresh_rate_hz = 1;
-            if (config.refresh_rate_hz > 5) config.refresh_rate_hz = 5;
-            config.font_scaling = doc["font_scaling"] | "auto";
-            config.compact_mode = doc["compact_mode"] | false;
             
             JsonArray fields = doc["fields"];
             config.fields.clear();
@@ -282,12 +198,6 @@ void ConfigManager::setDisplayConfig(const DisplayConfig& config) {
     doc["dc_pin"] = config.dc_pin;
     doc["rst_pin"] = config.rst_pin;
     doc["backlight_pin"] = config.backlight_pin;
-    doc["i2c_sda"] = config.i2c_sda;
-    doc["i2c_scl"] = config.i2c_scl;
-    doc["i2c_address"] = config.i2c_address;
-    doc["refresh_rate_hz"] = config.refresh_rate_hz;
-    doc["font_scaling"] = config.font_scaling;
-    doc["compact_mode"] = config.compact_mode;
     
     JsonArray fields = doc["fields"].to<JsonArray>();
     for (const String& field : config.fields) {
@@ -300,7 +210,7 @@ void ConfigManager::setDisplayConfig(const DisplayConfig& config) {
 }
 
 // PID Configuration
-PidConfig ConfigManager::getPidConfig() const {
+ConfigManager::PidConfig ConfigManager::getPidConfig() const {
     PidConfig config;
     if (!initialized_) return config;
     
@@ -317,8 +227,8 @@ PidConfig ConfigManager::getPidConfig() const {
     return config;
 }
 
-bool ConfigManager::setPidConfig(const PidConfig& config) {
-    if (!initialized_) return false;
+void ConfigManager::setPidConfig(const PidConfig& config) {
+    if (!initialized_) return;
     
     JsonDocument doc;
     doc["kp"] = config.kp;
@@ -328,11 +238,11 @@ bool ConfigManager::setPidConfig(const PidConfig& config) {
     
     String json;
     serializeJson(doc, json);
-    return writeString(KEY_PID, json);
+    writeString(KEY_PID, json);
 }
 
 // Filament Profiles
-std::vector<FilamentProfile> ConfigManager::getProfiles() const {
+std::vector<ConfigManager::FilamentProfile> ConfigManager::getProfiles() const {
     std::vector<FilamentProfile> profiles;
     if (!initialized_) return profiles;
     
@@ -366,96 +276,41 @@ std::vector<FilamentProfile> ConfigManager::getProfiles() const {
     return profiles;
 }
 
-FilamentProfile ConfigManager::getProfile(const String& profile_id) const {
+ConfigManager::FilamentProfile ConfigManager::getProfile(const String& profile_id) const {
     FilamentProfile empty;
-    FilamentProfile builtin_match;
     auto profiles = getProfiles();
     for (const auto& p : profiles) {
-        if (p.id != profile_id) continue;
-        if (!p.is_builtin) {
-            return p;  // custom override wins
-        }
-        builtin_match = p;
+        if (p.id == profile_id) return p;
     }
-    return builtin_match.id.isEmpty() ? empty : builtin_match;
+    return empty;
 }
 
 bool ConfigManager::addProfile(const FilamentProfile& profile) {
     auto profiles = getProfiles();
-
-    if (!validateProfileParams(profile.target_temp_c, profile.default_duration_min,
-                               profile.target_humidity_pct)) {
-        return false;
-    }
-
-    bool has_builtin = false;
+    
+    // Check for duplicate ID
     for (const auto& p : profiles) {
-        if (p.id == profile.id) {
-            if (p.is_builtin) {
-                has_builtin = true;
-            } else {
-                return false;  // custom already exists — use update
-            }
-        }
+        if (p.id == profile.id) return false;
     }
-
-    // Shadowing a builtin is allowed (custom override with same ID)
-    if (!has_builtin) {
-        for (const auto& p : profiles) {
-            if (p.id == profile.id) return false;
-        }
-    }
-
-    size_t custom_count = 0;
-    for (const auto& p : profiles) {
-        if (!p.is_builtin) ++custom_count;
-    }
-    if (custom_count >= kMaxCustomProfiles) {
-        return false;
-    }
-
-    FilamentProfile to_save = profile;
-    to_save.is_builtin = false;
-    to_save.created_at = millis();
-    to_save.updated_at = to_save.created_at;
-    profiles.push_back(to_save);
+    
+    profiles.push_back(profile);
     return saveProfiles(profiles);
 }
 
 bool ConfigManager::updateProfile(const FilamentProfile& profile) {
     auto profiles = getProfiles();
-
-    if (!validateProfileParams(profile.target_temp_c, profile.default_duration_min,
-                               profile.target_humidity_pct)) {
-        return false;
-    }
-
-    // Update existing custom entry
+    
     for (auto& p : profiles) {
-        if (p.id == profile.id && !p.is_builtin) {
+        if (p.id == profile.id) {
+            // Don't allow modifying builtin profiles
+            if (p.is_builtin) return false;
+            
             p.name_pt = profile.name_pt;
             p.name_en = profile.name_en;
             p.target_temp_c = profile.target_temp_c;
             p.default_duration_min = profile.default_duration_min;
             p.target_humidity_pct = profile.target_humidity_pct;
             p.updated_at = millis();
-            return saveProfiles(profiles);
-        }
-    }
-
-    // Builtin ID with no custom yet → create override
-    for (const auto& p : profiles) {
-        if (p.id == profile.id && p.is_builtin) {
-            FilamentProfile override_profile = profile;
-            override_profile.is_builtin = false;
-            override_profile.created_at = millis();
-            override_profile.updated_at = override_profile.created_at;
-            size_t custom_count = 0;
-            for (const auto& existing : profiles) {
-                if (!existing.is_builtin) ++custom_count;
-            }
-            if (custom_count >= kMaxCustomProfiles) return false;
-            profiles.push_back(override_profile);
             return saveProfiles(profiles);
         }
     }
@@ -504,63 +359,14 @@ bool ConfigManager::saveProfiles(const std::vector<FilamentProfile>& profiles) {
     return writeString(KEY_PROFILES, json);
 }
 
-std::vector<FilamentProfile> ConfigManager::getDefaultProfiles() {
+std::vector<ConfigManager::FilamentProfile> ConfigManager::getDefaultProfiles() {
     std::vector<FilamentProfile> profiles;
     
-    FilamentProfile pla;
-    pla.id = "pla";
-    pla.name_pt = "PLA";
-    pla.name_en = "PLA";
-    pla.target_temp_c = 50.0f;
-    pla.default_duration_min = 240;
-    pla.target_humidity_pct = 15.0f;
-    pla.is_builtin = true;
-    pla.created_at = 0;
-    pla.updated_at = 0;
-
-    FilamentProfile petg;
-    petg.id = "petg";
-    petg.name_pt = "PETG";
-    petg.name_en = "PETG";
-    petg.target_temp_c = 65.0f;
-    petg.default_duration_min = 240;
-    petg.target_humidity_pct = 15.0f;
-    petg.is_builtin = true;
-    petg.created_at = 0;
-    petg.updated_at = 0;
-
-    FilamentProfile abs;
-    abs.id = "abs";
-    abs.name_pt = "ABS";
-    abs.name_en = "ABS";
-    abs.target_temp_c = 80.0f;
-    abs.default_duration_min = 120;
-    abs.target_humidity_pct = 10.0f;
-    abs.is_builtin = true;
-    abs.created_at = 0;
-    abs.updated_at = 0;
-
-    FilamentProfile tpu;
-    tpu.id = "tpu";
-    tpu.name_pt = "TPU";
-    tpu.name_en = "TPU";
-    tpu.target_temp_c = 45.0f;
-    tpu.default_duration_min = 240;
-    tpu.target_humidity_pct = 20.0f;
-    tpu.is_builtin = true;
-    tpu.created_at = 0;
-    tpu.updated_at = 0;
-
-    FilamentProfile nylon;
-    nylon.id = "nylon";
-    nylon.name_pt = "Nylon";
-    nylon.name_en = "Nylon";
-    nylon.target_temp_c = 70.0f;
-    nylon.default_duration_min = 360;
-    nylon.target_humidity_pct = 10.0f;
-    nylon.is_builtin = true;
-    nylon.created_at = 0;
-    nylon.updated_at = 0;
+    FilamentProfile pla = {"pla", "PLA", "PLA", 50.0f, 240, 15.0f, true, 0, 0};
+    FilamentProfile petg = {"petg", "PETG", "PETG", 65.0f, 240, 15.0f, true, 0, 0};
+    FilamentProfile abs = {"abs", "ABS", "ABS", 80.0f, 120, 10.0f, true, 0, 0};
+    FilamentProfile tpu = {"tpu", "TPU", "TPU", 45.0f, 240, 20.0f, true, 0, 0};
+    FilamentProfile nylon = {"nylon", "Nylon", "Nylon", 70.0f, 360, 10.0f, true, 0, 0};
     
     profiles.push_back(pla);
     profiles.push_back(petg);
@@ -599,7 +405,7 @@ bool ConfigManager::setObjectConfig(const String& object_name, const JsonObject&
     return writeString(key.c_str(), json);
 }
 
-JsonObject ConfigManager::getObjectConfig(const String& object_name) {
+JsonObject ConfigManager::getObjectConfig(const String& object_name) const {
     JsonDocument doc;
     if (!initialized_) return doc.as<JsonObject>();
     
@@ -626,80 +432,13 @@ void ConfigManager::factoryReset() {
 String ConfigManager::toJson() const {
     JsonDocument doc;
     
-    // WiFi
-    JsonObject wifi_obj = doc.createNestedObject("wifi");
-    WifiConfig wifi = getWifiConfig();
-    wifi_obj["ssid"] = wifi.ssid;
-    wifi_obj["password"] = wifi.password;
-    wifi_obj["valid"] = wifi.valid;
+    doc["wifi"] = getWifiConfig();
+    doc["sensor"] = getSensorConfig();
+    doc["actuator"] = getActuatorConfig();
+    doc["display"] = getDisplayConfig();
+    doc["pid"] = getPidConfig();
     
-    // Sensor
-    JsonObject sensor_obj = doc.createNestedObject("sensor");
-    SensorConfig sensor = getSensorConfig();
-    sensor_obj["type"] = sensor.type;
-    sensor_obj["is_integrated"] = sensor.is_integrated;
-    sensor_obj["i2c_bus"] = sensor.i2c_bus;
-    sensor_obj["i2c_address"] = sensor.i2c_address;
-    sensor_obj["gpio_pin"] = sensor.gpio_pin;
-    sensor_obj["sda_pin"] = sensor.sda_pin;
-    sensor_obj["scl_pin"] = sensor.scl_pin;
-    
-    // Actuator
-    JsonObject actuator_obj = doc.createNestedObject("actuator");
-    ActuatorConfig actuator = getActuatorConfig();
-    actuator_obj["heater_type"] = actuator.heater_type;
-    actuator_obj["heater_pin"] = actuator.heater_pin;
-    actuator_obj["heater_pwm_freq"] = actuator.heater_pwm_freq;
-    actuator_obj["heater_max_power_pct"] = actuator.heater_max_power_pct;
-    actuator_obj["heater_max_temp_c"] = actuator.heater_max_temp_c;
-    actuator_obj["fan_type"] = actuator.fan_type;
-    actuator_obj["fan_mode"] = actuator.fan_mode;
-    actuator_obj["fan_pin"] = actuator.fan_pin;
-    actuator_obj["fan_pwm_freq"] = actuator.fan_pwm_freq;
-    actuator_obj["fan_duty_pct"] = actuator.fan_duty_pct;
-    actuator_obj["cooldown_duration_sec"] = actuator.cooldown_duration_sec;
-    JsonArray curve_arr = actuator_obj.createNestedArray("fan_speed_curve");
-    for (const auto& pt : actuator.fan_speed_curve) {
-        JsonObject obj = curve_arr.add<JsonObject>();
-        obj["temp_c"] = pt.temp_c;
-        obj["power_pct"] = pt.power_pct;
-    }
-    
-    // Display
-    JsonObject display_obj = doc.createNestedObject("display");
-    DisplayConfig display = getDisplayConfig();
-    display_obj["enabled"] = display.enabled;
-    display_obj["driver"] = display.driver;
-    display_obj["bus_type"] = display.bus_type;
-    display_obj["width"] = display.width;
-    display_obj["height"] = display.height;
-    display_obj["rotation"] = display.rotation;
-    display_obj["spi_mosi"] = display.spi_mosi;
-    display_obj["spi_sclk"] = display.spi_sclk;
-    display_obj["spi_cs"] = display.spi_cs;
-    display_obj["dc_pin"] = display.dc_pin;
-    display_obj["rst_pin"] = display.rst_pin;
-    display_obj["backlight_pin"] = display.backlight_pin;
-    display_obj["i2c_sda"] = display.i2c_sda;
-    display_obj["i2c_scl"] = display.i2c_scl;
-    display_obj["i2c_address"] = display.i2c_address;
-    display_obj["font_scaling"] = display.font_scaling;
-    display_obj["compact_mode"] = display.compact_mode;
-    
-    JsonArray fields_arr = display_obj.createNestedArray("fields");
-    for (const String& f : display.fields) {
-        fields_arr.add(f);
-    }
-    
-    // PID
-    JsonObject pid_obj = doc.createNestedObject("pid");
-    PidConfig pid = getPidConfig();
-    pid_obj["kp"] = pid.kp;
-    pid_obj["ki"] = pid.ki;
-    pid_obj["kd"] = pid.kd;
-    pid_obj["calibrated"] = pid.calibrated;
-    
-    JsonArray profiles_arr = doc.createNestedArray("profiles");
+    JsonArray profiles_arr = doc["profiles"].to<JsonArray>();
     for (const auto& p : getProfiles()) {
         JsonObject obj = profiles_arr.add<JsonObject>();
         obj["id"] = p.id;
@@ -713,7 +452,7 @@ String ConfigManager::toJson() const {
         obj["updated_at"] = p.updated_at;
     }
     
-    JsonArray objects_arr = doc.createNestedArray("objects");
+    JsonArray objects_arr = doc["objects"].to<JsonArray>();
     for (const String& obj : listObjectConfigs()) {
         objects_arr.add(obj);
     }
@@ -757,30 +496,13 @@ bool ConfigManager::fromJson(const String& json) {
     if (doc["actuator"].is<JsonObject>()) {
         JsonObject actuatorObj = doc["actuator"].as<JsonObject>();
         ActuatorConfig actuator;
-        actuator.heater_type = actuatorObj["heater_type"] | "mosfet_pwm";
         actuator.heater_pin = actuatorObj["heater_pin"] | 25;
         actuator.heater_pwm_freq = actuatorObj["heater_pwm_freq"] | 1000;
         actuator.heater_max_power_pct = actuatorObj["heater_max_power_pct"] | 100;
-        actuator.heater_max_temp_c = actuatorObj["heater_max_temp_c"] | 0.0f;
-        actuator.fan_type = actuatorObj["fan_type"] | "fan_pwm";
         actuator.fan_mode = actuatorObj["fan_mode"] | "independent_pwm";
         actuator.fan_pin = actuatorObj["fan_pin"] | 26;
         actuator.fan_pwm_freq = actuatorObj["fan_pwm_freq"] | 5000;
-        actuator.fan_duty_pct = actuatorObj["fan_duty_pct"] | 80.0f;
         actuator.cooldown_duration_sec = actuatorObj["cooldown_duration_sec"] | 30;
-        actuator.fan_speed_curve.clear();
-        if (actuatorObj["fan_speed_curve"].is<JsonArray>()) {
-            for (JsonVariant v : actuatorObj["fan_speed_curve"].as<JsonArray>()) {
-                FanCurvePoint pt;
-                if (v.is<JsonObject>()) {
-                    pt.temp_c = v["temp_c"] | 0.0f;
-                    pt.power_pct = v["power_pct"] | 80.0f;
-                } else {
-                    pt.power_pct = v.as<float>();
-                }
-                actuator.fan_speed_curve.push_back(pt);
-            }
-        }
         setActuatorConfig(actuator);
     }
     
@@ -800,12 +522,6 @@ bool ConfigManager::fromJson(const String& json) {
         display.dc_pin = displayObj["dc_pin"] | -1;
         display.rst_pin = displayObj["rst_pin"] | -1;
         display.backlight_pin = displayObj["backlight_pin"] | -1;
-        display.i2c_sda = displayObj["i2c_sda"] | 21;
-        display.i2c_scl = displayObj["i2c_scl"] | 22;
-        display.i2c_address = displayObj["i2c_address"] | 0x3C;
-        display.refresh_rate_hz = displayObj["refresh_rate_hz"] | 1;
-        display.font_scaling = displayObj["font_scaling"] | "auto";
-        display.compact_mode = displayObj["compact_mode"] | false;
         
         JsonArray fields = displayObj["fields"].as<JsonArray>();
         display.fields.clear();
@@ -876,7 +592,7 @@ bool ConfigManager::writeString(const char* key, const String& value) {
     return prefs_.putString(key, value);
 }
 
-bool ConfigManager::readJsonArray(const char* key, std::vector<String>& array) const {
+bool ConfigManager::readJsonArray(const char* key, std::vector<String>& array) {
     if (!initialized_) return false;
     String json = prefs_.getString(key, "[]");
     JsonDocument doc;

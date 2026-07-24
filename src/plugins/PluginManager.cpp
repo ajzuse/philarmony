@@ -1,26 +1,11 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * PluginManager - Implementation
  */
 #include "IPlugin.hpp"
-#include "../core/ConfigManager.hpp"
+#include "ConfigManager.hpp"
+#include "StateMachine.hpp"
+#include "SafetyEngine.hpp"
+#include "LogManager.hpp"
 
 namespace filament_dryer {
 
@@ -34,20 +19,30 @@ PluginManager::~PluginManager() {
 }
 
 bool PluginManager::begin() {
+    if (initialized_) return true;
+    
+    // Call onInit for all plugins
+    callOnInit(*ConfigManager::getInstance());
+    
     initialized_ = true;
+    Serial.printf("[PluginManager] Initialized with %d plugins\n", plugins_.size());
     return true;
 }
 
 bool PluginManager::registerPlugin(IPlugin* plugin) {
     if (!plugin) return false;
-
+    
+    // Check for duplicate name
     for (auto* p : plugins_) {
         if (p->getName() == plugin->getName()) {
+            Serial.printf("[PluginManager] Plugin '%s' already registered\n", plugin->getName().c_str());
             return false;
         }
     }
-
+    
     plugins_.push_back(plugin);
+    Serial.printf("[PluginManager] Registered plugin: %s v%s\n", 
+                  plugin->getName().c_str(), plugin->getVersion().c_str());
     return true;
 }
 
@@ -56,6 +51,7 @@ bool PluginManager::unregisterPlugin(const String& name) {
         if ((*it)->getName() == name) {
             delete *it;
             plugins_.erase(it);
+            Serial.printf("[PluginManager] Unregistered plugin: %s\n", name.c_str());
             return true;
         }
     }
@@ -71,7 +67,7 @@ IPlugin* PluginManager::getPlugin(const String& name) {
 
 std::vector<String> PluginManager::listPlugins() const {
     std::vector<String> names;
-    for (auto* p : plugins_) {
+    for (const auto* p : plugins_) {
         names.push_back(p->getName());
     }
     return names;
@@ -79,76 +75,118 @@ std::vector<String> PluginManager::listPlugins() const {
 
 void PluginManager::callOnInit(ConfigManager& config) {
     for (auto* p : plugins_) {
-        p->onInit(config);
+        try {
+            p->onInit(config);
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in onInit for plugin: %s\n", p->getName().c_str());
+        }
     }
 }
 
 void PluginManager::callOnStart() {
     for (auto* p : plugins_) {
-        p->onStart();
+        try {
+            p->onStart();
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in onStart for plugin: %s\n", p->getName().c_str());
+        }
     }
 }
 
 void PluginManager::callOnStop() {
     for (auto* p : plugins_) {
-        p->onStop();
+        try {
+            p->onStop();
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in onStop for plugin: %s\n", p->getName().c_str());
+        }
     }
 }
 
 void PluginManager::callOnShutdown() {
     for (auto* p : plugins_) {
-        p->onShutdown();
+        try {
+            p->onShutdown();
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in onShutdown for plugin: %s\n", p->getName().c_str());
+        }
     }
 }
 
 void PluginManager::callOnSessionStart(const DryingSession& session) {
     for (auto* p : plugins_) {
-        p->onSessionStart(session);
+        try {
+            p->onSessionStart(session);
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in onSessionStart for plugin: %s\n", p->getName().c_str());
+        }
     }
 }
 
-void PluginManager::callOnSessionStop(const DryingSession& session, DryingStopReason reason) {
+void PluginManager::callOnSessionStop(const DryingSession& session, StopReason reason) {
     for (auto* p : plugins_) {
-        p->onSessionStop(session, reason);
+        try {
+            p->onSessionStop(session, reason);
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in onSessionStop for plugin: %s\n", p->getName().c_str());
+        }
     }
 }
 
 void PluginManager::callOnTelemetryTick(const StatusPayload& telemetry) {
     for (auto* p : plugins_) {
-        p->onTelemetryTick(telemetry);
+        try {
+            p->onTelemetryTick(telemetry);
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in onTelemetryTick for plugin: %s\n", p->getName().c_str());
+        }
     }
 }
 
 void PluginManager::callOnFault(FaultCode fault, const String& message) {
     for (auto* p : plugins_) {
-        p->onFault(fault, message);
+        try {
+            p->onFault(fault, message);
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in onFault for plugin: %s\n", p->getName().c_str());
+        }
     }
 }
 
 void PluginManager::callOnConfigChanged(const String& section, const JsonObject& new_config) {
     for (auto* p : plugins_) {
-        p->onConfigChanged(section, new_config);
+        try {
+            p->onConfigChanged(section, new_config);
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in onConfigChanged for plugin: %s\n", p->getName().c_str());
+        }
     }
 }
 
-bool PluginManager::callWebSocketCommand(const String& topic, const JsonObject& payload,
-                                         JsonObject& response) {
+bool PluginManager::callWebSocketCommand(const String& topic, const JsonObject& payload, JsonObject& response) {
     for (auto* p : plugins_) {
-        if (p->handleWebSocketCommand(topic, payload, response)) {
-            return true;
+        try {
+            if (p->handleWebSocketCommand(topic, payload, response)) {
+                return true;
+            }
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in handleWebSocketCommand for plugin: %s\n", p->getName().c_str());
         }
     }
     return false;
 }
 
-bool PluginManager::callHttpRequest(const String& path, const JsonObject& params,
-                                    String& response) {
+bool PluginManager::callHttpRequest(const String& path, const JsonObject& params, String& response) {
     for (auto* p : plugins_) {
-        if (p->handleHttpRequest(path, params, response)) {
-            return true;
+        try {
+            if (p->handleHttpRequest(path, params, response)) {
+                return true;
+            }
+        } catch (...) {
+            Serial.printf("[PluginManager] Exception in handleHttpRequest for plugin: %s\n", p->getName().c_str());
         }
     }
     return false;
 }
 
-}  // namespace filament_dryer
+} // namespace filament_dryer

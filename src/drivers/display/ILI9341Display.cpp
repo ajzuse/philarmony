@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * ILI9341Display - Implementation
  * ESP32-2432S028 CYD (240x320)
@@ -51,6 +33,7 @@ bool ILI9341Display::begin(const JsonObject& config) {
     display_ = new LGFX_CYD(mosi_pin_, sclk_pin_, cs_pin_, dc_pin_, rst_pin_, bl_pin_, width_, height_, rotation_);
     
     if (!display_->init()) {
+        logMgr.logSystem(LogLevel::ERROR, LogModule::DISPLAY, "ILI9341 init failed");
         return false;
     }
     
@@ -61,6 +44,9 @@ bool ILI9341Display::begin(const JsonObject& config) {
     display_->setTextSize(1);
     
     initialized_ = true;
+    logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY, 
+                     "ILI9341 %dx%d initialized (SPI DMA)", width_, height_);
+    
     return true;
 }
 
@@ -106,6 +92,7 @@ void ILI9341Display::showBootScreen(const String& firmware_version) {
     display_->setCursor(20, 200);
     display_->print("v");
     display_->print(firmware_version);
+    delay(2000);
 }
 
 DisplayMetrics ILI9341Display::getMetrics() const {

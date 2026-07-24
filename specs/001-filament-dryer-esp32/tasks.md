@@ -8,7 +8,7 @@
 ## Format: `- [ ] [ID] [P?] [Story?] Description with file path`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: User story identifier ([US1], [US2], [US3], [US4], [US5])
+- **[Story]**: User story identifier ([US1], [US2], [US3], [US4], [US5], [US6], [US7], [US8])
 
 ---
 
@@ -16,9 +16,9 @@
 
 **Purpose**: Project initialization, PlatformIO build environment, partition table, and version headers.
 
-- [ ] T001 Create PlatformIO project structure and platformio.ini for target ESP32 environments in platformio.ini
-- [ ] T002 [P] Create firmware version header in include/firmware_version.h
-- [ ] T003 [P] Configure LittleFS partition table layout in partitions.csv
+- [x] T001 Create PlatformIO project structure and platformio.ini for target ESP32 environments in platformio.ini
+- [x] T002 [P] Create firmware version header in include/firmware_version.h
+- [x] T003 [P] Configure LittleFS partition table layout in partitions.csv
 
 ---
 
@@ -26,13 +26,18 @@
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented.
 
-- [ ] T004 [P] Implement ConfigManager for NVS storage and Klipper-style JSON config in src/core/ConfigManager.hpp and src/core/ConfigManager.cpp
-- [ ] T005 [P] Implement StateMachine for system and drying session states in src/core/StateMachine.hpp and src/core/StateMachine.cpp
-- [ ] T006 [P] Implement dual LogManager for system.log and drying.log in LittleFS in src/core/LogManager.hpp and src/core/LogManager.cpp
-- [ ] T007 Implement SafetyEngine with hard 80C limit cutoff and hardware watchdog in src/core/SafetyEngine.hpp and src/core/SafetyEngine.cpp
-- [ ] T008 [P] Implement abstract driver interfaces ISensorDriver, IActuatorDriver, and IDisplayDriver in src/drivers/interfaces/
-- [ ] T009 [P] Implement PluginManager and IPlugin hook extension interface in src/plugins/PluginManager.hpp and src/plugins/IPlugin.hpp
-- [ ] T010 [P] Implement SystemMetrics for FreeRTOS CPU and Heap utilization in src/utils/SystemMetrics.hpp and src/utils/SystemMetrics.cpp
+- [x] T004 [P] Implement ConfigManager for NVS storage and Klipper-style JSON config in src/core/ConfigManager.hpp and src/core/ConfigManager.cpp
+- [x] T005 [P] Implement StateMachine for system and drying session states in src/core/StateMachine.hpp and src/core/StateMachine.cpp
+- [x] T006 [P] Implement dual LogManager for system.log and drying.log in LittleFS in src/core/LogManager.hpp and src/core/LogManager.cpp
+- [x] T007 Implement SafetyEngine with hard 80C limit cutoff and hardware watchdog in src/core/SafetyEngine.hpp and src/core/SafetyEngine.cpp
+- [x] T008 [P] Implement abstract driver interfaces ISensorDriver, IActuatorDriver, and IDisplayDriver in src/drivers/interfaces/
+- [x] T009 [P] Implement PluginManager and IPlugin hook extension interface in src/plugins/PluginManager.hpp and src/plugins/IPlugin.hpp
+- [x] T010 [P] Implement SystemMetrics for FreeRTOS CPU and Heap utilization in src/utils/SystemMetrics.hpp and src/utils/SystemMetrics.cpp
+
+**NEW: Generic Driver Registry & Factory Pattern**
+- [ ] T010a [P] Implement DriverRegistry with factory functions for sensors, actuators, displays, and control algorithms in src/core/DriverRegistry.hpp and src/core/DriverRegistry.cpp
+- [ ] T010b [P] Implement built-in driver registration (sensors, actuators, displays, control algorithms) in src/core/DriverRegistry.cpp
+- [ ] T010c [P] Implement generic hardware configuration parser and validator in src/core/HardwareConfigParser.hpp and src/core/HardwareConfigParser.cpp
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel.
 
@@ -44,26 +49,40 @@
 
 **Independent Test**: Boot unconfigured device -> Connect to "philarmony" AP -> Submit WiFi credentials -> ESP32 connects to STA network and disables AP.
 
-- [ ] T011 [P] [US1] Implement WifiManager with STA connection logic and AP fallback in src/network/WifiManager.hpp and src/network/WifiManager.cpp
-- [ ] T012 [US1] Implement Async HTTP WebServer serving captive portal configuration page in src/network/WebServer.hpp and src/network/WebServer.cpp
-- [ ] T013 [US1] Implement POST /api/wifi/config credential handling and NVS save in src/network/WebServer.cpp
+- [x] T011 [P] [US1] Implement WifiManager with STA connection logic and AP fallback in src/network/WifiManager.hpp and src/network/WifiManager.cpp
+- [x] T012 [US1] Implement Async HTTP WebServer serving captive portal configuration page in src/network/WebServer.hpp and src/network/WebServer.cpp
+- [x] T013 [US1] Implement POST /api/wifi/config credential handling and NVS save in src/network/WebServer.cpp
 
 **Checkpoint**: User Story 1 (WiFi Setup Hotspot) complete and testable independently.
 
 ---
 
-## Phase 4: User Story 2 - Normal Operation & WebSocket Real-Time Control (Priority: P1)
+## Phase 4: User Story 2 - Generic Hardware Configuration & WebSocket Real-Time Control (Priority: P1)
 
-**Goal**: WebSocket API for hardware/sensor configuration, drying cycle control, and 1Hz status updates.
+**Goal**: Generic WebSocket API for hardware/sensor/actuator/display/control configuration, drying cycle control, and 1Hz status updates.
 
-**Independent Test**: Connect via WebSocket -> Send hardware config for SHT31 and MOSFET AOD4184 -> Issue control/start -> Verify PWM driving and 1Hz status stream.
+**Independent Test**: Connect via WebSocket -> Send generic hardware config for any sensor/actuator/display -> Issue control/start -> Verify PWM driving and 1Hz status stream.
 
-- [ ] T014 [P] [US2] Implement SHT31 I2C sensor driver in src/drivers/sensors/SHT31Sensor.hpp and src/drivers/sensors/SHT31Sensor.cpp
-- [ ] T015 [P] [US2] Implement DHT22 and DS18B20 drivers in src/drivers/sensors/DHT22Sensor.cpp and src/drivers/sensors/DS18B20Sensor.cpp
-- [ ] T016 [P] [US2] Implement MOSFET AOD4184 PWM heater driver in src/drivers/actuators/MosfetActuator.hpp and src/drivers/actuators/MosfetActuator.cpp
-- [ ] T017 [P] [US2] Implement Fan driver (PWM / digital / shared MOSFET) in src/drivers/actuators/FanActuator.hpp and src/drivers/actuators/FanActuator.cpp
-- [ ] T018 [US2] Implement WebSocketServer handling control/start, control/stop, and config/hardware in src/network/WebSocketServer.hpp and src/network/WebSocketServer.cpp
-- [ ] T019 [US2] Implement 1Hz status update broadcast on topic status/update in src/network/WebSocketServer.cpp
+- [x] T014 [P] [US2] Implement SHT3x I2C sensor driver in src/drivers/sensors/SHT3xSensor.hpp and src/drivers/sensors/SHT3xSensor.cpp
+- [x] T015 [P] [US2] Implement DHT22 and DS18B20 drivers in src/drivers/sensors/DHT22Sensor.cpp and src/drivers/sensors/DS18B20Sensor.cpp
+- [ ] T015a [P] [US2] Implement NTC thermistor ADC sensor driver in src/drivers/sensors/NTCSensor.hpp and src/drivers/sensors/NTCSensor.cpp
+- [ ] T015b [P] [US2] Implement BME280/BMP280 I2C sensor driver in src/drivers/sensors/BME280Sensor.hpp and src/drivers/sensors/BME280Sensor.cpp
+- [ ] T015c [P] [US2] Implement AHT20 I2C sensor driver in src/drivers/sensors/AHT20Sensor.hpp and src/drivers/sensors/AHT20Sensor.cpp
+- [ ] T015d [P] [US2] Implement generic CustomSensorDriver template for plugin sensors in src/drivers/sensors/CustomSensor.hpp and src/drivers/sensors/CustomSensor.cpp
+
+- [x] T016 [P] [US2] Implement MOSFET AOD4184 PWM heater driver in src/drivers/actuators/MosfetActuator.hpp and src/drivers/actuators/MosfetActuator.cpp
+- [x] T017 [P] [US2] Implement Fan driver (PWM / digital / shared MOSFET) in src/drivers/actuators/FanActuator.hpp and src/drivers/actuators/FanActuator.cpp
+- [ ] T017a [P] [US2] Implement SSR actuator driver in src/drivers/actuators/SSRActuator.hpp and src/drivers/actuators/SSRActuator.cpp
+- [ ] T017b [P] [US2] Implement Stepper actuator driver in src/drivers/actuators/StepperActuator.hpp and src/drivers/actuators/StepperActuator.cpp
+- [ ] T017c [P] [US2] Implement Servo actuator driver in src/drivers/actuators/ServoActuator.hpp and src/drivers/actuators/ServoActuator.cpp
+- [ ] T017d [P] [US2] Implement Generic GPIO actuator driver in src/drivers/actuators/GPIOActuator.hpp and src/drivers/actuators/GPIOActuator.cpp
+- [ ] T017e [P] [US2] Implement SharedMosfetActuator for heater+fan on same MOSFET in src/drivers/actuators/SharedMosfetActuator.hpp and src/drivers/actuators/SharedMosfetActuator.cpp
+
+- [x] T018 [US2] Implement WebSocketServer handling control/start, control/stop, and config/hardware in src/network/WebSocketServer.hpp and src/network/WebSocketServer.cpp
+- [x] T019 [US2] Implement 1Hz status update broadcast on topic status/update in src/network/WebSocketServer.cpp
+- [ ] T019a [US2] Implement generic hardware config WebSocket handler (config/hardware) with full JSON schema validation in src/network/WebSocketServer.cpp
+- [ ] T019b [US2] Implement HTTP GET/POST /api/hardware/config endpoints in src/network/WebServer.cpp
+- [ ] T019c [US2] Implement generic status payload builder reflecting all configured sensors/actuators in src/network/WebSocketServer.cpp
 
 **Checkpoint**: User Story 2 complete and testable independently.
 
@@ -75,26 +94,45 @@
 
 **Independent Test**: Disconnect sensor during cycle -> Heater PWM drops to 0% -> System state moves to FAULT_STOPPED -> Download log via GET /log/drying and verify fault reason.
 
-- [ ] T020 [US3] Implement thermal runaway and sensor timeout detection logic in src/core/SafetyEngine.cpp
-- [ ] T021 [US3] Implement safe abort emergency handler forcing PWM outputs LOW in src/core/SafetyEngine.cpp
-- [ ] T022 [P] [US3] Implement fixed HTTP endpoint GET /log/drying in src/network/WebServer.cpp
-- [ ] T023 [P] [US3] Implement fixed HTTP endpoint GET /log/system in src/network/WebServer.cpp
-- [ ] T024 [US3] Implement WebSocket real-time log streaming on topic logs/stream in src/network/WebSocketServer.cpp
+- [x] T020 [US3] Implement thermal runaway and sensor timeout detection logic in src/core/SafetyEngine.cpp
+- [x] T021 [US3] Implement safe abort emergency handler forcing PWM outputs LOW in src/core/SafetyEngine.cpp
+- [x] T022 [P] [US3] Implement fixed HTTP endpoint GET /log/drying in src/network/WebServer.cpp
+- [x] T023 [P] [US3] Implement fixed HTTP endpoint GET /log/system in src/network/WebServer.cpp
+- [x] T024 [US3] Implement WebSocket real-time log streaming on topic logs/stream in src/network/WebSocketServer.cpp
+
+**NEW: Generic Safety Framework**
+- [ ] T024a [US3] Implement configurable safety limits per actuator type in SafetyEngine (max_temp_c, max_power_pct, sensor_timeout_ms, thermal_runaway_time_sec, thermal_runaway_temp_rise_c) in src/core/SafetyEngine.hpp and src/core/SafetyEngine.cpp
+- [ ] T024b [US3] Implement sensor validation: timeout, range, rate-of-change checks per sensor capability in src/core/SafetyEngine.cpp
+- [ ] T024c [US3] Implement I2C bus lockup detection (SDA stuck LOW) and recovery sequence (9 clock cycles) in src/core/SafetyEngine.cpp
+- [ ] T024d [US3] Implement SPI bus error detection and recovery in src/core/SafetyEngine.cpp
+- [ ] T024e [US3] Implement actuator fault detection: PWM output mismatch, overcurrent detection in src/core/SafetyEngine.cpp
+- [ ] T024f [US3] Implement fault codes: SENSOR_DISCONNECT, OVER_TEMPERATURE, THERMAL_RUNAWAY, I2C_BUS_LOCKUP, SPI_BUS_ERROR, ACTUATOR_FAULT, NVS_CORRUPT, WATCHDOG_RESET in src/core/SafetyEngine.hpp
 
 **Checkpoint**: User Story 3 complete and testable independently.
 
 ---
 
-## Phase 6: User Story 4 - Multi-Display Support & Layout Engine (Priority: P2)
+## Phase 6: User Story 4 - Generic Multi-Display Support & Auto-Layout Engine (Priority: P2)
 
-**Goal**: Display telemetry and status on attached ST7789, ILI9341, or SSD1306 displays via LovyanGFX zero-copy DMA.
+**Goal**: Display telemetry and status on any attached display (ST7789, ILI9341, SSD1306, SH1106, ST7735, GC9A01, ILI9488, HD44780, Nextion) via LovyanGFX zero-copy DMA with auto-adapting layout engine.
 
 **Independent Test**: Send config/display via WebSocket -> Display renders status fields at 1Hz without blocking control loop.
 
-- [ ] T025 [P] [US4] Implement ST7789 TFT display driver in src/drivers/display/ST7789Display.hpp and src/drivers/display/ST7789Display.cpp
-- [ ] T026 [P] [US4] Implement ILI9341 display driver for CYD board in src/drivers/display/ILI9341Display.cpp
-- [ ] T027 [P] [US4] Implement SSD1306 OLED display driver in src/drivers/display/SSD1306Display.cpp
-- [ ] T028 [US4] Implement auto-adapting display layout manager in src/drivers/display/DisplayManager.cpp
+- [x] T025 [P] [US4] Implement ST7789 TFT display driver in src/drivers/display/ST7789Display.hpp and src/drivers/display/ST7789Display.cpp
+- [x] T026 [P] [US4] Implement ILI9341 display driver for CYD board in src/drivers/display/ILI9341Display.cpp
+- [x] T027 [P] [US4] Implement SSD1306 OLED display driver in src/drivers/display/SSD1306Display.cpp
+- [x] T028 [US4] Implement auto-adapting display layout manager in src/drivers/display/DisplayManager.cpp
+
+**NEW: Extended Display Drivers & Auto-Detection**
+- [ ] T028a [P] [US4] Implement SH1106 OLED display driver in src/drivers/display/SH1106Display.hpp and src/drivers/display/SH1106Display.cpp
+- [ ] T028b [P] [US4] Implement ST7735 TFT display driver in src/drivers/display/ST7735Display.hpp and src/drivers/display/ST7735Display.cpp
+- [ ] T028c [P] [US4] Implement GC9A01 round TFT display driver in src/drivers/display/GC9A01Display.hpp and src/drivers/display/GC9A01Display.cpp
+- [ ] T028d [P] [US4] Implement ILI9488 large TFT display driver in src/drivers/display/ILI9488Display.hpp and src/drivers/display/ILI9488Display.cpp
+- [ ] T028e [P] [US4] Implement HD44780 character LCD (I2C backpack) driver in src/drivers/display/HD44780Display.hpp and src/drivers/display/HD44780Display.cpp
+- [ ] T028f [P] [US4] Implement Nextion UART HMI display driver in src/drivers/display/NextionDisplay.hpp and src/drivers/display/NextionDisplay.cpp
+- [ ] T028g [US4] Implement DisplayManager auto-detection (try ST7789, ILI9341, SSD1306 in order) in src/drivers/display/DisplayManager.cpp
+- [ ] T028h [US4] Implement auto-layout engine: auto font scaling, field density adjustment per resolution, compact mode in src/drivers/display/DisplayManager.cpp
+- [ ] T028i [US4] Implement configurable display refresh rate (1Hz-5Hz) decoupled from status stream in src/drivers/display/DisplayManager.cpp
 
 **Checkpoint**: User Story 4 complete and testable independently.
 
@@ -106,8 +144,10 @@
 
 **Independent Test**: Create custom profile via WebSocket -> Start session using profile ID -> Parameters applied to drying run.
 
-- [ ] T029 [P] [US5] Implement built-in material profiles in src/core/ProfileManager.hpp and src/core/ProfileManager.cpp
-- [ ] T030 [US5] Implement custom profile NVS persistence and WebSocket API handlers in src/network/WebSocketServer.cpp
+- [x] T029 [P] [US5] Implement built-in material profiles in src/core/ProfileManager.hpp and src/core/ProfileManager.cpp
+- [x] T030 [US5] Implement custom profile NVS persistence and WebSocket API handlers in src/network/WebSocketServer.cpp
+
+**Checkpoint**: User Story 5 complete and testable independently.
 
 ---
 
@@ -117,33 +157,74 @@
 
 **Independent Test**: Send `control/pid_calibrate` via WebSocket -> Heater cycles PWM to measure thermal response -> Calculated PID coefficients streamed on `status/pid_calibrate` and saved to NVS.
 
-- [ ] T031 [P] [US6] Implement PidAutotuneController Ziegler-Nichols calculation engine in src/core/PidAutotuneController.hpp and src/core/PidAutotuneController.cpp
-- [ ] T032 [US6] Implement WebSocket handlers for control/pid_calibrate and status/pid_calibrate progress stream in src/network/WebSocketServer.cpp
-- [ ] T033 [US6] Save calibrated Kp, Ki, Kd coefficients persistently in NVS under heater.pid in src/core/ConfigManager.cpp
+- [x] T031 [P] [US6] Implement PidAutotuneController Ziegler-Nichols calculation engine in src/core/PidAutotuneController.hpp and src/core/PidAutotuneController.cpp
+- [x] T032 [US6] Implement WebSocket handlers for control/pid_calibrate and status/pid_calibrate progress stream in src/network/WebSocketServer.cpp
+- [x] T033 [US6] Save calibrated Kp, Ki, Kd coefficients persistently in NVS under heater.pid in src/core/ConfigManager.cpp
+
+**NEW: Generic Auto-Tune for Any Control Algorithm**
+- [ ] T033a [P] [US6] Extend PidAutotuneController to support Bang-Bang and Feedforward algorithm auto-tune in src/core/PidAutotuneController.cpp
+- [ ] T033b [US6] Implement algorithm-agnostic auto-tune interface in IControlAlgorithm for custom algorithms in src/core/IControlAlgorithm.hpp
+
+**Checkpoint**: User Story 6 complete and testable independently.
 
 ---
 
-## Phase 9: Polish & Cross-Cutting Concerns
+## Phase 9: User Story 7 - Generic Control Algorithm Framework (Priority: P2)
+
+**Goal**: Support multiple control algorithms (PID, Bang-Bang, PWM Feedforward, Custom) selectable via configuration, with auto-tune support.
+
+**Independent Test**: Configure different algorithms via config/control -> Verify each regulates temperature correctly -> Auto-tune works for each.
+
+- [ ] T034 [P] [US7] Implement BangBangControl algorithm (hysteresis-based) in src/control/BangBangControl.hpp and src/control/BangBangControl.cpp
+- [ ] T035 [P] [US7] Implement PWMFeedforwardControl algorithm (base PWM + temp coefficient) in src/control/PWMFeedforwardControl.hpp and src/control/PWMFeedforwardControl.cpp
+- [ ] T036 [P] [US7] Implement IControlAlgorithm interface and ControlEngine for algorithm switching in src/control/IControlAlgorithm.hpp and src/control/ControlEngine.hpp/.cpp
+- [ ] T037 [US7] Register control algorithms in DriverRegistry and integrate with ConfigManager in src/core/ConfigManager.cpp
+- [ ] T038 [US7] Implement config/control WebSocket handler for algorithm selection and parameter configuration in src/network/WebSocketServer.cpp
+
+**Checkpoint**: User Story 7 complete and testable independently.
+
+---
+
+## Phase 10: User Story 8 - Generic Sensor/Actuator Calibration & Advanced Features (Priority: P2)
+
+**Goal**: Support per-capability calibration (offset/scale), sensor validation, actuator fault detection, and bus recovery.
+
+**Independent Test**: Configure sensor with offset/scale -> Verify readings adjusted -> Disconnect sensor -> Fault detected and logged -> Reconnect -> Auto-recovery.
+
+- [ ] T039 [P] [US8] Implement sensor calibration (offset/scale per capability) in ConfigManager and apply in sensor drivers in src/core/ConfigManager.cpp and sensor drivers
+- [ ] T040 [P] [US8] Implement sensor validation: timeout, range check, rate-of-change per capability in src/core/SafetyEngine.cpp
+- [ ] T041 [US8] Implement actuator fault detection: PWM output verification, overcurrent sense in src/core/SafetyEngine.cpp and actuator drivers
+- [ ] T042 [US8] Implement I2C bus recovery (9 clock cycles) and SPI error recovery in src/core/SafetyEngine.cpp
+- [ ] T043 [US8] Implement WebSocket fault notification (status/fault) with standardized fault codes in src/network/WebSocketServer.cpp
+- [ ] T044 [P] [US8] Add calibration fields to sensor config schema and validate in HardwareConfigParser in src/core/HardwareConfigParser.cpp
+
+**Checkpoint**: User Story 8 complete and testable independently.
+
+---
+
+## Phase 11: Polish & Cross-Cutting Concerns
 
 **Purpose**: Documentation, memory optimization, and quickstart validation.
 
-- [ ] T034 [P] Update firmware documentation and API references in README.md
-- [ ] T035 Perform memory leak profiling and FreeRTOS stack verification
-- [ ] T036 Execute end-to-end quickstart validation scenarios in specs/001-filament-dryer-esp32/quickstart.md
+- [x] T045 [P] Update firmware documentation and API references in README.md
+- [x] T046 Perform memory leak profiling and FreeRTOS stack verification
+- [x] T047 Execute end-to-end quickstart validation scenarios in specs/001-filament-dryer-esp32/quickstart.md
 
 ---
 
 ## Dependencies & Execution Order
 
 1. **Phase 1 (Setup)** -> Blocks Phase 2
-2. **Phase 2 (Foundational)** -> Blocks all User Stories
+2. **Phase 2 (Foundational + Driver Registry + Hardware Config Parser)** -> Blocks all User Stories
 3. **Phase 3 (US1)** -> Priority P1 (MVP)
 4. **Phase 4 (US2)** -> Priority P1
 5. **Phase 5 (US3)** -> Priority P1
 6. **Phase 6 (US4)** -> Priority P2
 7. **Phase 7 (US5)** -> Priority P2
 8. **Phase 8 (US6)** -> Priority P2
-9. **Phase 9 (Polish)** -> Final
+9. **Phase 9 (US7)** -> Priority P2
+10. **Phase 10 (US8)** -> Priority P2
+11. **Phase 11 (Polish)** -> Final
 
 ---
 
@@ -153,4 +234,4 @@
 Complete Setup, Foundational, and User Story 1 (WiFi Setup Hotspot) to produce a bootable, configurable hardware node.
 
 ### Incremental Delivery
-Add US2 (Control & Telemetry) -> Add US3 (Safety Engine & Logs) -> Add US4 (Displays) -> Add US5 (Profiles) -> Add US6 (PID Calibration).
+Add US2 (Control & Telemetry) -> Add US3 (Safety Engine & Logs) -> Add US4 (Displays) -> Add US5 (Profiles) -> Add US6 (PID Calibration) -> Add US7 (Generic Control Algorithms) -> Add US8 (Calibration & Advanced Safety).

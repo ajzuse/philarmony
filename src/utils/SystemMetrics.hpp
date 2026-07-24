@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * SystemMetrics - FreeRTOS CPU and Heap utilization monitoring
  */
@@ -55,11 +37,10 @@ private:
     uint32_t sample_interval_ms_ = 1000;
     uint32_t last_update_ms_ = 0;
     
-    // CPU measurement (run-time stats if enabled, else idle/tick hooks)
+    // CPU measurement (using FreeRTOS run time stats if available)
     float cpu_usage_pct_ = 0.0f;
     uint32_t last_idle_time_ = 0;
     uint32_t last_total_time_ = 0;
-    bool hooks_registered_ = false;
     
     // Memory metrics
     uint32_t free_heap_bytes_ = 0;

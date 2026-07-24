@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * Fan Actuator - Implementation
  */
@@ -28,17 +10,9 @@ FanActuator::FanActuator() {}
 FanActuator::~FanActuator() {}
 
 bool FanActuator::begin(const JsonObject& config) {
-    gpio_pin_ = config["fan_pin"] | config["gpio_pin"] | 26;
+    gpio_pin_ = config["fan_pin"] | 26;
     pwm_freq_ = config["fan_pwm_freq"] | 5000;
-    type_ = config["type"] | "fan_pwm";
-    String mode_str = config["fan_mode"] | "independent_pwm";
-    if (type_ == "fan_digital") {
-        mode_str = "independent_digital";
-    }
-    mode_ = parseFanMode(mode_str);
-    if (mode_ == FanMode::INDEPENDENT_DIGITAL) {
-        type_ = "fan_digital";
-    }
+    mode_ = parseFanMode(config["fan_mode"] | "independent_pwm");
     shared_heater_pin_ = config["heater_pin"] | -1;
     
     // Configure PWM channel for independent modes
@@ -50,12 +24,20 @@ bool FanActuator::begin(const JsonObject& config) {
         ledcAttachPin(gpio_pin_, pwm_channel_);
         ledcWrite(pwm_channel_, 0);
         
+        Serial.printf("[FanActuator] PWM mode on GPIO %d, freq=%luHz, ch=%d\n",
+                      gpio_pin_, pwm_freq_, pwm_channel_);
     } else if (mode_ == FanMode::INDEPENDENT_DIGITAL) {
         pinMode(gpio_pin_, OUTPUT);
         digitalWrite(gpio_pin_, LOW);
+        
+        Serial.printf("[FanActuator] Digital mode on GPIO %d\n", gpio_pin_);
+    } else {
+        // Shared MOSFET mode - fan runs when heater runs
+        Serial.printf("[FanActuator] Shared MOSFET mode (fan follows heater on GPIO %d)\n",
+                      shared_heater_pin_);
     }
     
-    state_ = ActuatorState{};
+    state_ = {false, 0.0f, false, ""};
     initialized_ = true;
     return true;
 }

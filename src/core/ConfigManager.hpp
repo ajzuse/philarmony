@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * ConfigManager - NVS and JSON Configuration Manager
  * Klipper-style object configuration with NVS persistence
@@ -30,7 +12,6 @@
 
 namespace filament_dryer {
 
-// Structs at namespace scope (not inside class)
 struct PidConfig {
     float kp = 0.0f;
     float ki = 0.0f;
@@ -42,56 +23,29 @@ struct PidConfig {
 };
 
 struct SensorConfig {
-    String type = "sht31";          // primary / temperature sensor type
+    String type = "sht31";          // sht31, dht22, ds18b20, ntc_thermistor, bme280
     bool is_integrated = true;      // true if temp+humidity in same IC
-    uint8_t i2c_bus = 0;
-    uint8_t i2c_address = 0x44;
-    int8_t gpio_pin = -1;
-    int8_t sda_pin = 21;
-    int8_t scl_pin = 22;
-    float temperature_offset = 0.0f;
-    float temperature_scale = 1.0f;
-    float humidity_offset = 0.0f;
-    float humidity_scale = 1.0f;
-    // Separate humidity sensor (when is_integrated == false)
-    String humidity_type;
-    uint8_t humidity_i2c_address = 0;
-    int8_t humidity_gpio_pin = -1;
-    int8_t humidity_sda_pin = 21;
-    int8_t humidity_scl_pin = 22;
-    // Optional extra temperature sensor id/type for status reflection
-    String extra_temp_type;
-    int8_t extra_temp_gpio_pin = -1;
-    uint8_t extra_temp_i2c_address = 0;
-};
-
-struct FanCurvePoint {
-    float temp_c = 0.0f;
-    float power_pct = 80.0f;
+    uint8_t i2c_bus = 0;            // I2C bus number (0 or 1)
+    uint8_t i2c_address = 0x44;     // I2C address
+    int8_t gpio_pin = -1;           // GPIO pin for 1-Wire/DHT/ADC (-1 if I2C)
+    int8_t sda_pin = 21;            // I2C SDA GPIO
+    int8_t scl_pin = 22;            // I2C SCL GPIO
 };
 
 struct ActuatorConfig {
-    String heater_type = "mosfet_pwm";
-    int8_t heater_pin = 25;
-    uint32_t heater_pwm_freq = 1000;
-    uint8_t heater_max_power_pct = 100;
-    float heater_max_temp_c = 0.0f;  // 0 = unset; from safety_limits.max_temp_c
-    String fan_type = "fan_pwm";
-    String fan_mode = "independent_pwm";
-    int8_t fan_pin = 26;
-    uint32_t fan_pwm_freq = 5000;
-    float fan_duty_pct = 80.0f;
-    std::vector<FanCurvePoint> fan_speed_curve;
-    uint16_t cooldown_duration_sec = 30;
-    bool has_custom = false;
-    String custom_type;
-    int8_t custom_pin = -1;
+    int8_t heater_pin = 25;             // Heater MOSFET PWM GPIO
+    uint32_t heater_pwm_freq = 1000;    // PWM frequency in Hz
+    uint8_t heater_max_power_pct = 100; // Soft safety power limit %
+    String fan_mode = "independent_pwm"; // shared_mosfet, independent_pwm, independent_digital
+    int8_t fan_pin = 26;                // Fan MOSFET/PWM GPIO
+    uint32_t fan_pwm_freq = 5000;       // Fan PWM frequency in Hz
+    uint16_t cooldown_duration_sec = 30; // Post-heating fan run time in seconds
 };
 
 struct DisplayConfig {
     bool enabled = false;
     String driver = "auto";           // ssd1306, sh1106, st7789, ili9341, st7735, gc9a01, ili9488, hd44780, nextion, auto
-    String bus_type = "i2c";          // i2c, spi, uart (parallel_8bit rejected at parse)
+    String bus_type = "i2c";          // i2c, spi, parallel_8bit, uart
     uint16_t width = 128;
     uint16_t height = 64;
     uint16_t rotation = 0;            // 0, 90, 180, 270
@@ -101,12 +55,6 @@ struct DisplayConfig {
     int8_t dc_pin = -1;
     int8_t rst_pin = -1;
     int8_t backlight_pin = -1;
-    int8_t i2c_sda = 21;
-    int8_t i2c_scl = 22;
-    uint8_t i2c_address = 0x3C;
-    uint8_t refresh_rate_hz = 1;          // Display refresh 1–5 Hz
-    String font_scaling = "auto";         // auto|small|medium|large
-    bool compact_mode = false;
     std::vector<String> fields = {"chamber_temp_c", "target_temp_c", "humidity_pct", "heater_power_pct", "status"};
 };
 
@@ -128,19 +76,6 @@ struct WifiConfig {
     bool valid = false;
 };
 
-struct ControlConfig {
-    String algorithm = "pid";              // pid, bang_bang, pwm_feedforward, custom
-    bool auto_tune = false;
-    JsonObject parameters;                  // Algorithm-specific parameters
-    struct SafetyLimits {
-        float hard_temp_limit_c = 80.0f;
-        int max_heater_power_pct = 100;
-        int sensor_timeout_ms = 600;
-        int thermal_runaway_time_sec = 45;
-        float thermal_runaway_temp_rise_c = 0.5f;
-    } safety_limits;
-};
-
 class ConfigManager {
 public:
     ConfigManager();
@@ -152,7 +87,7 @@ public:
     
     // WiFi Configuration
     WifiConfig getWifiConfig() const;
-    bool setWifiConfig(const WifiConfig& config);
+    void setWifiConfig(const WifiConfig& config);
     
     // Sensor Configuration
     SensorConfig getSensorConfig() const;
@@ -168,7 +103,7 @@ public:
     
     // PID Configuration
     PidConfig getPidConfig() const;
-    bool setPidConfig(const PidConfig& config);
+    void setPidConfig(const PidConfig& config);
     
     // Filament Profiles
     std::vector<FilamentProfile> getProfiles() const;
@@ -177,24 +112,10 @@ public:
     bool updateProfile(const FilamentProfile& profile);
     bool deleteProfile(const String& profile_id);
     void resetProfilesToDefaults();
-    static bool validateProfileParams(float temp_c, uint16_t duration_min, float humidity_pct) {
-        if (temp_c < 30.0f || temp_c > 80.0f) return false;
-        if (duration_min < 1 || duration_min > 1440) return false;
-        if (humidity_pct < 5.0f || humidity_pct > 50.0f) return false;
-        return true;
-    }
-    static bool validateStartParams(float temp_c, uint16_t duration_min, float humidity_pct,
-                                    bool has_humidity) {
-        if (temp_c < 30.0f || temp_c > 80.0f) return false;
-        if (duration_min < 1 || duration_min > 1440) return false;
-        if (has_humidity && (humidity_pct < 5.0f || humidity_pct > 50.0f)) return false;
-        return true;
-    }
-    static constexpr size_t kMaxCustomProfiles = 20;
     
     // Generic JSON config (Klipper-style object config)
     bool setObjectConfig(const String& object_name, const JsonObject& config);
-    JsonObject getObjectConfig(const String& object_name);
+    JsonObject getObjectConfig(const String& object_name) const;
     std::vector<String> listObjectConfigs() const;
     
     // Factory reset
@@ -208,7 +129,7 @@ public:
     Preferences& getPreferences() { return prefs_; }
 
 private:
-    mutable Preferences prefs_;
+    Preferences prefs_;
     bool initialized_ = false;
     
     // NVS Keys
@@ -231,11 +152,8 @@ private:
     bool writeStruct(const char* key, const T& value);
     bool readString(const char* key, String& value);
     bool writeString(const char* key, const String& value);
-    bool readJsonArray(const char* key, std::vector<String>& array) const;
+    bool readJsonArray(const char* key, std::vector<String>& array);
     bool writeJsonArray(const char* key, const std::vector<String>& array);
-    
-    // Private helper for profile operations
-    bool saveProfiles(const std::vector<FilamentProfile>& profiles);
 };
 
 } // namespace filament_dryer

@@ -1,22 +1,4 @@
 /**
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
-/**
  * StateMachine - System and Drying Session State Management
  */
 #pragma once
@@ -31,7 +13,6 @@ enum class SystemState {
     HOTSPOT,
     READY,
     DRYING,
-    COOLDOWN,
     STOPPED,
     FAULT_STOPPED
 };
@@ -58,12 +39,6 @@ struct DryingSession {
     uint32_t remaining_sec = 0;
     uint32_t start_timestamp = 0;
     DryingStopReason stop_reason = DryingStopReason::RUNNING;
-    float current_temp_c = NAN;
-    float current_humidity_pct = NAN;
-    float heater_power_pct = 0.0f;
-    bool heater_on = false;
-    float exhaust_fan_power_pct = 0.0f;
-    bool exhaust_fan_on = false;
 };
 
 class StateMachine {
@@ -73,18 +48,16 @@ public:
     
     bool begin();
     
+    // State access
     SystemState getState() const { return current_state_; }
-    String getStateName() const;
-    /** Lowercase status for status/update and display (boot, drying, cooldown, …). */
-    String getStatusStreamName() const;
-    static String stopReasonToString(DryingStopReason reason);
+    const String getStateName() const;
     
+    // State transitions
     bool transitionTo(SystemState new_state);
     bool canTransition(SystemState from, SystemState to) const;
     
+    // Drying session management
     bool startDrying(const DryingSession& session);
-    bool beginCooldown(DryingStopReason reason);
-    bool completeCooldown();
     bool stopDrying(DryingStopReason reason);
     bool updateDryingProgress(float current_temp, float current_humidity, 
                                float heater_power_pct, bool heater_on,
@@ -93,14 +66,16 @@ public:
     const DryingSession& getCurrentSession() const { return current_session_; }
     DryingSession& getCurrentSession() { return current_session_; }
     
+    // Safety state checks
     bool isInFaultState() const { return current_state_ == SystemState::FAULT_STOPPED; }
     bool isDrying() const { return current_state_ == SystemState::DRYING; }
-    bool isCoolingDown() const { return current_state_ == SystemState::COOLDOWN; }
     bool isReady() const { return current_state_ == SystemState::READY; }
     
+    // Time tracking
     uint32_t getSessionUptime() const;
     float getProgressPercent() const;
     
+    // Callbacks
     using StateChangeCallback = void(*)(SystemState old_state, SystemState new_state);
     using SessionUpdateCallback = void(*)(const DryingSession& session);
     
@@ -111,22 +86,21 @@ private:
     SystemState current_state_ = SystemState::BOOT;
     SystemState previous_state_ = SystemState::BOOT;
     DryingSession current_session_;
-    DryingStopReason pending_cooldown_reason_ = DryingStopReason::COMPLETED;
     uint32_t state_enter_time_ = 0;
     
     StateChangeCallback state_change_cb_ = nullptr;
     SessionUpdateCallback session_update_cb_ = nullptr;
     
-    // BOOT, WIFI, HOTSPOT, READY, DRYING, COOLDOWN, STOPPED, FAULT
-    static constexpr bool valid_transitions[8][8] = {
-        {false, true,  true,  false, false, false, false, false}, // BOOT
-        {false, false, true,  true,  false, false, false, false}, // WIFI_CONNECT
-        {false, true,  false, true,  false, false, false, false}, // HOTSPOT
-        {false, false, true,  false, true,  false, false, false}, // READY
-        {false, false, false, false, true,  true,  true,  true},  // DRYING
-        {false, false, false, false, false, false, true,  true},  // COOLDOWN
-        {false, false, true,  true,  false, false, false, false}, // STOPPED
-        {false, false, true,  true,  false, false, false, false}  // FAULT_STOPPED
+    // State transition validation
+    static constexpr bool valid_transitions[7][7] = {
+        // BOOT, WIFI, HOTSPOT, READY, DRYING, STOPPED, FAULT
+        {false, true,  true,  false, false,  false,  false}, // BOOT
+        {false, false, true,  true,  false,  false,  false}, // WIFI_CONNECT
+        {false, true,  false, true,  false,  false,  false}, // HOTSPOT
+        {false, false, true,  false, true,   false,  false}, // READY
+        {false, false, false, true,  true,   true,   true},  // DRYING
+        {false, false, true,  true,  false,  false,  false}, // STOPPED
+        {false, false, true,  true,  false,  false,  false}  // FAULT_STOPPED
     };
 };
 

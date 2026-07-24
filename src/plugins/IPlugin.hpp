@@ -1,87 +1,58 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * Plugin System - Extension Interface
  */
 #pragma once
 
 #include <Arduino.h>
-#include <ArduinoJson.h>
 #include <vector>
-#include "../core/SafetyEngine.hpp"
-#include "../core/StateMachine.hpp"
+#include <functional>
 
 namespace filament_dryer {
 
+// Forward declarations
 class ConfigManager;
+class StateMachine;
+class SafetyEngine;
+class LogManager;
 
-struct StatusPayload {
-    String status;
-    float chamber_temp_c = NAN;
-    float humidity_pct = NAN;
-    float heater_power_pct = 0.0f;
-};
+struct DryingSession;
+struct StatusPayload;
+struct PidConfig;
 
 class IPlugin {
 public:
     virtual ~IPlugin() = default;
-
+    
+    // Plugin identification
     virtual String getName() const = 0;
     virtual String getVersion() const = 0;
     virtual String getAuthor() const = 0;
     virtual String getDescription() const = 0;
-
-    virtual void onInit(ConfigManager& config) { (void)config; }
+    
+    // Lifecycle hooks
+    virtual void onInit(ConfigManager& config) {}
     virtual void onStart() {}
     virtual void onStop() {}
     virtual void onShutdown() {}
-
-    virtual void onSessionStart(const DryingSession& session) { (void)session; }
-    virtual void onSessionStop(const DryingSession& session, DryingStopReason reason) {
-        (void)session;
-        (void)reason;
-    }
-    virtual void onTelemetryTick(const StatusPayload& telemetry) { (void)telemetry; }
-
-    virtual void onFault(FaultCode fault, const String& message) {
-        (void)fault;
-        (void)message;
-    }
-
-    virtual void onConfigChanged(const String& section, const JsonObject& new_config) {
-        (void)section;
-        (void)new_config;
-    }
-
-    virtual bool handleWebSocketCommand(const String& topic, const JsonObject& payload,
-                                        JsonObject& response) {
-        (void)topic;
-        (void)payload;
-        (void)response;
+    
+    // Session hooks
+    virtual void onSessionStart(const DryingSession& session) {}
+    virtual void onSessionStop(const DryingSession& session, StopReason reason) {}
+    virtual void onTelemetryTick(const StatusPayload& telemetry) {}
+    
+    // Safety hooks
+    virtual void onFault(FaultCode fault, const String& message) {}
+    
+    // Configuration hooks
+    virtual void onConfigChanged(const String& section, const JsonObject& new_config) {}
+    
+    // Custom WebSocket command handlers
+    virtual bool handleWebSocketCommand(const String& topic, const JsonObject& payload, JsonObject& response) {
         return false;
     }
-
-    virtual bool handleHttpRequest(const String& path, const JsonObject& params,
-                                   String& response) {
-        (void)path;
-        (void)params;
-        (void)response;
+    
+    // Custom HTTP endpoints
+    virtual bool handleHttpRequest(const String& path, const JsonObject& params, String& response) {
         return false;
     }
 };
@@ -90,26 +61,39 @@ class PluginManager {
 public:
     PluginManager();
     ~PluginManager();
-
+    
     bool begin();
-
+    
+    // Register a plugin
     bool registerPlugin(IPlugin* plugin);
+    
+    // Unregister a plugin
     bool unregisterPlugin(const String& name);
+    
+    // Get plugin by name
     IPlugin* getPlugin(const String& name);
+    
+    // List all registered plugins
     std::vector<String> listPlugins() const;
-
+    
+    // Call lifecycle hooks
     void callOnInit(ConfigManager& config);
     void callOnStart();
     void callOnStop();
     void callOnShutdown();
-
+    
+    // Call session hooks
     void callOnSessionStart(const DryingSession& session);
-    void callOnSessionStop(const DryingSession& session, DryingStopReason reason);
+    void callOnSessionStop(const DryingSession& session, StopReason reason);
     void callOnTelemetryTick(const StatusPayload& telemetry);
-
+    
+    // Call safety hooks
     void callOnFault(FaultCode fault, const String& message);
+    
+    // Call config hooks
     void callOnConfigChanged(const String& section, const JsonObject& new_config);
-
+    
+    // Call custom command handlers
     bool callWebSocketCommand(const String& topic, const JsonObject& payload, JsonObject& response);
     bool callHttpRequest(const String& path, const JsonObject& params, String& response);
 
@@ -118,4 +102,4 @@ private:
     bool initialized_ = false;
 };
 
-}  // namespace filament_dryer
+} // namespace filament_dryer

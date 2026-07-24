@@ -1,25 +1,6 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
- * PidAutotuneController - Algorithm-aware thermal auto-tuning
- * PID: Ziegler-Nichols relay. Bang-Bang: hysteresis from amplitude.
- * Feedforward: base PWM + temp coefficient from heating rate.
+ * PidAutotuneController - Ziegler-Nichols Relay Auto-Tuning
+ * Inspired by Klipper's PID_CALIBRATE
  */
 #pragma once
 
@@ -35,8 +16,6 @@ public:
         float pwm_step = 100.0f;      // 0-100% PWM drive
         float max_temp = 80.0f;       // Safety limit
         int cycle_timeout_sec = 300;  // Per cycle timeout
-        /** "pid" | "bang_bang" | "pwm_feedforward" */
-        String algorithm = "pid";
     };
     
     struct Result {
@@ -44,10 +23,6 @@ public:
         float kp = 0.0f;
         float ki = 0.0f;
         float kd = 0.0f;
-        float hysteresis = 0.0f;
-        float base_pwm = 0.0f;
-        float temp_coefficient = 0.0f;
-        String algorithm;
         String error;
     };
     
@@ -84,7 +59,7 @@ private:
     CompleteCallback complete_cb_ = nullptr;
     bool running_ = false;
     
-    // Ziegler-Nichols / shared oscillation measurement
+    // Ziegler-Nichols measurement
     float cycle_start_temp_ = 0.0f;
     float peak_temp_ = 0.0f;
     float valley_temp_ = 0.0f;
@@ -95,18 +70,15 @@ private:
     int cycles_completed_ = 0;
     float oscillation_period_ = 0.0f;
     float oscillation_amplitude_ = 0.0f;
-    float heating_rate_c_per_sec_ = 0.0f;
     
+    // Callbacks
     using HeaterSetCallback = void(*)(float power_pct);
     HeaterSetCallback heater_cb_ = nullptr;
     
     void reset();
     void transitionTo(State new_state);
     void checkSafety(float current_temp);
-    void calculateResults();
     void calculatePid();
-    void calculateBangBang();
-    void calculateFeedforward();
     
 public:
     void setHeaterCallback(HeaterSetCallback cb) { heater_cb_ = cb; }

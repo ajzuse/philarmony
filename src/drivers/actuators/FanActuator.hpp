@@ -1,27 +1,9 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * Fan Actuator Driver - Supports PWM, Digital, and Shared MOSFET modes
  */
 #pragma once
 
-#include "../interfaces/IDriverInterfaces.hpp"
+#include "IDriverInterfaces.hpp"
 
 namespace filament_dryer {
 
@@ -40,12 +22,11 @@ public:
     bool setPower(float power_pct) override;
     void emergencyStop() override;
     ActuatorState getState() const override;
-    String getType() const override { return type_; }
+    String getType() const override { return "fan_pwm"; }
     String getName() const override { return "Exhaust Fan"; }
     bool isHealthy() const override { return initialized_ && !state_.fault; }
     
 private:
-    String type_ = "fan_pwm";
     int8_t gpio_pin_ = 26;
     uint32_t pwm_freq_ = 5000;
     uint8_t pwm_channel_ = 1;

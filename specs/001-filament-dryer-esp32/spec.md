@@ -128,7 +128,8 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - Stop/interrupt command: immediately stops heater and ventilation
 - Automatic stop when: max time reached, target humidity reached, safety temperature exceeded
 - On completion (target humidity or max time reached): immediately turn off heater PWM and run exhaust fan for 30 seconds cooldown before marking status as "stopped"
-- Safety: hard temperature limit (e.g., 80°C) cuts heater regardless of target
+- Safety: hard temperature limit (configurable, default 80°C) cuts heater regardless of target
+- Configurable safety limits per heater type
 
 ### FR-006: Real-time Status Streaming
 - WebSocket topic `status/subscribe` enables per-second JSON updates
@@ -157,6 +158,22 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - Calculates optimal PID coefficients: `Kp` (proportional), `Ki` (integral), `Kd` (derivative)
 - Saves calculated `Kp`, `Ki`, `Kd` values persistently to NVS upon calibration completion
 - Emits real-time calibration progress and final PID parameters via WebSocket topic `status/pid_calibrate`
+- Works with any heater configuration (MOSFET, SSR, different thermal masses)
+
+### FR-010: Generic Control Algorithm Framework
+- Supports multiple control algorithms: PID, Bang-Bang (hysteresis), PWM with feedforward, custom algorithms
+- Algorithm selected and parameterized via configuration
+- Auto-tune routine works with any algorithm that exposes PID-like parameters
+- Safety engine integrates with all algorithms (hard limits, sensor validation, watchdog)
+
+### FR-011: Safety & Fault Tolerance (Generic)
+- Hardware watchdog timer enabled
+- Configurable safety limits per actuator type
+- Sensor validation: timeout, range, rate-of-change checks
+- Thermal runaway detection (configurable thresholds)
+- I2C/SPI bus lockup detection and recovery
+- Emergency stop: immediate actuator cutoff, system stays online for diagnostics
+- Fault codes: standardized, extensible
 
 ## Non-Functional Requirements
 
