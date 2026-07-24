@@ -4,7 +4,7 @@
 [![Platform: ESP32](https://img.shields.io/badge/Platform-ESP32-red.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![Language: C/C++](https://img.shields.io/badge/Language-C%2FC%2B%2B-orange.svg)]()
 [![Spec Kit](https://img.shields.io/badge/Spec%20Kit-v0.13.2-green.svg)]()
-[![Constitution](https://img.shields.io/badge/Constitution-v0.3.0-purple.svg)](.specify/memory/constitution.md)
+[![Constitution](https://img.shields.io/badge/Constitution-v0.4.0-purple.svg)](.specify/memory/constitution.md)
 
 ## 📋 Sobre o Projeto
 
@@ -60,7 +60,7 @@
 
 | # | Spec | Nome | Status | Última Atualização |
 |---|------|------|--------|-------------------|
-| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | 📋 Planejado | 2026-07-23   |
+| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | 📝 Especificado | 2026-07-23   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | 📝 Especificado | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
@@ -343,5 +343,5 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 
 ---
 
-*README auto-gerado e sincronizado pela Constituição Philarmony v0.3.0*
-*Última atualização: 2026-07-23 | Trigger: plan*
+*README auto-gerado e sincronizado pela Constituição Philarmony v0.4.0*
+*Última atualização: 2026-07-24 | Trigger: tasks*
