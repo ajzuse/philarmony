@@ -12,28 +12,90 @@
   - **Core 1**: Critical control loop (sensor acquisition, PID/PWM regulation, safety watchdog, display rendering).
 - **Zero Dynamic Allocation**: Critical control loops use pre-allocated static buffers to prevent heap fragmentation (`FreeHeap` drops) during multi-day drying sessions.
 
+### Alternatives Considered
+- **Rust for ESP32 (`esp-rs`)**: High safety, but library support for diverse displays (LovyanGFX/Adafruit) and Async WebServers is less mature than C++.
+- **MicroPython**: Easy development, but high garbage collection latency penalties (>50ms pauses) that breach the 20ms control loop requirement and consume excessive RAM (~2MB base runtime).
+
 ---
 
-## 2. Klipper-Inspired Object Architecture & Plugin System
+## 2. Generic Plugin-Driver Architecture (Klipper-Inspired)
+
+### Core Philosophy
+**"Everything is a Plugin"** - No hardcoded hardware references. All sensors, actuators, displays, control algorithms, and communication protocols are loaded dynamically from a driver registry based on JSON configuration.
 
 ### Architecture
-Inspired by Klipper 3D printer firmware, the system represents hardware and software features as **Configurable Named Objects**. A central `ObjectRegistry` parses hardware definitions from NVS/JSON configuration at boot and instantiates drivers dynamically.
+```
+                    +-------------------------+
+                    |     ObjectRegistry      |
+                    |  (Config → Drivers)     |
+                    +-----------+-------------+
+                                |
+        +-----------------------+-----------------------+
+        |                       |                       |
++-------v-------+       +-------v-------+       +-------v-------+
+| ISensorDriver |       |IActuatorDriver|       |IDisplayDriver |
++-------+-------+       +-------+-------+       +-------+-------+
+        |                       |                       |
++-------+-------+       +-------+-------+       +-------+-------+
+| sht3x, dht22  |       |mosfet_pwm,    |       |st7789, ili9341|
+| ds18b20, ntc  |       | fan_pwm,      |       |ssd1306, hd44780|
+| bme280, aht20 |       | stepper, custom|       | nextion, auto |
++-------+-------+       +---------------+       +---------------+
+        |                       |                       |
+        +-----------------------+-----------------------+
+                                |
+                    +-----------v-----------+
+                    |    ControlEngine      |
+                    |  (PID, Bang-Bang,     |
+                    |   Feedforward, Custom)|
+                    +-----------+-----------+
+                                |
+                    +-----------v-----------+
+                    |    SafetyEngine       |
+                    | (Watchdog, Limits,    |
+                    |  Thermal Runaway,     |
+                    |  Sensor Validation)   |
+                    +-----------------------+
+```
 
-```text
-               +-----------------------+
-               |    ObjectRegistry     |
-               +-----------+-----------+
-                           |
-       +-------------------+-------------------+
-       |                   |                   |
-+------v------+     +------v------+     +------v------+
-| ISensorDriver|     |IActuatorDrv |     |IDisplayDrv  |
-+------+------+     +------+------+     +------+------+
-       |                   |                   |
-   +---+---+           +---+---+           +---+---+
-   |SHT31  |           |AOD4184|           |LovyanGFX|
-   |DS18B20|           |  PWM  |           | (Multi) |
-   +-------+           +-------+           +-------+
+### Driver Interface Contracts
+
+All drivers implement standard interfaces:
+
+**ISensorDriver**
+```cpp
+virtual bool begin(const JsonObject& config) = 0;
+virtual SensorReading read() = 0;
+virtual String getType() const = 0;
+virtual String getName() const = 0;
+virtual bool isConnected() = 0;
+```
+
+**IActuatorDriver**
+```cpp
+virtual bool begin(const JsonObject& config) = 0;
+virtual bool setPower(float power_pct) = 0;
+virtual void emergencyStop() = 0;
+virtual ActuatorState getState() const = 0;
+virtual String getType() const = 0;
+```
+
+**IDisplayDriver**
+```cpp
+virtual bool begin(const JsonObject& config) = 0;
+virtual void clear() = 0;
+virtual bool update(const JsonObject& status_fields) = 0;
+virtual void showError(const String& message) = 0;
+virtual void showBootScreen(const String& firmware_version) = 0;
+virtual DisplayMetrics getMetrics() const = 0;
+```
+
+**IControlAlgorithm**
+```cpp
+virtual bool begin(const JsonObject& config) = 0;
+virtual float compute(float target, float current, float dt) = 0;
+virtual void reset() = 0;
+virtual String getType() const = 0;
 ```
 
 ### Plugin Hook System (`IPlugin`)
@@ -43,79 +105,79 @@ Plugins register lifecycle callbacks to extend capabilities without modifying co
 - `void onTelemetryTick(const StatusPayload& telemetry)`
 - `void onSessionStop(StopReason reason)`
 - `void onFault(FaultCode fault, const char* message)`
+- `bool handleWebSocketCommand(const String& topic, const JsonObject& payload, JsonObject& response)`
+- `bool handleHttpRequest(const String& path, const JsonObject& params, String& response)`
 
 ---
 
-## 3. Expanded Display Drivers Architecture & Ecosystem Matrix
+## 3. Generic Hardware Support Matrix
 
-To ensure maximum hardware compatibility across the ESP32 maker ecosystem, display rendering uses **LovyanGFX / Adafruit GFX / U8g2 abstraction wrappers**, providing zero-copy SPI DMA memory transfers and hardware-accelerated drawing.
+### Sensor Drivers (Configurable via `type` string)
+| Category | Driver Types | Communication | Examples |
+|----------|--------------|---------------|----------|
+| **Temp+Humidity** | `sht3x`, `sht30`, `aht20`, `bme280` | I2C | SHT31, SHT30, AHT10/20, BME280 |
+| **Temp+Humidity** | `dht22`, `dht11`, `am2302` | 1-Wire (GPIO) | DHT22, AM2302 |
+| **Temp Only** | `ds18b20`, `ds18s20` | 1-Wire | DS18B20, DS18S20 |
+| **Temp Only** | `ntc`, `thermistor` | ADC | 10k/100k NTC with beta formula |
+| **Temp+Pressure** | `bme280`, `bmp280` | I2C/SPI | BME280, BMP280 |
+| **Custom** | `custom` | Any | User-provided plugin |
 
-### Supported Display Controllers & Bus Types
+### Actuator Drivers (Configurable via `type` + `role`)
+| Role | Driver Types | Control Methods | Examples |
+|------|--------------|-----------------|----------|
+| **Heater** | `mosfet_pwm`, `ssr`, `triac`, `custom` | PID, Bang-Bang, Feedforward | AOD4184, IRLB3034, SSR-25DA |
+| **Fan** | `fan_pwm`, `fan_digital`, `shared_mosfet`, `custom` | PWM, ON/OFF, Shared | AOD4184, 12V/24V PWM fans |
+| **Custom** | `stepper`, `servo`, `gpio`, `custom` | Position, Speed, PWM | 28BYJ-48, SG90, generic GPIO |
 
-| Driver Family | Controller IC | Common Bus Types | Resolutions Supported | Popular Hardware Modules / Examples |
-|---------------|---------------|------------------|-----------------------|-------------------------------------|
-| **OLED Monochrome** | `SSD1306` | I2C / SPI | 128x64, 128x32 | Standard 0.96" / 0.91" I2C OLEDs |
-| **OLED Monochrome** | `SH1106` | I2C / SPI | 128x64 | 1.3" I2C OLED displays |
-| **OLED Monochrome** | `SSD1309` | I2C / SPI | 128x64 | 2.42" large OLED displays |
-| **TFT Small Color** | `ST7789` | SPI | 135x240, 240x240, 170x320 | LilyGo T-Display V1.1, TTGO, T-QT |
-| **TFT Medium Color**| `ILI9341` | SPI / Parallel-8 | 240x320 | ESP32-2432S028 (CYD), Red SPI TFTs |
-| **TFT Compact Color**| `ST7735` | SPI | 128x128, 128x160 | 1.44" / 1.8" Color TFT modules |
-| **Round Color TFT** | `GC9A01` | SPI | 240x240 | 1.28" Round Smartwatch Style TFTs |
-| **TFT Large Color** | `ILI9488` / `ST7796` | SPI / Parallel-8 | 320x480 | 3.5" / 4.0" Color TFT displays |
-| **Character LCD**  | `HD44780` (PCF8574)| I2C | 16x2, 20x4 | Classic 1602 / 2004 LCDs with I2C backpack |
-| **Smart HMI**      | `Nextion` | UART Serial | Customizable | Nextion Basic/Enhanced/Intelligent HMI |
+### Display Drivers (Configurable via `driver` + `bus`)
+| Driver | Controller | Bus | Resolutions | Common Hardware |
+|--------|------------|-----|-------------|-----------------|
+| `ssd1306` | SSD1306 | I2C/SPI | 128x64, 128x32 | 0.96" OLED |
+| `sh1106` | SH1106 | I2C/SPI | 128x64 | 1.3" OLED |
+| `st7789` | ST7789 | SPI | 135x240, 240x240 | LilyGo T-Display, TTGO, T-QT |
+| `ili9341` | ILI9341 | SPI | 240x320 | ESP32-2432S028 (CYD) |
+| `st7735` | ST7735 | SPI | 128x128, 128x160 | 1.44"/1.8" Color TFT |
+| `gc9a01` | GC9A01 | SPI | 240x240 | 1.28" Round Smartwatch TFT |
+| `ili9488` | ILI9488 | SPI/8-bit | 320x480 | 3.5"/4.0" Color TFT |
+| `hd44780` | HD44780 (PCF8574) | I2C | 16x2, 20x4 | Classic 1602/2004 LCD |
+| `nextion` | Nextion | UART | Customizable | Nextion HMI |
+| `auto` | Auto-detect | Any | Any | Best-effort |
 
-### Display Layout Engine
-- **Layout Auto-Adaptation**: Automatically adjusts font size, icon positioning, and field density according to detected display width and height.
-- **Configurable Display Refresh Rate**: Refresh cycle decoupled from status stream (e.g. 1Hz - 5Hz configurable, default 1Hz).
+### Control Algorithms (Configurable via `algorithm`)
+| Algorithm | Parameters | Use Case |
+|-----------|------------|----------|
+| `pid` | `kp`, `ki`, `kd`, `max_integral` | Precision temperature control |
+| `bang_bang` | `hysteresis_c`, `min_cycle_sec` | Simple on/off with hysteresis |
+| `pwm_feedforward` | `base_pwm`, `temp_coefficient` | Known thermal characteristics |
+| `custom` | User-defined | Plugin-provided algorithm |
 
 ---
 
-## 4. Hardware Support Matrix & Test Hardware Mapping
+## 4. Hardware Test Matrix (User Provided)
 
-### Test Board Configurations
-1. **ESP32_DEVKITC_V4**:
-   - ESP32-WROOM-32D (4MB Flash). Standard development board.
-   - Default I2C: SDA (GPIO21), SCL (GPIO22).
-   - PWM Heater: GPIO25 (MOSFET AOD4184).
-   - PWM Fan: GPIO26 (MOSFET AOD4184).
-
-2. **LilyGo T-Display V1.1**:
-   - ESP32 + ST7789 1.14" IPS Display (135x240 resolution, SPI).
-   - Display Pins: MOSI (GPIO19), SCLK (GPIO18), CS (GPIO5), DC (GPIO16), RST (GPIO23), BL (GPIO4).
-   - I2C Sensors: SDA (GPIO21), SCL (GPIO22).
-
-3. **ESP32-2432S028 (Cheap Yellow Display - CYD)**:
-   - ESP32 + 2.8" TFT 240x320 Display (ILI9341/ST7789, SPI).
-   - Display Pins: MOSI (GPIO13), MISO (GPIO12), SCLK (GPIO14), CS (GPIO15), DC (GPIO2), RST (NC/3.3V), BL (GPIO21).
-
-### Sensor Drivers
-- **Integrated Temp + Humidity**: SHT31 (I2C `0x44`/`0x45`), SHT30, DHT22 (1-Wire digital), BME280 (I2C `0x76`/`0x77`), AHT10/AHT20.
-- **Dedicated Temp-Only**: DS18B20 (1-Wire), NTC Thermistor (ADC with Beta formula), PT100/MAX31865.
-- **Combined/Separate Sensor Resolution**: The `SensorManager` can bind a single integrated sensor (e.g. SHT31 for both temp and humidity) OR two independent drivers (e.g., DS18B20 for temperature + DHT22 for humidity).
-
-### Actuator Configurations (MOSFET AOD4184)
-- **Shared MOSFET (Single Output)**: One MOSFET controls both heater element and fan tied to the same power output.
-- **Independent Dual MOSFET**:
-  - Heater: MOSFET AOD4184 on GPIO X with LEDC PWM frequency 100Hz - 1kHz.
-  - Exhaust Fan: MOSFET AOD4184 on GPIO Y with LEDC PWM or Digital GPIO HIGH/LOW.
+| Board | MCU | Display | Default I2C | Test Sensors | Test Actuators |
+|-------|-----|---------|-------------|--------------|----------------|
+| **ESP32_DEVKITC_V4** | ESP32-WROOM-32D | None/External | GPIO21/22 | SHT31 (I2C), DS18B20 (1-Wire) | AOD4184 MOSFET (PWM) |
+| **LilyGo T-Display V1.1** | ESP32 + ST7789 135x240 SPI | ST7789 135x240 | GPIO21/22 | SHT31 (I2C) | AOD4184 MOSFET (PWM) |
+| **ESP32-2432S028 (CYD)** | ESP32 + 2.8" 240x320 | ILI9341/ST7789 SPI | GPIO21/22 | SHT31 (I2C) | AOD4184 MOSFET (PWM) |
 
 ---
 
 ## 5. Fault Tolerance & Safety Matrix ("Tolerante a Falhas")
 
 ### Safe Abort Principle
-Any anomaly during operation triggers `FAULT_STOPPED`. The heater MOSFET is **immediately forced LOW via hardware register write (<1ms)**. However, the ESP32 platform, WiFi, AsyncWebServer, WebSocket server, display, and logging subsystems **remain 100% operational**.
+Any anomaly during operation triggers `FAULT_STOPPED`. The heater actuator is **immediately forced LOW via hardware register write (<1ms)**. However, the ESP32 platform, WiFi, AsyncWebServer, WebSocket server, display, and logging subsystems **remain 100% operational**.
 
 ### Failure Conditions & Recovery Actions
 
 | Failure Condition | Detection Criteria | Safety Action | Log Outcome |
 |-------------------|--------------------|---------------|-------------|
-| **Sensor Disconnect** | 3 consecutive failed reads (600ms timeout) | Heater PWM = 0%, Fan = 100% (cool down), State -> `FAULT_STOPPED` | Recorded in `drying.log` with sensor ID & pin |
-| **Over-Temperature** | Chamber temp >= 80.0°C | Hard GPIO LOW to Heater MOSFET, State -> `FAULT_STOPPED` | Critical fault logged with peak temp |
-| **Thermal Runaway** | Heater >80% power for 45s without +0.5°C temp rise | Heater PWM = 0%, State -> `FAULT_STOPPED` | Logged as `THERMAL_RUNAWAY` error |
-| **I2C Bus Lockup** | SDA stuck LOW for >10ms | Execute I2C clock toggling recovery sequence (9 clock cycles). If unrecovered -> `FAULT_STOPPED` | Bus recovery attempt & result logged |
-| **NVS / Flash Corrupt**| Invalid checksum on config read | Load safe embedded factory defaults, activate "philarmony" AP | Warning logged in `system.log` |
+| **Sensor Disconnect** | 3 consecutive failed reads (configurable timeout) | Heater PWM = 0%, Fan = 100% (cool down), State -> `FAULT_STOPPED` | Recorded in `drying.log` with sensor ID & pin |
+| **Over-Temperature** | Chamber temp >= configurable limit (default 80°C) | Hard GPIO LOW to Heater, State -> `FAULT_STOPPED` | Critical fault logged with peak temp |
+| **Thermal Runaway** | Heater >80% power for configurable time (45s) without configurable temp rise (0.5°C) | Heater PWM = 0%, State -> `FAULT_STOPPED` | Logged as `THERMAL_RUNAWAY` error |
+| **I2C Bus Lockup** | SDA stuck LOW for >10ms | Execute I2C clock toggling recovery (9 cycles). If unrecovered -> `FAULT_STOPPED` | Bus recovery attempt & result logged |
+| **Actuator Fault** | PWM output mismatch, overcurrent | Immediate cutoff, State -> `FAULT_STOPPED` | Actuator ID & fault logged |
+| **NVS / Flash Corrupt** | Invalid checksum on config read | Load safe embedded factory defaults, activate "philarmony" AP | Warning logged in `system.log` |
 
 ---
 
@@ -150,4 +212,3 @@ Inspired by Klipper's `PID_CALIBRATE` command, the firmware implements the **Zie
   - $K_i = \frac{2 \cdot K_p}{T_u}$
   - $K_d = \frac{K_p \cdot T_u}{8}$
 - Automatically stores $K_p, K_i, K_d$ into NVS memory under `heater.pid` namespace for seamless boot persistence.
-

@@ -18,6 +18,8 @@
 
 Implement the base firmware structure for an open-source DIY filament dryer running on ESP32. The device controls chamber temperature, humidity, drying time, heater, and exhaust ventilation. It provides WiFi connectivity with automatic fallback to a configuration hotspot, a WebSocket API for real-time control and monitoring, optional display support with configurable layouts, and per-second status updates via WebSocket and optional display.
 
+**Key Design Principle**: **100% Configurable & Generic Architecture** - No hardcoded hardware references. All sensors, actuators, displays, and control algorithms are configured via JSON/YAML. The firmware loads driver implementations dynamically based on configuration. Supports any sensor, actuator, display, or control algorithm through a plugin/driver architecture.
+
 ## User Scenarios & Testing
 
 ### Primary User Scenarios
@@ -33,7 +35,7 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 **Scenario 2: Normal Operation via WebSocket**
 1. ESP32 connects to configured WiFi
 2. User connects via WebSocket to ESP32 IP
-3. User configures sensor types and GPIO pin mappings for heater/ventilation
+3. User configures sensor types, GPIO pin mappings, and control algorithms via generic configuration API
 4. User configures optional display (enabled/disabled, resolution, displayed fields)
 5. User starts drying cycle with target temperature, max time, optional target humidity
 6. System runs drying cycle, updating status every second via WebSocket
@@ -41,10 +43,17 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 8. Status updates include: current status, temperatures, heater status/power %, exhaust fan status, ESP32 CPU/memory usage
 
 **Scenario 3: Display Operation**
-1. Display is configured as enabled with specific resolution
+1. Display is configured as enabled with specific resolution and driver
 2. User selects which status fields to display
 3. During drying cycle, display updates every second with selected fields
 4. Initial display shows same fields as WebSocket status stream
+
+**Scenario 4: Hardware Configuration (Generic)**
+1. User defines sensor configuration via JSON (type, communication bus, pins, parameters)
+2. User defines actuator configuration via JSON (type, control method, pins, parameters)
+3. User defines display configuration via JSON (driver type, bus, pins, layout)
+4. User defines control algorithm configuration (PID parameters, safety limits, calibration)
+5. System loads appropriate drivers and validates configuration at boot
 
 ### Acceptance Criteria
 
@@ -52,9 +61,9 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 |----------|-------|------|------|
 | Hotspot fallback | No WiFi configured or connection fails | ESP32 boots | Hotspot "philarmony"/"philarmony" active with HTTP config server on fixed IP |
 | WiFi config | Connected to hotspot | User submits WiFi credentials via HTTP | ESP32 connects to WiFi, disables hotspot, starts WebSocket server |
-| Sensor config | Connected via WebSocket | User sends sensor/pin config | Configuration persisted and applied to hardware |
+| Hardware config | Connected via WebSocket | User sends generic hardware config | Configuration persisted and applied to hardware drivers |
 | Display config | Connected via WebSocket | User sends display config | Display settings persisted and applied |
-| Start drying | Configured sensors/pins | User sends start command with temp/time/humidity | Drying cycle starts, status streamed every second |
+| Start drying | Configured sensors/pins/algorithms | User sends start command with temp/time/humidity | Drying cycle starts, status streamed every second |
 | Stop drying | Drying cycle running | User sends stop command | Heater/ventilation stopped, status updated |
 | Status stream | WebSocket connected | Every second during operation | JSON status with all required fields sent |
 | Display update | Display configured | Every second during operation | Display shows configured fields with current values |
@@ -67,6 +76,8 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - WebSocket disconnect during drying: Drying continues, status resumes on reconnect
 - Target humidity reached before max time: Drying stops automatically
 - Over-temperature safety: Heater cuts off regardless of target
+- Actuator failure: Safety engine triggers emergency stop
+- Calibration routine: Auto-tunes PID for any heater configuration
 
 ## Functional Requirements
 
@@ -81,49 +92,54 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - WebSocket server starts when connected to WiFi
 - Supports multiple concurrent clients
 - Message format: JSON with `topic` and `payload` fields
-- Topics: `config/sensors`, `config/pins`, `config/display`, `control/start`, `control/stop`, `status/subscribe`, `status/unsubscribe`
+- Core topics: `config/hardware`, `config/control`, `config/display`, `control/start`, `control/stop`, `status/subscribe`, `status/unsubscribe`, `control/pid_calibrate`
 
-### FR-003: Sensor and Pin Configuration
-- Configure sensor types: temperature (DHT22, DS18B20, etc.), humidity (DHT22, etc.)
-- Configure GPIO pins for: heater control (PWM), exhaust fan control (PWM/digital), sensor data pins
-- Configuration persisted in non-volatile storage
-- Validation: pin conflicts prevented, valid GPIO ranges enforced
+### FR-003: Generic Hardware Configuration (Sensors, Actuators, Displays)
+- **Sensors**: Configure any sensor type via generic schema:
+  - Type identifier (driver name): `sht3x`, `dht22`, `ds18b20`, `ntc`, `bme280`, `aht20`, `custom`
+  - Communication bus: I2C (bus, address, pins), SPI (pins), 1-Wire (pin), UART (pins), ADC (pin)
+  - Measurement capabilities: temperature, humidity, pressure, custom
+  - Driver-specific parameters: resolution, sampling rate, calibration coefficients
+  - Supports single integrated sensor (temp+humidity) OR separate sensors
+- **Actuators**: Configure any actuator via generic schema:
+  - Heater: MOSFET/SSR/PWM, pin, frequency, max power limit, control algorithm (PID, bang-bang, hystereis)
+  - Fan: PWM/digital/shared MOSFET, pin, frequency, cooldown duration, speed curve
+  - Custom actuators: generic GPIO/PWM/servo/stepper with custom parameters
+- **Displays**: Configure any display via generic schema:
+  - Driver: `ssd1306`, `sh1106`, `st7789`, `ili9341`, `st7735`, `gc9a01`, `ili9488`, `hd44780`, `nextion`, `auto`
+  - Bus: I2C, SPI, parallel 8-bit, UART
+  - Resolution, rotation, pin mapping
+  - Layout engine: auto-adapts fields to resolution, configurable font scaling
+- **Persistence**: All hardware configuration in NVS (survives power loss)
+- **Validation**: Pin conflicts prevented, valid GPIO ranges enforced, bus conflicts detected
+- **Hot-reload**: Configuration changes applied without reboot where possible
 
-### FR-004: Display Configuration
+### FR-004: Display Configuration & Layout Engine
 - Enable/disable display
-- Configure display resolution (e.g., 128x64, 128x32, 240x240)
+- Configure display resolution (auto-detected or manual: 128x64, 128x32, 135x240, 240x240, 240x320, 320x480, 16x2, 20x4)
 - Select which status fields to display (subset of WebSocket status fields)
+- Auto-layout engine: adjusts font size, field positioning, density based on resolution
+- Configurable refresh rate (1Hz - 5Hz, default 1Hz)
 - Configuration persisted and applied on boot
+- No touch screen differentiation in this phase
 
 ### FR-005: Drying Cycle Control
 - Start command: target temperature (°C), maximum time (minutes), optional target humidity (%)
 - Stop/interrupt command: immediately stops heater and ventilation
 - Automatic stop when: max time reached, target humidity reached, safety temperature exceeded
 - On completion (target humidity or max time reached): immediately turn off heater PWM and run exhaust fan for 30 seconds cooldown before marking status as "stopped"
-- Safety: hard temperature limit (e.g., 80°C) cuts heater regardless of target
+- Safety: hard temperature limit (configurable, default 80°C) cuts heater regardless of target
+- Configurable safety limits per heater type
 
 ### FR-006: Real-time Status Streaming
 - WebSocket topic `status/subscribe` enables per-second JSON updates
-- Status payload includes:
-  - `status`: "idle" | "drying" | "stopped" | "error"
-  - `chamber_temp_c`: current chamber temperature
-  - `target_temp_c`: target temperature
-  - `humidity_pct`: current humidity
-  - `target_humidity_pct`: target humidity (null if not set)
-  - `heater_on`: boolean
-  - `heater_power_pct`: 0-100 PWM duty cycle
-  - `exhaust_fan_on`: boolean
-  - `exhaust_fan_power_pct`: 0-100
-  - `elapsed_time_sec`: seconds since cycle start
-  - `remaining_time_sec`: seconds until max time (null if no limit)
-  - `cpu_usage_pct`: ESP32 CPU utilization
-  - `memory_free_bytes`: free heap memory
-  - `uptime_sec`: device uptime
+- Status payload includes all configured sensor readings, actuator states, and system metrics
+- Payload structure is generic and reflects configured sensors/actuators
 
 ### FR-007: Display Updates
 - If display enabled: update configured fields every second
 - Initial display shows same fields as status stream
-- Support for different resolutions and layouts
+- Support for different resolutions and layouts via layout engine
 - No touch screen differentiation in this phase
 
 ### FR-008: Filament Drying Profiles (Material Templates)
@@ -142,6 +158,22 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - Calculates optimal PID coefficients: `Kp` (proportional), `Ki` (integral), `Kd` (derivative)
 - Saves calculated `Kp`, `Ki`, `Kd` values persistently to NVS upon calibration completion
 - Emits real-time calibration progress and final PID parameters via WebSocket topic `status/pid_calibrate`
+- Works with any heater configuration (MOSFET, SSR, different thermal masses)
+
+### FR-010: Generic Control Algorithm Framework
+- Supports multiple control algorithms: PID, Bang-Bang (hysteresis), PWM with feedforward, custom algorithms
+- Algorithm selected and parameterized via configuration
+- Auto-tune routine works with any algorithm that exposes PID-like parameters
+- Safety engine integrates with all algorithms (hard limits, sensor validation, watchdog)
+
+### FR-011: Safety & Fault Tolerance (Generic)
+- Hardware watchdog timer enabled
+- Configurable safety limits per actuator type
+- Sensor validation: timeout, range, rate-of-change checks
+- Thermal runaway detection (configurable thresholds)
+- I2C/SPI bus lockup detection and recovery
+- Emergency stop: immediate actuator cutoff, system stays online for diagnostics
+- Fault codes: standardized, extensible
 
 ## Non-Functional Requirements
 
@@ -155,8 +187,8 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 ### Safety
 - Hardware watchdog timer enabled
 - Heater over-temperature hardware cutoff (if supported by hardware)
-- Software temperature limit: heater off at 80°C chamber temp
-- Fan runs for 30s after heater off to cool chamber
+- Software temperature limit: heater off at configurable limit (default 80°C)
+- Fan runs for configurable duration after heater off to cool chamber
 
 ### Reliability
 - Configuration persisted in NVS (survives power loss)
@@ -180,21 +212,35 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - `end_time`: timestamp (null if running)
 - `stop_reason`: "completed" | "stopped" | "target_humidity" | "max_time" | "safety_cutoff" | "error"
 
-### SensorConfig
-- `temperature_sensor`: { type: string, pin: number, ...params }
-- `humidity_sensor`: { type: string, pin: number, ...params }
+### SensorConfig (Generic)
+- `id`: unique identifier
+- `type`: driver type string (e.g., "sht3x", "dht22", "ds18b20", "ntc", "custom")
+- `capabilities`: array of measured quantities ["temperature", "humidity", "pressure"]
+- `bus`: object with bus-specific config (I2C/SPI/1Wire/UART/ADC)
+- `driver_params`: object with driver-specific parameters
+- `calibration`: offset/scale factors per capability
 
-### PinConfig
-- `heater_pwm_pin`: number
-- `exhaust_fan_pwm_pin`: number
-- `exhaust_fan_digital_pin`: number (optional)
+### ActuatorConfig (Generic)
+- `id`: unique identifier
+- `type`: driver type string (e.g., "mosfet_pwm", "ssr", "fan_pwm", "fan_digital", "stepper", "servo", "custom")
+- `role`: "heater" | "fan" | "custom"
+- `pins`: object with pin assignments
+- `control`: object with algorithm-specific parameters
+- `safety_limits`: object with min/max/rate limits
 
-### DisplayConfig
+### DisplayConfig (Generic)
 - `enabled`: boolean
-- `width`: number
-- `height`: number
-- `driver`: "ssd1306" | "st7789" | "ili9341" | "auto"
-- `fields`: array of field names from status payload
+- `driver`: driver type string
+- `bus`: bus configuration (I2C/SPI/parallel/UART)
+- `geometry`: width, height, rotation
+- `pin_mapping`: bus-specific pin assignments
+- `layout`: field selection, font scaling, layout mode (auto/manual)
+
+### ControlConfig (Generic)
+- `algorithm`: "pid" | "bang_bang" | "pwm_feedforward" | "custom"
+- `parameters`: algorithm-specific parameters
+- `auto_tune`: enable/disable auto-tune
+- `safety_limits`: integrated with SafetyEngine
 
 ### FilamentProfile
 - `id`: string (builtin: pla, petg, abs, tpu, nylon; custom: user-defined UUID)
@@ -208,7 +254,9 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 - `updated_at`: timestamp (for custom profiles)
 
 ### StatusPayload
-- All fields from FR-006
+- Generic structure reflecting all configured sensors and actuators
+- System metrics: cpu_usage_pct, memory_free_bytes, uptime_sec
+- Drying session state if active
 
 ## Success Criteria
 
@@ -225,22 +273,20 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 
 ## Assumptions
 
-1. ESP32 variant: ESP32-WROOM-32 or ESP32-S3 (4MB flash minimum)
-2. Sensors: DHT22 for temp/humidity, DS18B20 for temperature (user configurable)
-3. Heater control: MOSFET + PWM on GPIO
-4. Exhaust fan: PWM or digital control on GPIO
-5. Display: I2C OLED (SSD1306) or SPI TFT (ST7789/ILI9341) - auto-detect or config
+1. ESP32 variant: ESP32-WROOM-32, ESP32-S3, ESP32-C3 (4MB flash minimum)
+2. Any sensor/actuator/display supported via driver registry
+3. Configuration via WebSocket/HTTP only (no local buttons/encoder in this phase)
+4. Single drying chamber (single temperature/humidity zone)
+5. Safety temperature limit: configurable (default 80°C)
 6. Power supply: 12V/24V for heater, 3.3V/5V for ESP32 and logic
 7. No touch screen support in this phase
-8. Single drying chamber (single temperature/humidity zone)
-9. Configuration via WebSocket only (no local buttons/encoder in this phase)
-10. Safety temperature limit: 80°C hardcoded (configurable in future)
+8. Open-source GPLv3 licensing
 
 ## Dependencies & Constraints
 
-- **Hardware**: ESP32 dev board, temperature/humidity sensors, MOSFET driver, exhaust fan, optional display
-- **Software**: ESP-IDF or Arduino framework, AsyncWebServer/AsyncWebSocket libraries
-- **Storage**: NVS for WiFi credentials and device config
+- **Hardware**: ESP32 dev board, any compatible sensors, MOSFET driver, exhaust fan, optional display
+- **Software**: ESP-IDF or Arduino framework, AsyncWebServer/AsyncWebSocket, ArduinoJson, LittleFS
+- **Storage**: NVS for WiFi credentials and device config, LittleFS for logs
 - **Network**: 2.4GHz WiFi only (ESP32 limitation)
 - **Constitutional**: Must comply with safety standards for DIY equipment, GPLv3 licensing, PT-BR/EN-US documentation
 
@@ -257,14 +303,61 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 
 ## Appendix: WebSocket Message Examples
 
-### Configure Sensors
+### Generic Hardware Configuration
 ```json
-{ "topic": "config/sensors", "payload": { "temperature": { "type": "dht22", "pin": 4 }, "humidity": { "type": "dht22", "pin": 4 } } }
-```
-
-### Configure Pins
-```json
-{ "topic": "config/pins", "payload": { "heater_pwm": 25, "exhaust_fan_pwm": 26, "exhaust_fan_digital": 27 } }
+{
+  "topic": "config/hardware",
+  "payload": {
+    "sensors": [
+      {
+        "id": "chamber_temp",
+        "type": "sht3x",
+        "capabilities": ["temperature", "humidity"],
+        "bus": { "type": "i2c", "bus": 0, "address": 0x44, "sda_pin": 21, "scl_pin": 22 },
+        "driver_params": { "repeatability": "high" },
+        "calibration": { "temperature_offset": 0.0, "humidity_scale": 1.0 }
+      },
+      {
+        "id": "external_temp",
+        "type": "ds18b20",
+        "capabilities": ["temperature"],
+        "bus": { "type": "onewire", "pin": 4 },
+        "driver_params": { "resolution": 12 }
+      }
+    ],
+    "actuators": [
+      {
+        "id": "heater",
+        "type": "mosfet_pwm",
+        "role": "heater",
+        "pins": { "pwm": 25 },
+        "control": { "algorithm": "pid", "pwm_freq_hz": 1000, "max_power_pct": 100 },
+        "safety_limits": { "max_temp_c": 80, "max_power_pct": 100 }
+      },
+      {
+        "id": "exhaust_fan",
+        "type": "fan_pwm",
+        "role": "fan",
+        "pins": { "pwm": 26 },
+        "control": { "pwm_freq_hz": 5000, "cooldown_sec": 30 },
+        "safety_limits": { "max_power_pct": 100 }
+      }
+    ],
+    "display": {
+      "enabled": true,
+      "driver": "st7789",
+      "bus": { "type": "spi", "mosi": 19, "sclk": 18, "cs": 5, "dc": 16, "rst": 23 },
+      "geometry": { "width": 135, "height": 240, "rotation": 1 },
+      "layout": { "fields": ["chamber_temp_c", "target_temp_c", "humidity_pct", "heater_power_pct", "status"], "font_scaling": "auto" }
+    },
+    "control": {
+      "algorithm": "pid",
+      "parameters": { "kp": 12.5, "ki": 0.45, "kd": 32.1 },
+      "auto_tune": false,
+      "safety_limits": { "hard_temp_limit_c": 80 }
+    }
+  }
+}
 ```
 
 ### Configure Display
@@ -322,7 +415,27 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 { "topic": "status/subscribe", "payload": {} }
 ```
 
+### PID Auto-Tune Calibration
+```json
+{ "topic": "control/pid_calibrate", "payload": { "target_temp_c": 50.0, "cycles": 5 } }
+```
+
 ### Status Update (server → client, 1Hz)
 ```json
-{ "topic": "status/update", "payload": { "status": "drying", "chamber_temp_c": 48.5, "target_temp_c": 50, "humidity_pct": 22.1, "target_humidity_pct": 20, "heater_on": true, "heater_power_pct": 65, "exhaust_fan_on": true, "exhaust_fan_power_pct": 80, "elapsed_time_sec": 3600, "remaining_time_sec": 3600, "cpu_usage_pct": 12.5, "memory_free_bytes": 245760, "uptime_sec": 7200 } }
+{ "topic": "status/update", "payload": { "status": "drying", "chamber_temp_c": 49.2, "target_temp_c": 50.0, "humidity_pct": 18.5, "target_humidity_pct": 15.0, "heater_on": true, "heater_power_pct": 42.5, "exhaust_fan_on": true, "exhaust_fan_power_pct": 80.0, "elapsed_time_sec": 1240, "remaining_time_sec": 13160, "cpu_usage_pct": 14.2, "memory_free_bytes": 224500, "uptime_sec": 3800 } }
+```
+
+### PID Calibration Progress/Result
+```json
+{ "topic": "status/pid_calibrate", "payload": { "status": "calibrating", "cycle": 3, "total_cycles": 5, "current_temp_c": 51.4, "kp": 14.2, "ki": 0.52, "kd": 36.8, "saved_to_nvs": true } }
+```
+
+### Fault Notification
+```json
+{ "topic": "status/fault", "payload": { "fault_code": "THERMAL_RUNAWAY", "message": "Heater power >80% for 45s with no temperature increase.", "action_taken": "Heater MOSFET PWM cut off to 0%. Platform online.", "timestamp_sec": 3812 } }
+```
+
+### Real-Time Log Stream
+```json
+{ "topic": "logs/stream", "payload": { "target_log": "drying", "line": "[2026-07-23 14:35:00][INFO][DRYING] Temperature reached target 50.0C. Regulating PWM." } }
 ```
