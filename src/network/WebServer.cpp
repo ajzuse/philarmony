@@ -4,6 +4,8 @@
 #include "WebServer.hpp"
 #include "ConfigManager.hpp"
 #include "LogManager.hpp"
+#include "HardwareConfigParser.hpp"
+#include "DriverRegistry.hpp"
 
 namespace filament_dryer {
 
@@ -16,9 +18,13 @@ WebServer::~WebServer() {
     }
 }
 
-bool WebServer::begin(ConfigManager* config_mgr, LogManager* log_mgr) {
+bool WebServer::begin(ConfigManager* config_mgr, LogManager* log_mgr,
+                      HardwareConfigParser* hw_parser,
+                      DriverRegistry* driver_registry) {
     config_mgr_ = config_mgr;
     log_mgr_ = log_mgr;
+    hw_parser_ = hw_parser;
+    driver_registry_ = driver_registry;
     
     server_ = new AsyncWebServer(port_);
     
@@ -69,6 +75,31 @@ void WebServer::setupRoutes() {
     server_->on("/log/system", HTTP_GET, [this](AsyncWebServerRequest* request) {
         handleLogDownload(request, false);
     });
+    
+    // T019b: HTTP GET/POST /api/hardware/config endpoints
+    server_->on("/api/hardware/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        handleHardwareConfigGet(request);
+    });
+    
+    // POST: use a body handler to receive JSON body
+    server_->on("/api/hardware/config", HTTP_POST,
+        [this](AsyncWebServerRequest* request) {
+            // Final handler - body has been received and processed by body handler
+            // The response was already sent in the body handler
+        },
+        [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            // Body handler
+            static String body_buffer;
+            if (index == 0) body_buffer = "";
+            for (size_t i = 0; i < len; i++) {
+                body_buffer += (char)data[i];
+            }
+            if (index + len == total) {
+                handleHardwareConfigPostBody(request, body_buffer);
+                body_buffer = "";
+            }
+        }
+    );
     
     // 404 handler
     server_->onNotFound([this](AsyncWebServerRequest* request) {
@@ -184,6 +215,341 @@ void WebServer::handleNotFound(AsyncWebServerRequest* request) {
     }
     
     request->send(404, "text/plain", "Not found");
+}
+
+// T019b: GET /api/hardware/config - returns current hardware config as JSON
+void WebServer::handleHardwareConfigGet(AsyncWebServerRequest* request) {
+    if (!config_mgr_) {
+        sendError(request, 500, "Config manager not available");
+        return;
+    }
+    
+    JsonDocument doc;
+    
+    // Sensors (generic array)
+    JsonObject saved_sensors = config_mgr_->getObjectConfig("sensors");
+    if (!saved_sensors.isNull() && saved_sensors.is<JsonArray>()) {
+        JsonArray arr = saved_sensors.as<JsonArray>();
+        JsonArray out = doc.createNestedArray("sensors");
+        for (JsonVariant v : arr) {
+            out.add(v);
+        }
+    } else {
+        // Fall back to legacy single-sensor config
+        JsonObject sensors_obj = doc.createNestedObject("sensors");
+        SensorConfig sc = config_mgr_->getSensorConfig();
+        sensors_obj["chamber_temp"]["type"] = sc.type;
+        sensors_obj["chamber_temp"]["i2c_address"] = sc.i2c_address;
+        sensors_obj["chamber_temp"]["sda_pin"] = sc.sda_pin;
+        sensors_obj["chamber_temp"]["scl_pin"] = sc.scl_pin;
+    }
+    
+    // Actuators (generic array)
+    JsonObject saved_actuators = config_mgr_->getObjectConfig("actuators");
+    if (!saved_actuators.isNull() && saved_actuators.is<JsonArray>()) {
+        JsonArray arr = saved_actuators.as<JsonArray>();
+        JsonArray out = doc.createNestedArray("actuators");
+        for (JsonVariant v : arr) {
+            out.add(v);
+        }
+    } else {
+        // Fall back to legacy actuator config
+        JsonObject acts_obj = doc.createNestedObject("actuators");
+        ActuatorConfig ac = config_mgr_->getActuatorConfig();
+        JsonObject heater = acts_obj.createNestedObject("heater");
+        heater["type"] = "mosfet_pwm";
+        heater["role"] = "heater";
+        heater["pins"]["pwm"] = ac.heater_pin;
+        JsonObject fan = acts_obj.createNestedObject("exhaust_fan");
+        fan["type"] = "fan_pwm";
+        fan["role"] = "fan";
+        fan["pins"]["pwm"] = ac.fan_pin;
+    }
+    
+    // Display
+    JsonObject display = doc.createNestedObject("display");
+    DisplayConfig dc = config_mgr_->getDisplayConfig();
+    display["enabled"] = dc.enabled;
+    display["driver"] = dc.driver;
+    display["bus_type"] = dc.bus_type;
+    display["width"] = dc.width;
+    display["height"] = dc.height;
+    display["rotation"] = dc.rotation;
+    display["spi_mosi"] = dc.spi_mosi;
+    display["spi_sclk"] = dc.spi_sclk;
+    display["spi_cs"] = dc.spi_cs;
+    display["dc_pin"] = dc.dc_pin;
+    display["rst_pin"] = dc.rst_pin;
+    display["backlight_pin"] = dc.backlight_pin;
+    JsonArray fields_out = display.createNestedArray("fields");
+    for (const String& f : dc.fields) {
+        fields_out.add(f);
+    }
+    
+    // Control algorithm
+    JsonObject control = doc.createNestedObject("control");
+    JsonObject saved_control = config_mgr_->getObjectConfig("control");
+    if (!saved_control.isNull()) {
+        control["algorithm"] = saved_control["algorithm"] | "pid";
+        control["auto_tune"] = saved_control["auto_tune"] | false;
+        if (saved_control.containsKey("parameters")) {
+            JsonObject params_in = saved_control["parameters"].as<JsonObject>();
+            JsonObject params_out = control.createNestedObject("parameters");
+            for (JsonPair kv : params_in) {
+                params_out[kv.key()] = kv.value();
+            }
+        }
+        if (saved_control.containsKey("safety_limits")) {
+            JsonObject sl = saved_control["safety_limits"].as<JsonObject>();
+            JsonObject sl_out = control.createNestedObject("safety_limits");
+            for (JsonPair kv : sl) {
+                sl_out[kv.key()] = kv.value();
+            }
+        }
+    } else {
+        control["algorithm"] = "pid";
+        control["auto_tune"] = false;
+    }
+    
+    // Available drivers (informational)
+    if (driver_registry_) {
+        JsonObject available = doc.createNestedObject("available_drivers");
+        JsonArray sensors_arr = available.createNestedArray("sensors");
+        for (const String& s : driver_registry_->listSensors()) sensors_arr.add(s);
+        JsonArray actuators_arr = available.createNestedArray("actuators");
+        for (const String& s : driver_registry_->listActuators()) actuators_arr.add(s);
+        JsonArray displays_arr = available.createNestedArray("displays");
+        for (const String& s : driver_registry_->listDisplays()) displays_arr.add(s);
+        JsonArray controls_arr = available.createNestedArray("controls");
+        for (const String& s : driver_registry_->listControls()) controls_arr.add(s);
+    }
+    
+    String json;
+    serializeJson(doc, json);
+    sendJson(request, 200, json);
+}
+
+// T019b: POST /api/hardware/config - accept hardware config JSON
+void WebServer::handleHardwareConfigPostBody(AsyncWebServerRequest* request, const String& body) {
+    if (!config_mgr_) {
+        sendError(request, 500, "Config manager not available");
+        return;
+    }
+    
+    if (body.isEmpty()) {
+        sendError(request, 400, "Empty request body");
+        return;
+    }
+    
+    // Parse JSON
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, body);
+    if (err) {
+        sendError(request, 400, "JSON parse error: " + String(err.c_str()));
+        return;
+    }
+    
+    JsonObject payload = doc.as<JsonObject>();
+    
+    // Validate using HardwareConfigParser if available
+    if (hw_parser_) {
+        SensorConfig sc = config_mgr_->getSensorConfig();
+        ActuatorConfig ac = config_mgr_->getActuatorConfig();
+        DisplayConfig dc = config_mgr_->getDisplayConfig();
+        ControlConfig cc;
+        
+        ControlConfig current_control;
+        JsonObject existing_control = config_mgr_->getObjectConfig("control");
+        if (!existing_control.isNull()) {
+            current_control.algorithm = existing_control["algorithm"] | "pid";
+            current_control.auto_tune = existing_control["auto_tune"] | false;
+            if (existing_control.containsKey("safety_limits")) {
+                JsonObject sl = existing_control["safety_limits"];
+                current_control.safety_limits.hard_temp_limit_c = sl["hard_temp_limit_c"] | 80.0f;
+                current_control.safety_limits.max_heater_power_pct = sl["max_heater_power_pct"] | 100;
+                current_control.safety_limits.sensor_timeout_ms = sl["sensor_timeout_ms"] | 600;
+                current_control.safety_limits.thermal_runaway_time_sec = sl["thermal_runaway_time_sec"] | 45;
+                current_control.safety_limits.thermal_runaway_temp_rise_c = sl["thermal_runaway_temp_rise_c"] | 0.5f;
+            }
+        }
+        cc = current_control;
+        
+        auto validation = hw_parser_->parse(payload, sc, ac, dc, cc);
+        if (!validation.valid) {
+            String err_msg = "Schema validation failed:";
+            for (const auto& e : validation.errors) {
+                err_msg += " " + e + ";";
+            }
+            sendError(request, 400, err_msg);
+            return;
+        }
+    }
+    
+    // Validate driver types via DriverRegistry
+    if (driver_registry_) {
+        if (payload.containsKey("sensors")) {
+            JsonArray sensors = payload["sensors"].as<JsonArray>();
+            for (JsonVariant v : sensors) {
+                JsonObject sensor = v.as<JsonObject>();
+                String type = sensor["type"] | "";
+                if (!type.isEmpty() && !driver_registry_->hasSensor(type)) {
+                    sendError(request, 400, "Unknown sensor driver: " + type);
+                    return;
+                }
+            }
+        }
+        if (payload.containsKey("actuators")) {
+            JsonArray actuators = payload["actuators"].as<JsonArray>();
+            for (JsonVariant v : actuators) {
+                JsonObject actuator = v.as<JsonObject>();
+                String type = actuator["type"] | "";
+                if (!type.isEmpty() && !driver_registry_->hasActuator(type)) {
+                    sendError(request, 400, "Unknown actuator driver: " + type);
+                    return;
+                }
+            }
+        }
+        if (payload.containsKey("display")) {
+            JsonObject display = payload["display"].as<JsonObject>();
+            String drv = display["driver"] | "auto";
+            if (drv != "auto" && !drv.isEmpty() && !driver_registry_->hasDisplay(drv)) {
+                sendError(request, 400, "Unknown display driver: " + drv);
+                return;
+            }
+        }
+        if (payload.containsKey("control")) {
+            JsonObject control = payload["control"].as<JsonObject>();
+            String algo = control["algorithm"] | "pid";
+            if (!driver_registry_->hasControl(algo)) {
+                sendError(request, 400, "Unknown control algorithm: " + algo);
+                return;
+            }
+        }
+    }
+    
+    // Persist config (same logic as WebSocket handler)
+    
+    // Sensors
+    if (payload.containsKey("sensors")) {
+        JsonArray sensors = payload["sensors"].as<JsonArray>();
+        if (sensors.size() > 0) {
+            JsonObject first_sensor = sensors[0].as<JsonObject>();
+            SensorConfig sc = config_mgr_->getSensorConfig();
+            sc.type = first_sensor["type"] | sc.type;
+            if (first_sensor.containsKey("bus")) {
+                JsonObject bus = first_sensor["bus"].as<JsonObject>();
+                String bus_type = bus["type"] | "i2c";
+                if (bus_type == "i2c") {
+                    sc.sda_pin = bus["sda_pin"] | sc.sda_pin;
+                    sc.scl_pin = bus["scl_pin"] | sc.scl_pin;
+                    sc.i2c_address = bus["address"] | sc.i2c_address;
+                } else {
+                    sc.gpio_pin = bus["pin"] | sc.gpio_pin;
+                }
+            }
+            config_mgr_->setSensorConfig(sc);
+        }
+        
+        JsonDocument sensor_doc;
+        sensor_doc.set(sensors);
+        JsonObject sensor_obj = sensor_doc.as<JsonObject>();
+        config_mgr_->setObjectConfig("sensors", sensor_obj);
+    }
+    
+    // Actuators
+    if (payload.containsKey("actuators")) {
+        JsonArray actuators = payload["actuators"].as<JsonArray>();
+        ActuatorConfig ac = config_mgr_->getActuatorConfig();
+        
+        for (JsonVariant v : actuators) {
+            JsonObject actuator = v.as<JsonObject>();
+            String role = actuator["role"] | "";
+            
+            if (role == "heater" && actuator.containsKey("pins")) {
+                JsonObject pins = actuator["pins"].as<JsonObject>();
+                ac.heater_pin = pins["pwm"] | ac.heater_pin;
+            } else if (role == "fan" && actuator.containsKey("pins")) {
+                JsonObject pins = actuator["pins"].as<JsonObject>();
+                ac.fan_pin = pins["pwm"] | ac.fan_pin;
+            }
+        }
+        config_mgr_->setActuatorConfig(ac);
+        
+        JsonDocument act_doc;
+        act_doc.set(actuators);
+        JsonObject act_obj = act_doc.as<JsonObject>();
+        config_mgr_->setObjectConfig("actuators", act_obj);
+    }
+    
+    // Display
+    if (payload.containsKey("display")) {
+        JsonObject display = payload["display"].as<JsonObject>();
+        DisplayConfig dc = config_mgr_->getDisplayConfig();
+        dc.enabled = display["enabled"] | dc.enabled;
+        dc.driver = display["driver"] | dc.driver;
+        dc.bus_type = display["bus_type"] | dc.bus_type;
+        dc.width = display["width"] | dc.width;
+        dc.height = display["height"] | dc.height;
+        dc.rotation = display["rotation"] | dc.rotation;
+        dc.spi_mosi = display["spi_mosi"] | dc.spi_mosi;
+        dc.spi_sclk = display["spi_sclk"] | dc.spi_sclk;
+        dc.spi_cs = display["spi_cs"] | dc.spi_cs;
+        dc.dc_pin = display["dc_pin"] | dc.dc_pin;
+        dc.rst_pin = display["rst_pin"] | dc.rst_pin;
+        dc.backlight_pin = display["backlight_pin"] | dc.backlight_pin;
+        if (display.containsKey("fields")) {
+            JsonArray arr = display["fields"].as<JsonArray>();
+            dc.fields.clear();
+            for (JsonVariant v : arr) {
+                dc.fields.push_back(v.as<String>());
+            }
+        }
+        config_mgr_->setDisplayConfig(dc);
+        
+        JsonDocument disp_doc;
+        disp_doc.set(display);
+        JsonObject disp_obj = disp_doc.as<JsonObject>();
+        config_mgr_->setObjectConfig("display", disp_obj);
+    }
+    
+    // Control
+    if (payload.containsKey("control")) {
+        JsonObject control = payload["control"].as<JsonObject>();
+        
+        JsonDocument ctrl_doc;
+        ctrl_doc.set(control);
+        JsonObject ctrl_obj = ctrl_doc.as<JsonObject>();
+        config_mgr_->setObjectConfig("control", ctrl_obj);
+        
+        String algo = control["algorithm"] | "pid";
+        if (algo == "pid" && control.containsKey("parameters")) {
+            JsonObject params = control["parameters"].as<JsonObject>();
+            PidConfig pid;
+            pid.kp = params["kp"] | 0.0f;
+            pid.ki = params["ki"] | 0.0f;
+            pid.kd = params["kd"] | 0.0f;
+            pid.calibrated = true;
+            config_mgr_->setPidConfig(pid);
+        }
+    }
+    
+    sendJson(request, 200, "{\"status\":\"saved\"}");
+}
+
+// T019b: HTTP JSON helpers
+void WebServer::sendJson(AsyncWebServerRequest* request, int code, const String& json) {
+    AsyncWebServerResponse* response = request->beginResponse(code, "application/json", json);
+    response->addHeader("Cache-Control", "no-cache");
+    request->send(response);
+}
+
+void WebServer::sendError(AsyncWebServerRequest* request, int code, const String& error) {
+    StaticJsonDocument<256> doc;
+    doc["status"] = "error";
+    doc["error"] = error;
+    String json;
+    serializeJson(doc, json);
+    sendJson(request, code, json);
 }
 
 const char* WebServer::getCaptivePortalHTML() {
