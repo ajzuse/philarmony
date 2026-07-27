@@ -2,7 +2,10 @@
  * LogManager - Implementation
  * Dual logging: system.log (boot & runtime) and drying.log (per-session)
  */
+#include <Arduino.h>
+#include "firmware_version.h"
 #include "LogManager.hpp"
+#include "StateMachine.hpp"
 
 namespace filament_dryer {
 
@@ -83,7 +86,7 @@ void LogManager::logDryingTelemetry(float temp, float target_temp, float humidit
     snprintf(buffer, sizeof(buffer),
              "[DATA][TELEMETRY] Temp: %.1fC/%.1fC, Hum: %.1f/%.1f%%, HeaterPWM: %.1f%%, FanPWM: %.1f%%, Elapsed: %lus, Remaining: %lus",
              temp, target_temp, humidity, target_humidity, 
-             heater_pct, fan_pct, elapsed_sec, remaining_sec);
+             heater_pct, fan_pct, (unsigned long)elapsed_sec, (unsigned long)remaining_sec);
     
     String entry = formatEntry(LogLevel::INFO, LogModule::DRYING, String(buffer));
     writeToFile(DRYING_LOG_PATH, entry, MAX_DRYING_LOG_SIZE);
@@ -101,7 +104,7 @@ void LogManager::logDryingStart(const String& profile_id, float target_temp,
     char buffer[MAX_LOG_LINE_LENGTH];
     snprintf(buffer, sizeof(buffer),
              "[INFO][DRYING] Session #%lu started. Profile: %s, Target: %.1fC, Duration: %lum, TargetHum: %.1f%%",
-             current_session_id_, profile_id.c_str(), target_temp, max_duration, target_humidity);
+             (unsigned long)current_session_id_, profile_id.c_str(), target_temp, (unsigned long)max_duration, target_humidity);
     
     String entry = formatEntry(LogLevel::INFO, LogModule::DRYING, String(buffer));
     writeToFile(DRYING_LOG_PATH, entry, MAX_DRYING_LOG_SIZE);
@@ -126,7 +129,7 @@ void LogManager::logDryingStop(DryingStopReason reason) {
     char buffer[MAX_LOG_LINE_LENGTH];
     snprintf(buffer, sizeof(buffer),
              "[INFO][DRYING] Session #%lu stopped. Reason: %s",
-             current_session_id_, reason_str);
+             (unsigned long)current_session_id_, reason_str);
     
     String entry = formatEntry(LogLevel::INFO, LogModule::DRYING, String(buffer));
     writeToFile(DRYING_LOG_PATH, entry, MAX_DRYING_LOG_SIZE);
@@ -309,7 +312,7 @@ const char* LogManager::moduleToStr(LogModule module) {
         case LogModule::ACTUATOR: return "ACTUATOR";
         case LogModule::DRYING: return "DRYING";
         case LogModule::SAFETY: return "SAFETY";
-        case LogModule::DISPLAY: return "DISPLAY";
+        case LogModule::DISPLAY_MODULE: return "DISPLAY";
         case LogModule::PID: return "PID";
         case LogModule::NVS: return "NVS";
     }

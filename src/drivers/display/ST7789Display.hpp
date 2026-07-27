@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include "IDriverInterfaces.hpp"
+#include "../interfaces/IDriverInterfaces.hpp"
 #include <LovyanGFX.hpp>
 
 namespace filament_dryer {

@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <FS.h>
 #include <LittleFS.h>
+#include "StateMachine.hpp"
 
 namespace filament_dryer {
 
@@ -24,7 +25,7 @@ enum class LogModule {
     ACTUATOR,
     DRYING,
     SAFETY,
-    DISPLAY_DRV,
+    DISPLAY_MODULE,
     PID,
     NVS
 };

@@ -1,0 +1,81 @@
+/**
+ * BangBangControl - Implementation
+ * Hysteresis-based on/off temperature control
+ */
+#include "BangBangControl.hpp"
+#include "../core/LogManager.hpp"
+
+extern filament_dryer::LogManager logMgr;
+
+namespace filament_dryer {
+
+BangBangControl::BangBangControl() {}
+
+BangBangControl::~BangBangControl() {}
+
+bool BangBangControl::begin(const JsonObject& config) {
+    config_.hysteresis = config["hysteresis"] | 1.0f;
+    config_.min_cycle_time = config["min_cycle_time"] | 10.0f;
+    
+    if (config_.hysteresis <= 0) config_.hysteresis = 1.0f;
+    if (config_.min_cycle_time <= 0) config_.min_cycle_time = 10.0f;
+    
+    reset();
+    initialized_ = true;
+    
+    logMgr.logSystem(LogLevel::INFO, LogModule::CONTROL, 
+                     "Bang-Bang Control initialized: hysteresis=%.1fC, min_cycle=%.1fs",
+                     config_.hysteresis, config_.min_cycle_time);
+    return true;
+}
+
+float BangBangControl::compute(float target, float current, float dt) {
+    if (!initialized_) return 0.0f;
+    
+    uint32_t now = millis();
+    float time_since_switch = (now - last_switch_time_) / 1000.0f;
+    
+    // Check if we should switch
+    if (shouldSwitch(target, current)) {
+        // Enforce minimum cycle time
+        if (time_since_switch >= config_.min_cycle_time) {
+            last_output_ = (last_output_ > 0) ? 0.0f : 100.0f;
+            last_switch_time_ = millis();
+        }
+    }
+    
+    return last_output_;
+}
+
+bool BangBangControl::shouldSwitch(float target, float current) {
+    if (last_output_ > 0) {
+        // Heater is ON, switch OFF if temp >= target + hysteresis/2
+        return current >= (target + config_.hysteresis / 2.0f);
+    } else {
+        // Heater is OFF, switch ON if temp <= target - hysteresis/2
+        return current <= (target - config_.hysteresis / 2.0f);
+    }
+}
+
+void BangBangControl::reset() {
+    last_output_ = 0.0f;
+    last_switch_time_ = millis();
+}
+
+JsonObject BangBangControl::getParameters() {
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    obj["hysteresis"] = config_.hysteresis;
+    obj["min_cycle_time"] = config_.min_cycle_time;
+    return obj;
+}
+
+void BangBangControl::setParameters(const JsonObject& params) {
+    if (params.containsKey("hysteresis")) config_.hysteresis = params["hysteresis"];
+    if (params.containsKey("min_cycle_time")) config_.min_cycle_time = params["min_cycle_time"];
+    if (config_.hysteresis <= 0) config_.hysteresis = 1.0f;
+    if (config_.min_cycle_time <= 0) config_.min_cycle_time = 10.0f;
+    reset();
+}
+
+} // namespace filament_dryer

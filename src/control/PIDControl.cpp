@@ -1,0 +1,99 @@
+/**
+ * PIDControl - Implementation
+ * PID temperature control with anti-windup and output clamping
+ */
+#include "PIDControl.hpp"
+#include "../core/LogManager.hpp"
+
+extern filament_dryer::LogManager logMgr;
+
+namespace filament_dryer {
+
+PIDControl::PIDControl() {}
+
+PIDControl::~PIDControl() {}
+
+bool PIDControl::begin(const JsonObject& config) {
+    config_.kp = config["kp"] | 0.0f;
+    config_.ki = config["ki"] | 0.0f;
+    config_.kd = config["kd"] | 0.0f;
+    config_.max_integral = config["max_integral"] | 1000.0f;
+    config_.min_output = config["min_output"] | 0.0f;
+    config_.max_output = config["max_output"] | 100.0f;
+    
+    reset();
+    initialized_ = true;
+    
+    logMgr.logSystem(LogLevel::INFO, LogModule::CONTROL, 
+                     "PID Control initialized: Kp=%.2f, Ki=%.2f, Kd=%.2f",
+                     config_.kp, config_.ki, config_.kd);
+    return true;
+}
+
+float PIDControl::compute(float target, float current, float dt) {
+    if (!initialized_ || dt <= 0) return 0.0f;
+    
+    float error = target - current;
+    
+    // Proportional term
+    float p_term = config_.kp * error;
+    
+    // Integral term with anti-windup
+    integral_ += error * dt;
+    integral_ = constrain(integral_, -config_.max_integral, config_.max_integral);
+    float i_term = config_.ki * integral_;
+    
+    // Derivative term
+    float d_term = config_.kd * (error - last_error_) / dt;
+    last_error_ = error;
+    
+    // Combine terms
+    float output = p_term + i_term + d_term;
+    
+    // Clamp output
+    output = clampOutput(output);
+    
+    // Anti-windup: if output is saturated, limit integral
+    if (output >= config_.max_output && i_term > 0) {
+        integral_ -= error * dt;
+    } else if (output <= config_.min_output && i_term < 0) {
+        integral_ -= error * dt;
+    }
+    
+    last_output_ = output;
+    return output;
+}
+
+void PIDControl::reset() {
+    integral_ = 0.0f;
+    last_error_ = 0.0f;
+    last_output_ = 0.0f;
+}
+
+String PIDControl::getParameters() {
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    obj["kp"] = config_.kp;
+    obj["ki"] = config_.ki;
+    obj["kd"] = config_.kd;
+    obj["max_integral"] = config_.max_integral;
+    obj["min_output"] = config_.min_output;
+    obj["max_output"] = config_.max_output;
+    return obj;
+}
+
+void PIDControl::setParameters(const JsonObject& params) {
+    if (params.containsKey("kp")) config_.kp = params["kp"];
+    if (params.containsKey("ki")) config_.ki = params["ki"];
+    if (params.containsKey("kd")) config_.kd = params["kd"];
+    if (params.containsKey("max_integral")) config_.max_integral = params["max_integral"];
+    if (params.containsKey("min_output")) config_.min_output = params["min_output"];
+    if (params.containsKey("max_output")) config_.max_output = params["max_output"];
+    reset();
+}
+
+float PIDControl::clampOutput(float output) {
+    return constrain(output, config_.min_output, config_.max_output);
+}
+
+} // namespace filament_dryer

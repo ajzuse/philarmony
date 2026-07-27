@@ -5,6 +5,8 @@
  */
 #include "ConfigManager.hpp"
 #include "firmware_version.h"
+#include <map>
+#include <functional>
 
 namespace filament_dryer {
 
