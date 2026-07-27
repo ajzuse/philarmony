@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * NTCSensor - Implementation
  * NTC Thermistor ADC-based temperature sensor with Steinhart-Hart equation
@@ -47,6 +29,9 @@ bool NTCSensor::begin(const JsonObject& config) {
 
     initialized_ = true;
     
+    logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR,
+                     "NTC Thermistor initialized on GPIO %d (Beta: %.0f, Series R: %.0f)",
+                     gpio_pin_, beta_coefficient_, series_resistor_);
 
     return true;
 }
@@ -60,7 +45,7 @@ SensorReading NTCSensor::read() {
     reading.pressure = NAN;
 
     if (!initialized_) {
-        reading.error_message = "Not initialized";
+        reading.error = "Not initialized";
         return reading;
     }
 
@@ -70,11 +55,11 @@ SensorReading NTCSensor::read() {
     // Convert to resistance
     uint32_t max_adc = (1 << adc_width_) - 1;  // 4095 for 12-bit
     if (adc_raw >= max_adc) {
-        reading.error_message = "ADC saturated (open circuit?)";
+        reading.error = "ADC saturated (open circuit?)";
         return reading;
     }
     if (adc_raw == 0) {
-        reading.error_message = "ADC zero (short circuit?)";
+        reading.error = "ADC zero (short circuit?)";
         return reading;
     }
 
@@ -95,7 +80,7 @@ SensorReading NTCSensor::read() {
 
     // Sanity check
     if (temp_celsius < -50.0f || temp_celsius > 200.0f) {
-        reading.error_message = "Temperature out of valid range";
+        reading.error = "Temperature out of valid range";
         return reading;
     }
 
@@ -103,7 +88,7 @@ SensorReading NTCSensor::read() {
     reading.humidity = NAN;
     reading.pressure = NAN;
     reading.valid = true;
-    reading.error_message = "";
+    reading.error = "";
     last_reading_ = reading;
 
     return reading;

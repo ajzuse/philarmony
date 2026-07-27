@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * ControlEngine - Implementation
  */
@@ -23,7 +5,6 @@
 #include "PIDControl.hpp"
 #include "BangBangControl.hpp"
 #include "PWMFeedforwardControl.hpp"
-#include <Arduino.h>
 
 namespace filament_dryer {
 
@@ -48,6 +29,7 @@ bool ControlEngine::begin() {
     };
     
     initialized_ = true;
+    logMgr.logSystem(LogLevel::INFO, LogModule::CONTROL, "ControlEngine initialized with %d algorithms", factories_.size());
     return true;
 }
 
@@ -56,12 +38,14 @@ bool ControlEngine::setAlgorithm(const String& type, const JsonObject& config) {
     
     auto it = factories_.find(type);
     if (it == factories_.end()) {
+        logMgr.logSystem(LogLevel::ERROR, LogModule::CONTROL, "Unknown algorithm: %s", type.c_str());
         return false;
     }
     
     // Create new algorithm instance
     IControlAlgorithm* new_algo = it->second(config);
     if (!new_algo->begin(config)) {
+        logMgr.logSystem(LogLevel::ERROR, LogModule::CONTROL, "Failed to initialize algorithm: %s", type.c_str());
         delete new_algo;
         return false;
     }
@@ -72,6 +56,7 @@ bool ControlEngine::setAlgorithm(const String& type, const JsonObject& config) {
     current_algorithm_ = new_algo;
     current_type_ = type;
     
+    logMgr.logSystem(LogLevel::INFO, LogModule::CONTROL, "Switched to algorithm: %s", type.c_str());
     return true;
 }
 

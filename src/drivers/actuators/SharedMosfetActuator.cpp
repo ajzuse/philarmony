@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * SharedMosfetActuator - Implementation
  * Heater and exhaust fan sharing single MOSFET output
@@ -41,7 +23,7 @@ bool SharedMosfetActuator::begin(const JsonObject& config) {
     ledcAttachPin(pwm_pin_, pwm_channel_);
     ledcWrite(pwm_channel_, 0);
     
-    state_ = ActuatorState{};
+    state_ = {};
     state_.enabled = false;
     state_.power_pct = 0.0f;
     state_.fault = false;
@@ -50,6 +32,8 @@ bool SharedMosfetActuator::begin(const JsonObject& config) {
     
     initialized_ = true;
     
+    logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, 
+                     "Shared MOSFET on GPIO %d (%luHz, ch%d)", pwm_pin_, pwm_freq_, pwm_channel_);
     return true;
 }
 
@@ -78,6 +62,7 @@ void SharedMosfetActuator::emergencyStop() {
     heater_power_ = 0;
     fan_power_ = 0;
     
+    logMgr.logSystem(LogLevel::WARNING, LogModule::ACTUATOR, "Shared MOSFET emergency stop");
 }
 
 ActuatorState SharedMosfetActuator::getState() const {

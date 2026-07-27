@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * DriverRegistry - Dynamic driver factory for sensors, actuators, displays, and control algorithms
  * Klipper-inspired object registry pattern for 100% configurable hardware
@@ -27,10 +9,8 @@
 #include <map>
 #include <functional>
 #include <memory>
-#include <vector>
 
 #include "drivers/interfaces/IDriverInterfaces.hpp"
-#include "control/IControlAlgorithm.hpp"
 
 namespace filament_dryer {
 
@@ -55,7 +35,6 @@ public:
             return new T(config);
         };
     }
-    void registerSensor(const String& type, SensorFactory factory);
 
     // Register actuator driver by type string
     template<typename T>
@@ -64,7 +43,6 @@ public:
             return new T(config);
         };
     }
-    void registerActuator(const String& type, ActuatorFactory factory);
 
     // Register display driver by type string
     template<typename T>
@@ -73,7 +51,6 @@ public:
             return new T(config);
         };
     }
-    void registerDisplay(const String& type, DisplayFactory factory);
 
     // Register control algorithm by type string
     template<typename T>
@@ -82,7 +59,6 @@ public:
             return new T(config);
         };
     }
-    void registerControl(const String& type, ControlFactory factory);
 
     // ===========================================
     // CREATION METHODS (called at runtime)
@@ -113,7 +89,7 @@ public:
     bool hasControl(const String& type) const;
 
     // Initialize - registers all built-in drivers
-    void registerBuiltins();
+    void initializeBuiltins();
 
 private:
     DriverRegistry() = default;
@@ -126,6 +102,34 @@ private:
     std::map<String, std::function<IDisplayDriver*(const JsonObject&)>> display_factories_;
     std::map<String, std::function<IControlAlgorithm*(const JsonObject&)>> control_factories_;
 
+    // Explicit template instantiations for common drivers
+    template void registerSensor<DHT22Sensor>(const String&);
+    template void registerSensor<DS18B20Sensor>(const String&);
+    template void registerSensor<NTCSensor>(const String&);
+    template void registerSensor<BME280Sensor>(const String&);
+    template void registerSensor<AHT20Sensor>(const String&);
+    template void registerSensor<CustomSensor>(const String&);
+
+    template void registerActuator<MosfetActuator>(const String&);
+    template void registerActuator<SSRActuator>(const String&);
+    template void registerActuator<FanActuator>(const String&);
+    template void registerActuator<StepperActuator>(const String&);
+    template void registerActuator<ServoActuator>(const String&);
+    template void registerActuator<GPIOActuator>(const String&);
+    template void registerActuator<SharedMosfetActuator>(const String&);
+
+    template void registerDisplay<SSD1306Display>(const String&);
+    template void registerDisplay<ST7789Display>(const String&);
+    template void registerDisplay<ILI9341Display>(const String&);
+    template void registerDisplay<ST7735Display>(const String&);
+    template void registerDisplay<GC9A01Display>(const String&);
+    template void registerDisplay<ILI9488Display>(const String&);
+    template void registerDisplay<HD44780Display>(const String&);
+    template void registerDisplay<NextionDisplay>(const String&);
+
+    template void registerControl<PIDControl>(const String&);
+    template void registerControl<BangBangControl>(const String&);
+    template void registerControl<PWMFeedforwardControl>(const String&);
 };
 
 } // namespace filament_dryer

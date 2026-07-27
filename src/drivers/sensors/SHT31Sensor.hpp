@@ -3,7 +3,7 @@
  */
 #pragma once
 
-#include "IDriverInterfaces.hpp"
+#include "../interfaces/IDriverInterfaces.hpp"
 #include <Wire.h>
 
 namespace filament_dryer {

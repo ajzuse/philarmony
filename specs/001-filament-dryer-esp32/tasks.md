@@ -35,9 +35,9 @@
 - [x] T010 [P] Implement SystemMetrics for FreeRTOS CPU and Heap utilization in src/utils/SystemMetrics.hpp and src/utils/SystemMetrics.cpp
 
 **NEW: Generic Driver Registry & Factory Pattern**
-- [ ] T010a [P] Implement DriverRegistry with factory functions for sensors, actuators, displays, and control algorithms in src/core/DriverRegistry.hpp and src/core/DriverRegistry.cpp
-- [ ] T010b [P] Implement built-in driver registration (sensors, actuators, displays, control algorithms) in src/core/DriverRegistry.cpp
-- [ ] T010c [P] Implement generic hardware configuration parser and validator in src/core/HardwareConfigParser.hpp and src/core/HardwareConfigParser.cpp
+- [x] T010a [P] Implement DriverRegistry with factory functions for sensors, actuators, displays, and control algorithms in src/core/DriverRegistry.hpp and src/core/DriverRegistry.cpp
+- [x] T010b [P] Implement built-in driver registration (sensors, actuators, displays, control algorithms) in src/core/DriverRegistry.cpp
+- [x] T010c [P] Implement generic hardware configuration parser and validator in src/core/HardwareConfigParser.hpp and src/core/HardwareConfigParser.cpp
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel.
 
@@ -65,18 +65,18 @@
 
 - [x] T014 [P] [US2] Implement SHT3x I2C sensor driver in src/drivers/sensors/SHT3xSensor.hpp and src/drivers/sensors/SHT3xSensor.cpp
 - [x] T015 [P] [US2] Implement DHT22 and DS18B20 drivers in src/drivers/sensors/DHT22Sensor.cpp and src/drivers/sensors/DS18B20Sensor.cpp
-- [ ] T015a [P] [US2] Implement NTC thermistor ADC sensor driver in src/drivers/sensors/NTCSensor.hpp and src/drivers/sensors/NTCSensor.cpp
-- [ ] T015b [P] [US2] Implement BME280/BMP280 I2C sensor driver in src/drivers/sensors/BME280Sensor.hpp and src/drivers/sensors/BME280Sensor.cpp
-- [ ] T015c [P] [US2] Implement AHT20 I2C sensor driver in src/drivers/sensors/AHT20Sensor.hpp and src/drivers/sensors/AHT20Sensor.cpp
-- [ ] T015d [P] [US2] Implement generic CustomSensorDriver template for plugin sensors in src/drivers/sensors/CustomSensor.hpp and src/drivers/sensors/CustomSensor.cpp
+- [x] T015a [P] [US2] Implement NTC thermistor ADC sensor driver in src/drivers/sensors/NTCSensor.hpp and src/drivers/sensors/NTCSensor.cpp
+- [x] T015b [P] [US2] Implement BME280/BMP280 I2C sensor driver in src/drivers/sensors/BME280Sensor.hpp and src/drivers/sensors/BME280Sensor.cpp
+- [x] T015c [P] [US2] Implement AHT20 I2C sensor driver in src/drivers/sensors/AHT20Sensor.hpp and src/drivers/sensors/AHT20Sensor.cpp
+- [x] T015d [P] [US2] Implement generic CustomSensorDriver template for plugin sensors in src/drivers/sensors/CustomSensor.hpp and src/drivers/sensors/CustomSensor.cpp
 
 - [x] T016 [P] [US2] Implement MOSFET AOD4184 PWM heater driver in src/drivers/actuators/MosfetActuator.hpp and src/drivers/actuators/MosfetActuator.cpp
 - [x] T017 [P] [US2] Implement Fan driver (PWM / digital / shared MOSFET) in src/drivers/actuators/FanActuator.hpp and src/drivers/actuators/FanActuator.cpp
-- [ ] T017a [P] [US2] Implement SSR actuator driver in src/drivers/actuators/SSRActuator.hpp and src/drivers/actuators/SSRActuator.cpp
-- [ ] T017b [P] [US2] Implement Stepper actuator driver in src/drivers/actuators/StepperActuator.hpp and src/drivers/actuators/StepperActuator.cpp
-- [ ] T017c [P] [US2] Implement Servo actuator driver in src/drivers/actuators/ServoActuator.hpp and src/drivers/actuators/ServoActuator.cpp
-- [ ] T017d [P] [US2] Implement Generic GPIO actuator driver in src/drivers/actuators/GPIOActuator.hpp and src/drivers/actuators/GPIOActuator.cpp
-- [ ] T017e [P] [US2] Implement SharedMosfetActuator for heater+fan on same MOSFET in src/drivers/actuators/SharedMosfetActuator.hpp and src/drivers/actuators/SharedMosfetActuator.cpp
+- [x] T017a [P] [US2] Implement SSR actuator driver in src/drivers/actuators/SSRActuator.hpp and src/drivers/actuators/SSRActuator.cpp
+- [x] T017b [P] [US2] Implement Stepper actuator driver in src/drivers/actuators/StepperActuator.hpp and src/drivers/actuators/StepperActuator.cpp
+- [x] T017c [P] [US2] Implement Servo actuator driver in src/drivers/actuators/ServoActuator.hpp and src/drivers/actuators/ServoActuator.cpp
+- [x] T017d [P] [US2] Implement Generic GPIO actuator driver in src/drivers/actuators/GPIOActuator.hpp and src/drivers/actuators/GPIOActuator.cpp
+- [x] T017e [P] [US2] Implement SharedMosfetActuator for heater+fan on same MOSFET in src/drivers/actuators/SharedMosfetActuator.hpp and src/drivers/actuators/SharedMosfetActuator.cpp
 
 - [x] T018 [US2] Implement WebSocketServer handling control/start, control/stop, and config/hardware in src/network/WebSocketServer.hpp and src/network/WebSocketServer.cpp
 - [x] T019 [US2] Implement 1Hz status update broadcast on topic status/update in src/network/WebSocketServer.cpp
@@ -101,12 +101,12 @@
 - [x] T024 [US3] Implement WebSocket real-time log streaming on topic logs/stream in src/network/WebSocketServer.cpp
 
 **NEW: Generic Safety Framework**
-- [ ] T024a [US3] Implement configurable safety limits per actuator type in SafetyEngine (max_temp_c, max_power_pct, sensor_timeout_ms, thermal_runaway_time_sec, thermal_runaway_temp_rise_c) in src/core/SafetyEngine.hpp and src/core/SafetyEngine.cpp
-- [ ] T024b [US3] Implement sensor validation: timeout, range, rate-of-change checks per sensor capability in src/core/SafetyEngine.cpp
-- [ ] T024c [US3] Implement I2C bus lockup detection (SDA stuck LOW) and recovery sequence (9 clock cycles) in src/core/SafetyEngine.cpp
-- [ ] T024d [US3] Implement SPI bus error detection and recovery in src/core/SafetyEngine.cpp
-- [ ] T024e [US3] Implement actuator fault detection: PWM output mismatch, overcurrent detection in src/core/SafetyEngine.cpp
-- [ ] T024f [US3] Implement fault codes: SENSOR_DISCONNECT, OVER_TEMPERATURE, THERMAL_RUNAWAY, I2C_BUS_LOCKUP, SPI_BUS_ERROR, ACTUATOR_FAULT, NVS_CORRUPT, WATCHDOG_RESET in src/core/SafetyEngine.hpp
+- [x] T024a [US3] Implement configurable safety limits per actuator type in SafetyEngine (max_temp_c, max_power_pct, sensor_timeout_ms, thermal_runaway_time_sec, thermal_runaway_temp_rise_c) in src/core/SafetyEngine.hpp and src/core/SafetyEngine.cpp
+- [x] T024b [US3] Implement sensor validation: timeout, range, rate-of-change checks per sensor capability in src/core/SafetyEngine.cpp
+- [x] T024c [US3] Implement I2C bus lockup detection (SDA stuck LOW) and recovery sequence (9 clock cycles) in src/core/SafetyEngine.cpp
+- [x] T024d [US3] Implement SPI bus error detection and recovery in src/core/SafetyEngine.cpp
+- [x] T024e [US3] Implement actuator fault detection: PWM output mismatch, overcurrent detection in src/core/SafetyEngine.cpp
+- [x] T024f [US3] Implement fault codes: SENSOR_DISCONNECT, OVER_TEMPERATURE, THERMAL_RUNAWAY, I2C_BUS_LOCKUP, SPI_BUS_ERROR, ACTUATOR_FAULT, NVS_CORRUPT, WATCHDOG_RESET in src/core/SafetyEngine.hpp
 
 **Checkpoint**: User Story 3 complete and testable independently.
 
@@ -124,15 +124,15 @@
 - [x] T028 [US4] Implement auto-adapting display layout manager in src/drivers/display/DisplayManager.cpp
 
 **NEW: Extended Display Drivers & Auto-Detection**
-- [ ] T028a [P] [US4] Implement SH1106 OLED display driver in src/drivers/display/SH1106Display.hpp and src/drivers/display/SH1106Display.cpp
-- [ ] T028b [P] [US4] Implement ST7735 TFT display driver in src/drivers/display/ST7735Display.hpp and src/drivers/display/ST7735Display.cpp
-- [ ] T028c [P] [US4] Implement GC9A01 round TFT display driver in src/drivers/display/GC9A01Display.hpp and src/drivers/display/GC9A01Display.cpp
-- [ ] T028d [P] [US4] Implement ILI9488 large TFT display driver in src/drivers/display/ILI9488Display.hpp and src/drivers/display/ILI9488Display.cpp
-- [ ] T028e [P] [US4] Implement HD44780 character LCD (I2C backpack) driver in src/drivers/display/HD44780Display.hpp and src/drivers/display/HD44780Display.cpp
-- [ ] T028f [P] [US4] Implement Nextion UART HMI display driver in src/drivers/display/NextionDisplay.hpp and src/drivers/display/NextionDisplay.cpp
-- [ ] T028g [US4] Implement DisplayManager auto-detection (try ST7789, ILI9341, SSD1306 in order) in src/drivers/display/DisplayManager.cpp
-- [ ] T028h [US4] Implement auto-layout engine: auto font scaling, field density adjustment per resolution, compact mode in src/drivers/display/DisplayManager.cpp
-- [ ] T028i [US4] Implement configurable display refresh rate (1Hz-5Hz) decoupled from status stream in src/drivers/display/DisplayManager.cpp
+- [x] T028a [P] [US4] Implement SH1106 OLED display driver in src/drivers/display/SH1106Display.hpp and src/drivers/display/SH1106Display.cpp
+- [x] T028b [P] [US4] Implement ST7735 TFT display driver in src/drivers/display/ST7735Display.hpp and src/drivers/display/ST7735Display.cpp
+- [x] T028c [P] [US4] Implement GC9A01 round TFT display driver in src/drivers/display/GC9A01Display.hpp and src/drivers/display/GC9A01Display.cpp
+- [x] T028d [P] [US4] Implement ILI9488 large TFT display driver in src/drivers/display/ILI9488Display.hpp and src/drivers/display/ILI9488Display.cpp
+- [x] T028e [P] [US4] Implement HD44780 character LCD (I2C backpack) driver in src/drivers/display/HD44780Display.hpp and src/drivers/display/HD44780Display.cpp
+- [x] T028f [P] [US4] Implement Nextion UART HMI display driver in src/drivers/display/NextionDisplay.hpp and src/drivers/display/NextionDisplay.cpp
+- [x] T028g [US4] Implement DisplayManager auto-detection (try ST7789, ILI9341, SSD1306 in order) in src/drivers/display/DisplayManager.cpp
+- [x] T028h [US4] Implement auto-layout engine: auto font scaling, field density adjustment per resolution, compact mode in src/drivers/display/DisplayManager.cpp
+- [x] T028i [US4] Implement configurable display refresh rate (1Hz-5Hz) decoupled from status stream in src/drivers/display/DisplayManager.cpp
 
 **Checkpoint**: User Story 4 complete and testable independently.
 
@@ -162,8 +162,8 @@
 - [x] T033 [US6] Save calibrated Kp, Ki, Kd coefficients persistently in NVS under heater.pid in src/core/ConfigManager.cpp
 
 **NEW: Generic Auto-Tune for Any Control Algorithm**
-- [ ] T033a [P] [US6] Extend PidAutotuneController to support Bang-Bang and Feedforward algorithm auto-tune in src/core/PidAutotuneController.cpp
-- [ ] T033b [US6] Implement algorithm-agnostic auto-tune interface in IControlAlgorithm for custom algorithms in src/core/IControlAlgorithm.hpp
+- [x] T033a [P] [US6] Extend PidAutotuneController to support Bang-Bang and Feedforward algorithm auto-tune in src/core/PidAutotuneController.cpp
+- [x] T033b [US6] Implement algorithm-agnostic auto-tune interface in IControlAlgorithm for custom algorithms in src/core/IControlAlgorithm.hpp
 
 **Checkpoint**: User Story 6 complete and testable independently.
 
@@ -175,11 +175,15 @@
 
 **Independent Test**: Configure different algorithms via config/control -> Verify each regulates temperature correctly -> Auto-tune works for each.
 
-- [ ] T034 [P] [US7] Implement BangBangControl algorithm (hysteresis-based) in src/control/BangBangControl.hpp and src/control/BangBangControl.cpp
-- [ ] T035 [P] [US7] Implement PWMFeedforwardControl algorithm (base PWM + temp coefficient) in src/control/PWMFeedforwardControl.hpp and src/control/PWMFeedforwardControl.cpp
-- [ ] T036 [P] [US7] Implement IControlAlgorithm interface and ControlEngine for algorithm switching in src/control/IControlAlgorithm.hpp and src/control/ControlEngine.hpp/.cpp
-- [ ] T037 [US7] Register control algorithms in DriverRegistry and integrate with ConfigManager in src/core/ConfigManager.cpp
-- [ ] T038 [US7] Implement config/control WebSocket handler for algorithm selection and parameter configuration in src/network/WebSocketServer.cpp
+- [x] T034 [P] [US7] Implement BangBangControl algorithm (hysteresis-based) in src/control/BangBangControl.hpp and src/control/BangBangControl.cpp
+- [x] T035 [P] [US7] Implement PWMFeedforwardControl algorithm (base PWM + temp coefficient) in src/control/PWMFeedforwardControl.hpp and src/control/PWMFeedforwardControl.cpp
+- [x] T036 [P] [US7] Implement IControlAlgorithm interface and ControlEngine for algorithm switching in src/control/IControlAlgorithm.hpp and src/control/ControlEngine.hpp/.cpp
+- [x] T037 [US7] Register control algorithms in DriverRegistry and integrate with ConfigManager in src/core/ConfigManager.cpp
+- [x] T038 [US7] Implement config/control WebSocket handler for algorithm selection and parameter configuration in src/network/WebSocketServer.cpp
+
+**Checkpoint**: User Story 7 complete and testable independently.
+
+---
 
 **Checkpoint**: User Story 7 complete and testable independently.
 
@@ -191,12 +195,12 @@
 
 **Independent Test**: Configure sensor with offset/scale -> Verify readings adjusted -> Disconnect sensor -> Fault detected and logged -> Reconnect -> Auto-recovery.
 
-- [ ] T039 [P] [US8] Implement sensor calibration (offset/scale per capability) in ConfigManager and apply in sensor drivers in src/core/ConfigManager.cpp and sensor drivers
-- [ ] T040 [P] [US8] Implement sensor validation: timeout, range check, rate-of-change per capability in src/core/SafetyEngine.cpp
-- [ ] T041 [US8] Implement actuator fault detection: PWM output verification, overcurrent sense in src/core/SafetyEngine.cpp and actuator drivers
-- [ ] T042 [US8] Implement I2C bus recovery (9 clock cycles) and SPI error recovery in src/core/SafetyEngine.cpp
-- [ ] T043 [US8] Implement WebSocket fault notification (status/fault) with standardized fault codes in src/network/WebSocketServer.cpp
-- [ ] T044 [P] [US8] Add calibration fields to sensor config schema and validate in HardwareConfigParser in src/core/HardwareConfigParser.cpp
+- [x] T039 [P] [US8] Implement sensor calibration (offset/scale per capability) in ConfigManager and apply in sensor drivers in src/core/ConfigManager.cpp and sensor drivers
+- [x] T040 [P] [US8] Implement sensor validation: timeout, range check, rate-of-change per capability in src/core/SafetyEngine.cpp
+- [x] T041 [US8] Implement actuator fault detection: PWM output verification, overcurrent sense in src/core/SafetyEngine.cpp and actuator drivers
+- [x] T042 [US8] Implement I2C bus recovery (9 clock cycles) and SPI error recovery in src/core/SafetyEngine.cpp
+- [x] T043 [US8] Implement WebSocket fault notification (status/fault) with standardized fault codes in src/network/WebSocketServer.cpp
+- [x] T044 [P] [US8] Add calibration fields to sensor config schema and validate in HardwareConfigParser in src/core/HardwareConfigParser.cpp
 
 **Checkpoint**: User Story 8 complete and testable independently.
 

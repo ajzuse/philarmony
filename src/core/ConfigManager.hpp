@@ -76,6 +76,19 @@ struct WifiConfig {
     bool valid = false;
 };
 
+struct ControlConfig {
+    String algorithm = "pid";              // pid, bang_bang, pwm_feedforward, custom
+    bool auto_tune = false;
+    JsonObject parameters;                  // Algorithm-specific parameters
+    struct SafetyLimits {
+        float hard_temp_limit_c = 80.0f;
+        int max_heater_power_pct = 100;
+        int sensor_timeout_ms = 600;
+        int thermal_runaway_time_sec = 45;
+        float thermal_runaway_temp_rise_c = 0.5f;
+    } safety_limits;
+};
+
 class ConfigManager {
 public:
     ConfigManager();

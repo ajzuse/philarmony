@@ -3,7 +3,7 @@
  */
 #pragma once
 
-#include "IDriverInterfaces.hpp"
+#include "../interfaces/IDriverInterfaces.hpp"
 #include "drivers/display/SSD1306Display.hpp"
 #include "drivers/display/ST7789Display.hpp"
 #include "drivers/display/ILI9341Display.hpp"

@@ -2,6 +2,7 @@
  * SafetyEngine - Implementation
  * Thermal runaway protection, sensor monitoring, and hardware watchdog
  */
+#include <Arduino.h>
 #include "SafetyEngine.hpp"
 
 namespace filament_dryer {

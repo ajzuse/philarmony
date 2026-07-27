@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * StepperActuator - Implementation
  * Stepper motor driver (A4988, DRV8825, TMC2209, etc.)
@@ -41,6 +23,7 @@ bool StepperActuator::begin(const JsonObject& config) {
     microsteps_ = config["microsteps"] | 16;
     
     if (step_pin_ < 0 || dir_pin_ < 0) {
+        logMgr.logSystem(LogLevel::ERROR, LogModule::ACTUATOR, "Stepper: step_pin and dir_pin required");
         return false;
     }
     
@@ -60,13 +43,16 @@ bool StepperActuator::begin(const JsonObject& config) {
     
     setMicrostepping(microsteps_);
     
-    state_ = ActuatorState{};
+    state_ = {};
     state_.enabled = false;
     state_.power_pct = 0.0f;
     state_.fault = false;
     
     initialized_ = true;
     
+    logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, 
+                     "Stepper initialized (step=%d, dir=%d, microsteps=%d)", 
+                     step_pin_, dir_pin_, microsteps_);
     return true;
 }
 
@@ -100,6 +86,7 @@ void StepperActuator::emergencyStop() {
     state_.fault = true;
     state_.fault_message = "Emergency stop";
     
+    logMgr.logSystem(LogLevel::WARNING, LogModule::ACTUATOR, "Stepper emergency stop");
 }
 
 ActuatorState StepperActuator::getState() const {
@@ -136,6 +123,7 @@ bool StepperActuator::home() {
     
     // Simple homing: move negative until limit switch (not implemented)
     // In practice, would use limit switch on a dedicated pin
+    logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, "Stepper homing not fully implemented");
     return true;
 }
 

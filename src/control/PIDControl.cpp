@@ -1,40 +1,15 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * PIDControl - Implementation
  * PID temperature control with anti-windup and output clamping
  */
 #include "PIDControl.hpp"
-#include <Arduino.h>
+#include "../core/LogManager.hpp"
+
+extern filament_dryer::LogManager logMgr;
 
 namespace filament_dryer {
 
 PIDControl::PIDControl() {}
-
-PIDControl::PIDControl(const JsonObject& config) {
-    config_.kp = config["kp"] | 0.0f;
-    config_.ki = config["ki"] | 0.0f;
-    config_.kd = config["kd"] | 0.0f;
-    config_.max_integral = config["max_integral"] | 1000.0f;
-    config_.min_output = config["min_output"] | 0.0f;
-    config_.max_output = config["max_output"] | 100.0f;
-}
 
 PIDControl::~PIDControl() {}
 
@@ -49,6 +24,9 @@ bool PIDControl::begin(const JsonObject& config) {
     reset();
     initialized_ = true;
     
+    logMgr.logSystem(LogLevel::INFO, LogModule::CONTROL, 
+                     "PID Control initialized: Kp=%.2f, Ki=%.2f, Kd=%.2f",
+                     config_.kp, config_.ki, config_.kd);
     return true;
 }
 
@@ -92,7 +70,7 @@ void PIDControl::reset() {
     last_output_ = 0.0f;
 }
 
-JsonObject PIDControl::getParameters() {
+String PIDControl::getParameters() {
     JsonDocument doc;
     JsonObject obj = doc.to<JsonObject>();
     obj["kp"] = config_.kp;
