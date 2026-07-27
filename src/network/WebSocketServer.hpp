@@ -14,6 +14,8 @@ class StateMachine;
 class SafetyEngine;
 class LogManager;
 class PidAutotuneController;
+class HardwareConfigParser;
+class DriverRegistry;
 
 class WebSocketServer {
 public:
@@ -22,7 +24,9 @@ public:
     
     bool begin(ConfigManager* config_mgr, StateMachine* state_machine,
                SafetyEngine* safety, LogManager* log_mgr,
-               PidAutotuneController* pid_autotune);
+               PidAutotuneController* pid_autotune,
+               HardwareConfigParser* hw_parser = nullptr,
+               DriverRegistry* driver_registry = nullptr);
     
     void loop();
     
@@ -31,6 +35,12 @@ public:
     void broadcastFault(FaultCode fault, const String& message);
     void broadcastLog(const String& line, bool is_drying_log);
     void broadcastPidCalibrate(const JsonObject& progress);
+    
+    // Generic status payload builder (T019c) - reflects all configured sensors/actuators
+    void buildStatusPayload(JsonObject& payload);
+    
+    // Direct access to AsyncWebSocket for external builders (display task, etc.)
+    AsyncWebSocket* getWebSocket() { return ws_; }
     
 private:
     uint16_t port_;
@@ -42,6 +52,8 @@ private:
     SafetyEngine* safety_ = nullptr;
     LogManager* log_mgr_ = nullptr;
     PidAutotuneController* pid_autotune_ = nullptr;
+    HardwareConfigParser* hw_parser_ = nullptr;
+    DriverRegistry* driver_registry_ = nullptr;
     
     // Client management
     struct ClientInfo {

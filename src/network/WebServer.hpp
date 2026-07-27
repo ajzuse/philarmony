@@ -11,13 +11,17 @@ namespace filament_dryer {
 
 class ConfigManager;
 class LogManager;
+class HardwareConfigParser;
+class DriverRegistry;
 
 class WebServer {
 public:
     WebServer(uint16_t port = 80);
     ~WebServer();
     
-    bool begin(ConfigManager* config_mgr, LogManager* log_mgr);
+    bool begin(ConfigManager* config_mgr, LogManager* log_mgr,
+               HardwareConfigParser* hw_parser = nullptr,
+               DriverRegistry* driver_registry = nullptr);
     
     // Template for captive portal
     static const char* getCaptivePortalHTML();
@@ -28,6 +32,8 @@ private:
     AsyncWebServer* server_ = nullptr;
     ConfigManager* config_mgr_ = nullptr;
     LogManager* log_mgr_ = nullptr;
+    HardwareConfigParser* hw_parser_ = nullptr;
+    DriverRegistry* driver_registry_ = nullptr;
     
     // Route handlers
     void setupRoutes();
@@ -36,7 +42,13 @@ private:
     void handleInfo(AsyncWebServerRequest* request);
     void handleWifiConfigPost(AsyncWebServerRequest* request);
     void handleLogDownload(AsyncWebServerRequest* request, bool drying_log);
+    void handleHardwareConfigGet(AsyncWebServerRequest* request);
+    void handleHardwareConfigPost(AsyncWebServerRequest* request);
     void handleNotFound(AsyncWebServerRequest* request);
+    
+    // Helpers
+    void sendJson(AsyncWebServerRequest* request, int code, const String& json);
+    void sendError(AsyncWebServerRequest* request, int code, const String& error);
 };
 
 } // namespace filament_dryer
