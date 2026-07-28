@@ -4,55 +4,66 @@
 #pragma once
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <vector>
-#include <functional>
+#include "../core/SafetyEngine.hpp"
+#include "../core/StateMachine.hpp"
 
 namespace filament_dryer {
 
-// Forward declarations
 class ConfigManager;
-class StateMachine;
-class SafetyEngine;
-class LogManager;
 
-struct DryingSession;
-struct StatusPayload;
-struct PidConfig;
+struct StatusPayload {
+    String status;
+    float chamber_temp_c = NAN;
+    float humidity_pct = NAN;
+    float heater_power_pct = 0.0f;
+};
 
 class IPlugin {
 public:
     virtual ~IPlugin() = default;
-    
-    // Plugin identification
+
     virtual String getName() const = 0;
     virtual String getVersion() const = 0;
     virtual String getAuthor() const = 0;
     virtual String getDescription() const = 0;
-    
-    // Lifecycle hooks
-    virtual void onInit(ConfigManager& config) {}
+
+    virtual void onInit(ConfigManager& config) { (void)config; }
     virtual void onStart() {}
     virtual void onStop() {}
     virtual void onShutdown() {}
-    
-    // Session hooks
-    virtual void onSessionStart(const DryingSession& session) {}
-    virtual void onSessionStop(const DryingSession& session, StopReason reason) {}
-    virtual void onTelemetryTick(const StatusPayload& telemetry) {}
-    
-    // Safety hooks
-    virtual void onFault(FaultCode fault, const String& message) {}
-    
-    // Configuration hooks
-    virtual void onConfigChanged(const String& section, const JsonObject& new_config) {}
-    
-    // Custom WebSocket command handlers
-    virtual bool handleWebSocketCommand(const String& topic, const JsonObject& payload, JsonObject& response) {
+
+    virtual void onSessionStart(const DryingSession& session) { (void)session; }
+    virtual void onSessionStop(const DryingSession& session, DryingStopReason reason) {
+        (void)session;
+        (void)reason;
+    }
+    virtual void onTelemetryTick(const StatusPayload& telemetry) { (void)telemetry; }
+
+    virtual void onFault(FaultCode fault, const String& message) {
+        (void)fault;
+        (void)message;
+    }
+
+    virtual void onConfigChanged(const String& section, const JsonObject& new_config) {
+        (void)section;
+        (void)new_config;
+    }
+
+    virtual bool handleWebSocketCommand(const String& topic, const JsonObject& payload,
+                                        JsonObject& response) {
+        (void)topic;
+        (void)payload;
+        (void)response;
         return false;
     }
-    
-    // Custom HTTP endpoints
-    virtual bool handleHttpRequest(const String& path, const JsonObject& params, String& response) {
+
+    virtual bool handleHttpRequest(const String& path, const JsonObject& params,
+                                   String& response) {
+        (void)path;
+        (void)params;
+        (void)response;
         return false;
     }
 };
@@ -61,39 +72,26 @@ class PluginManager {
 public:
     PluginManager();
     ~PluginManager();
-    
+
     bool begin();
-    
-    // Register a plugin
+
     bool registerPlugin(IPlugin* plugin);
-    
-    // Unregister a plugin
     bool unregisterPlugin(const String& name);
-    
-    // Get plugin by name
     IPlugin* getPlugin(const String& name);
-    
-    // List all registered plugins
     std::vector<String> listPlugins() const;
-    
-    // Call lifecycle hooks
+
     void callOnInit(ConfigManager& config);
     void callOnStart();
     void callOnStop();
     void callOnShutdown();
-    
-    // Call session hooks
+
     void callOnSessionStart(const DryingSession& session);
-    void callOnSessionStop(const DryingSession& session, StopReason reason);
+    void callOnSessionStop(const DryingSession& session, DryingStopReason reason);
     void callOnTelemetryTick(const StatusPayload& telemetry);
-    
-    // Call safety hooks
+
     void callOnFault(FaultCode fault, const String& message);
-    
-    // Call config hooks
     void callOnConfigChanged(const String& section, const JsonObject& new_config);
-    
-    // Call custom command handlers
+
     bool callWebSocketCommand(const String& topic, const JsonObject& payload, JsonObject& response);
     bool callHttpRequest(const String& path, const JsonObject& params, String& response);
 
@@ -102,4 +100,4 @@ private:
     bool initialized_ = false;
 };
 
-} // namespace filament_dryer
+}  // namespace filament_dryer

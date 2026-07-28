@@ -3,6 +3,7 @@
 #include "../core/ConfigManager.hpp"
 #include "../core/LogManager.hpp"
 #include "../core/HardwareConfigParser.hpp"
+#include "WifiManager.hpp"
 
 namespace filament_dryer {
 
@@ -17,11 +18,13 @@ WebServer::~WebServer() {
 
 bool WebServer::begin(ConfigManager* config_mgr, LogManager* log_mgr,
                       HardwareConfigParser* hw_parser,
-                      DriverRegistry* driver_registry) {
+                      DriverRegistry* driver_registry,
+                      WifiManager* wifi_mgr) {
     config_mgr_ = config_mgr;
     log_mgr_ = log_mgr;
     hw_parser_ = hw_parser;
     driver_registry_ = driver_registry;
+    wifi_mgr_ = wifi_mgr;
 
     if (!server_) {
         server_ = new AsyncWebServer(port_);
@@ -30,6 +33,12 @@ bool WebServer::begin(ConfigManager* config_mgr, LogManager* log_mgr,
     }
 
     return true;
+}
+
+void WebServer::attachWebSocket(AsyncWebSocket* ws) {
+    if (server_ && ws) {
+        server_->addHandler(ws);
+    }
 }
 
 void WebServer::setupRoutes() {
@@ -91,7 +100,16 @@ void WebServer::handleWifiConfigPost(AsyncWebServerRequest* request) {
         return;
     }
 
-    sendJson(request, 200, "{\"status\":\"saved\"}");
+    bool connected = false;
+    if (wifi_mgr_) {
+        connected = wifi_mgr_->setConfig(config);
+    }
+
+    if (connected) {
+        sendJson(request, 200, "{\"status\":\"connected\"}");
+    } else {
+        sendJson(request, 200, "{\"status\":\"saved\",\"ap_active\":true}");
+    }
 }
 
 void WebServer::handleLogDownload(AsyncWebServerRequest* request, bool drying_log) {
@@ -119,11 +137,15 @@ void WebServer::handleHardwareConfigGet(AsyncWebServerRequest* request) {
     JsonDocument doc;
     JsonObject root = doc.to<JsonObject>();
 
-  const SensorConfig sensor = config_mgr_->getSensorConfig();
+    const SensorConfig sensor = config_mgr_->getSensorConfig();
     JsonObject sensor_obj = root["sensor"].to<JsonObject>();
     sensor_obj["type"] = sensor.type;
     sensor_obj["i2c_address"] = sensor.i2c_address;
     sensor_obj["gpio_pin"] = sensor.gpio_pin;
+    sensor_obj["temperature_offset"] = sensor.temperature_offset;
+    sensor_obj["temperature_scale"] = sensor.temperature_scale;
+    sensor_obj["humidity_offset"] = sensor.humidity_offset;
+    sensor_obj["humidity_scale"] = sensor.humidity_scale;
 
     const ActuatorConfig actuator = config_mgr_->getActuatorConfig();
     JsonObject actuator_obj = root["actuator"].to<JsonObject>();
@@ -199,7 +221,38 @@ const char* WebServer::getCaptivePortalHTML() {
 }
 
 const char* WebServer::getConfigPageHTML() {
-    return "<!doctype html><html><body><h1>Philarmony</h1></body></html>";
+    return R"HTML(<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Philarmony WiFi</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#102018;color:#e8f5e9}
+.wrap{max-width:420px;margin:8vh auto;padding:1.5rem}
+h1{font-size:1.8rem;margin:0 0 .25rem}
+.sub{opacity:.8;margin-bottom:1.5rem}
+label{display:block;margin:.75rem 0 .25rem}
+input{width:100%;padding:.65rem;border:1px solid #2e7d32;border-radius:6px;background:#0b1510;color:#fff;box-sizing:border-box}
+button{margin-top:1.25rem;width:100%;padding:.8rem;border:0;border-radius:6px;background:#43a047;color:#fff;font-weight:600}
+.lang{font-size:.85rem;opacity:.7;margin-top:1rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Philarmony</h1>
+<p class="sub">Configurar WiFi / Configure WiFi</p>
+<form method="POST" action="/api/wifi/config">
+<label for="ssid">SSID</label>
+<input id="ssid" name="ssid" required maxlength="32" autocomplete="ssid"/>
+<label for="password">Senha / Password</label>
+<input id="password" name="password" type="password" maxlength="64" autocomplete="current-password"/>
+<button type="submit">Salvar e Conectar / Save &amp; Connect</button>
+</form>
+<p class="lang">PT: Informe a rede local. EN: Enter your local network credentials.</p>
+</div>
+</body>
+</html>)HTML";
 }
 
 }  // namespace filament_dryer

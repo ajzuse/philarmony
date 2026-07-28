@@ -31,6 +31,10 @@ struct SensorConfig {
     int8_t gpio_pin = -1;           // GPIO pin for 1-Wire/DHT/ADC (-1 if I2C)
     int8_t sda_pin = 21;            // I2C SDA GPIO
     int8_t scl_pin = 22;            // I2C SCL GPIO
+    float temperature_offset = 0.0f;
+    float temperature_scale = 1.0f;
+    float humidity_offset = 0.0f;
+    float humidity_scale = 1.0f;
 };
 
 struct ActuatorConfig {

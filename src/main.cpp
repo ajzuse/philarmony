@@ -26,6 +26,7 @@
 #include "utils/SystemMetrics.hpp"
 #include "drivers/interfaces/IDriverInterfaces.hpp"
 #include "drivers/display/DisplayManager.hpp"
+#include "plugins/IPlugin.hpp"
 
 using namespace filament_dryer;
 
@@ -41,6 +42,7 @@ HardwareConfigParser hwParser;
 ProfileManager profileMgr(configMgr);
 ControlEngine controlEngine;
 DisplayManager displayManager;
+PluginManager pluginMgr;
 WifiManager wifiMgr;
 WebServer webServer(80);
 WebSocketServer wsServer;
@@ -51,6 +53,40 @@ ISensorDriver* activeHumiditySensor = nullptr;
 IActuatorDriver* heaterActuator = nullptr;
 IActuatorDriver* fanActuator = nullptr;
 IDisplayDriver* activeDisplay = nullptr;
+
+static bool cooldownActive = false;
+static uint32_t cooldownEndMs = 0;
+static DryingStopReason pendingCooldownReason = DryingStopReason::COMPLETED;
+
+static SensorReading applySensorCalibration(const SensorReading& reading) {
+    if (!reading.valid) {
+        return reading;
+    }
+    SensorConfig cfg = configMgr.getSensorConfig();
+    SensorReading calibrated = reading;
+    if (!isnan(calibrated.temperature)) {
+        calibrated.temperature =
+            calibrated.temperature * cfg.temperature_scale + cfg.temperature_offset;
+    }
+    if (!isnan(calibrated.humidity)) {
+        calibrated.humidity =
+            calibrated.humidity * cfg.humidity_scale + cfg.humidity_offset;
+    }
+    return calibrated;
+}
+
+static void beginCooldown(DryingStopReason reason) {
+    pendingCooldownReason = reason;
+    cooldownActive = true;
+    ActuatorConfig actuatorCfg = configMgr.getActuatorConfig();
+    cooldownEndMs = millis() + (actuatorCfg.cooldown_duration_sec * 1000UL);
+    if (heaterActuator) {
+        heaterActuator->setPower(0.0f);
+    }
+    if (fanActuator) {
+        fanActuator->setPower(80.0f);
+    }
+}
 
 // ============================================================
 // FreeRTOS Task Handles
@@ -82,14 +118,25 @@ void controlLoopTask(void* pvParameters) {
         // Read active sensors
         SensorReading tempReading, humidityReading;
         if (activeTempSensor) {
-            tempReading = activeTempSensor->read();
+            tempReading = applySensorCalibration(activeTempSensor->read());
         }
         if (activeHumiditySensor) {
-            humidityReading = activeHumiditySensor->read();
+            humidityReading = applySensorCalibration(activeHumiditySensor->read());
         }
         
         float chamberTemp = tempReading.valid ? tempReading.temperature : NAN;
         float chamberHumidity = humidityReading.valid ? humidityReading.humidity : NAN;
+
+        if (cooldownActive) {
+            if (heaterActuator) heaterActuator->setPower(0.0f);
+            if (fanActuator) fanActuator->setPower(80.0f);
+            if (millis() >= cooldownEndMs) {
+                cooldownActive = false;
+                if (fanActuator) fanActuator->setPower(0.0f);
+                pluginMgr.callOnSessionStop(stateMachine.getCurrentSession(), pendingCooldownReason);
+            }
+            continue;
+        }
         
         float heaterPowerPct = (heaterActuator && heaterActuator->getState().enabled)
                                    ? heaterActuator->getState().power_pct
@@ -101,6 +148,8 @@ void controlLoopTask(void* pvParameters) {
                                        stateMachine.getCurrentSession().target_temp_c,
                                        heaterPower, heaterPower > 0, sensorConnected)) {
             stateMachine.stopDrying(DryingStopReason::SENSOR_ERROR);
+            if (heaterActuator) heaterActuator->setPower(0.0f);
+            if (fanActuator) fanActuator->setPower(0.0f);
             continue;
         }
 
@@ -140,7 +189,14 @@ void controlLoopTask(void* pvParameters) {
 
             if (stop) {
                 stateMachine.stopDrying(reason);
-                if (heaterActuator) heaterActuator->setPower(0.0f);
+                if (reason == DryingStopReason::HUMIDITY_REACHED ||
+                    reason == DryingStopReason::MAX_TIME ||
+                    reason == DryingStopReason::COMPLETED) {
+                    beginCooldown(reason);
+                } else {
+                    if (heaterActuator) heaterActuator->setPower(0.0f);
+                    if (fanActuator) fanActuator->setPower(0.0f);
+                }
                 continue;
             }
 
@@ -289,6 +345,7 @@ void onSessionUpdate(const DryingSession& session) {
 void onSafetyFault(FaultCode fault, const String& message) {
     logMgr.logSystem(LogLevel::ERROR, LogModule::SAFETY, "%s", message.c_str());
     wsServer.broadcastFault(fault, message);
+    pluginMgr.callOnFault(fault, message);
     
     // Force state machine to fault state
     stateMachine.transitionTo(SystemState::FAULT_STOPPED);
@@ -475,16 +532,20 @@ void initializeNetwork() {
         if (s == WifiManager::Status::CONNECTED) {
             logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                              "WiFi connected: %s", wifiMgr.getLocalIP().c_str());
+            stateMachine.transitionTo(SystemState::READY);
+        } else if (s == WifiManager::Status::AP_ACTIVE) {
+            stateMachine.transitionTo(SystemState::HOTSPOT);
         }
     });
 
-    if (webServer.begin(&configMgr, &logMgr, &hwParser, &DriverRegistry::instance())) {
+    if (webServer.begin(&configMgr, &logMgr, &hwParser, &DriverRegistry::instance(), &wifiMgr)) {
         logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                          "HTTP server started on port 80");
     }
 
     if (wsServer.begin(&configMgr, &stateMachine, &safetyEngine, &logMgr, &pidAutotune,
                        &hwParser, &DriverRegistry::instance(), &profileMgr, &controlEngine)) {
+        webServer.attachWebSocket(wsServer.getWebSocket());
         wsServer.setHardwareReloadCallback(reloadHardwareFromConfig);
         logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                          "WebSocket server started on ws://<ip>/ws");
@@ -530,6 +591,10 @@ void setup() {
     logMgr.setLogCallback(onLogCallback);
 
     DriverRegistry::instance().registerBuiltins();
+
+    pluginMgr.begin();
+    pluginMgr.callOnInit(configMgr);
+    pluginMgr.callOnStart();
 
     initializeSensors();
     initializeActuators();

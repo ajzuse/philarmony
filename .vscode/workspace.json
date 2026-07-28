@@ -21,7 +21,7 @@
     ]
   },
   "philarmony": {
-    "toolchain": "PlatformIO + Arduino-ESP32 + GNU Make",
+    "toolchain": "PlatformIO + Arduino-ESP32",
     "dependencies": [
       "AsyncTCP",
       "ESPAsyncWebServer",
@@ -29,15 +29,10 @@
       "LovyanGFX",
       "OneWire",
       "Adafruit GFX / SSD1306 / SH110X",
-      "LiquidCrystal_I2C",
-      "GNU Make (Makefile façade)"
+      "LiquidCrystal_I2C"
     ],
-    "test_command": "make test",
-    "build_command": "make build",
-    "flash_command": "make flash",
-    "pio_test_command": "pio test -e native",
-    "pio_build_command": "pio run -e esp32devkitc",
-    "docs": "https://docs.platformio.org/",
-    "makefile_contract": "specs/001-filament-dryer-esp32/contracts/makefile-targets.md"
+    "test_command": "pio test -e native",
+    "build_command": "pio run -e esp32devkitc",
+    "docs": "https://docs.platformio.org/"
   }
 }
