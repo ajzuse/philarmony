@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * GC9A01Display - Implementation
  * 1.28" 240x240 circular TFT with LovyanGFX SPI DMA.
@@ -49,6 +31,7 @@ bool GC9A01Display::begin(const JsonObject& config) {
     display_ = new LGFX_GC9A01(mosi_pin_, sclk_pin_, cs_pin_, dc_pin_, rst_pin_, bl_pin_);
 
     if (!display_->init()) {
+        Serial.println("[GC9A01] Init failed");
         delete display_;
         display_ = nullptr;
         return false;
@@ -59,6 +42,7 @@ bool GC9A01Display::begin(const JsonObject& config) {
     display_->fillScreen(TFT_BLACK);
 
     initialized_ = true;
+    Serial.println("[GC9A01] 240x240 round TFT initialized");
     return true;
 }
 
@@ -92,6 +76,7 @@ void GC9A01Display::showBootScreen(const String& firmware_version) {
     drawCentered(80,  "Filament", 2, TFT_CYAN);
     drawCentered(108, "Dryer",    2, TFT_CYAN);
     drawCentered(150, "v" + firmware_version, 1, TFT_WHITE);
+    delay(2000);
 }
 
 DisplayMetrics GC9A01Display::getMetrics() const {

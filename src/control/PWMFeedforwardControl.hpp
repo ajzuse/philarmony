@@ -11,6 +11,7 @@ namespace filament_dryer {
 class PWMFeedforwardControl : public IControlAlgorithm {
 public:
     PWMFeedforwardControl();
+    PWMFeedforwardControl(const JsonObject& config);
     ~PWMFeedforwardControl() override;
     
     bool begin(const JsonObject& config) override;
@@ -19,8 +20,8 @@ public:
     String getType() const override { return "pwm_feedforward"; }
     String getName() const override { return "PWM Feedforward"; }
     bool needsTuning() const override { return false; }
-    JsonObject getParameters() override { return JsonObject(); }
-    void setParameters(const JsonObject& params) override {}
+    JsonObject getParameters() override;
+    void setParameters(const JsonObject& params) override;
     bool isInitialized() const override { return initialized_; }
 
 private:

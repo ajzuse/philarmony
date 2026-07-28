@@ -5,8 +5,7 @@
  */
 #include "ConfigManager.hpp"
 #include "firmware_version.h"
-#include <map>
-#include <functional>
+#include <Arduino.h>
 
 namespace filament_dryer {
 
@@ -48,7 +47,7 @@ bool ConfigManager::save() {
 }
 
 // WiFi Configuration
-ConfigManager::WifiConfig ConfigManager::getWifiConfig() const {
+WifiConfig ConfigManager::getWifiConfig() const {
     WifiConfig config;
     if (!initialized_) return config;
     
@@ -64,8 +63,8 @@ ConfigManager::WifiConfig ConfigManager::getWifiConfig() const {
     return config;
 }
 
-void ConfigManager::setWifiConfig(const WifiConfig& config) {
-    if (!initialized_) return;
+bool ConfigManager::setWifiConfig(const WifiConfig& config) {
+    if (!initialized_) return false;
     
     JsonDocument doc;
     doc["ssid"] = config.ssid;
@@ -73,11 +72,11 @@ void ConfigManager::setWifiConfig(const WifiConfig& config) {
     
     String json;
     serializeJson(doc, json);
-    writeString(KEY_WIFI, json);
+    return writeString(KEY_WIFI, json);
 }
 
 // Sensor Configuration
-ConfigManager::SensorConfig ConfigManager::getSensorConfig() const {
+SensorConfig ConfigManager::getSensorConfig() const {
     SensorConfig config;
     if (!initialized_) return config;
     
@@ -115,7 +114,7 @@ void ConfigManager::setSensorConfig(const SensorConfig& config) {
 }
 
 // Actuator Configuration
-ConfigManager::ActuatorConfig ConfigManager::getActuatorConfig() const {
+ActuatorConfig ConfigManager::getActuatorConfig() const {
     ActuatorConfig config;
     if (!initialized_) return config;
     
@@ -153,7 +152,7 @@ void ConfigManager::setActuatorConfig(const ActuatorConfig& config) {
 }
 
 // Display Configuration
-ConfigManager::DisplayConfig ConfigManager::getDisplayConfig() const {
+DisplayConfig ConfigManager::getDisplayConfig() const {
     DisplayConfig config;
     if (!initialized_) return config;
     
@@ -212,7 +211,7 @@ void ConfigManager::setDisplayConfig(const DisplayConfig& config) {
 }
 
 // PID Configuration
-ConfigManager::PidConfig ConfigManager::getPidConfig() const {
+PidConfig ConfigManager::getPidConfig() const {
     PidConfig config;
     if (!initialized_) return config;
     
@@ -244,7 +243,7 @@ void ConfigManager::setPidConfig(const PidConfig& config) {
 }
 
 // Filament Profiles
-std::vector<ConfigManager::FilamentProfile> ConfigManager::getProfiles() const {
+std::vector<FilamentProfile> ConfigManager::getProfiles() const {
     std::vector<FilamentProfile> profiles;
     if (!initialized_) return profiles;
     
@@ -278,7 +277,7 @@ std::vector<ConfigManager::FilamentProfile> ConfigManager::getProfiles() const {
     return profiles;
 }
 
-ConfigManager::FilamentProfile ConfigManager::getProfile(const String& profile_id) const {
+FilamentProfile ConfigManager::getProfile(const String& profile_id) const {
     FilamentProfile empty;
     auto profiles = getProfiles();
     for (const auto& p : profiles) {
@@ -361,7 +360,7 @@ bool ConfigManager::saveProfiles(const std::vector<FilamentProfile>& profiles) {
     return writeString(KEY_PROFILES, json);
 }
 
-std::vector<ConfigManager::FilamentProfile> ConfigManager::getDefaultProfiles() {
+std::vector<FilamentProfile> ConfigManager::getDefaultProfiles() {
     std::vector<FilamentProfile> profiles;
     
     FilamentProfile pla = {"pla", "PLA", "PLA", 50.0f, 240, 15.0f, true, 0, 0};
@@ -434,13 +433,65 @@ void ConfigManager::factoryReset() {
 String ConfigManager::toJson() const {
     JsonDocument doc;
     
-    doc["wifi"] = getWifiConfig();
-    doc["sensor"] = getSensorConfig();
-    doc["actuator"] = getActuatorConfig();
-    doc["display"] = getDisplayConfig();
-    doc["pid"] = getPidConfig();
+    // WiFi
+    JsonObject wifi_obj = doc.createNestedObject("wifi");
+    WifiConfig wifi = getWifiConfig();
+    wifi_obj["ssid"] = wifi.ssid;
+    wifi_obj["password"] = wifi.password;
+    wifi_obj["valid"] = wifi.valid;
     
-    JsonArray profiles_arr = doc["profiles"].to<JsonArray>();
+    // Sensor
+    JsonObject sensor_obj = doc.createNestedObject("sensor");
+    SensorConfig sensor = getSensorConfig();
+    sensor_obj["type"] = sensor.type;
+    sensor_obj["is_integrated"] = sensor.is_integrated;
+    sensor_obj["i2c_bus"] = sensor.i2c_bus;
+    sensor_obj["i2c_address"] = sensor.i2c_address;
+    sensor_obj["gpio_pin"] = sensor.gpio_pin;
+    sensor_obj["sda_pin"] = sensor.sda_pin;
+    sensor_obj["scl_pin"] = sensor.scl_pin;
+    
+    // Actuator
+    JsonObject actuator_obj = doc.createNestedObject("actuator");
+    ActuatorConfig actuator = getActuatorConfig();
+    actuator_obj["heater_pin"] = actuator.heater_pin;
+    actuator_obj["heater_pwm_freq"] = actuator.heater_pwm_freq;
+    actuator_obj["heater_max_power_pct"] = actuator.heater_max_power_pct;
+    actuator_obj["fan_mode"] = actuator.fan_mode;
+    actuator_obj["fan_pin"] = actuator.fan_pin;
+    actuator_obj["fan_pwm_freq"] = actuator.fan_pwm_freq;
+    actuator_obj["cooldown_duration_sec"] = actuator.cooldown_duration_sec;
+    
+    // Display
+    JsonObject display_obj = doc.createNestedObject("display");
+    DisplayConfig display = getDisplayConfig();
+    display_obj["enabled"] = display.enabled;
+    display_obj["driver"] = display.driver;
+    display_obj["bus_type"] = display.bus_type;
+    display_obj["width"] = display.width;
+    display_obj["height"] = display.height;
+    display_obj["rotation"] = display.rotation;
+    display_obj["spi_mosi"] = display.spi_mosi;
+    display_obj["spi_sclk"] = display.spi_sclk;
+    display_obj["spi_cs"] = display.spi_cs;
+    display_obj["dc_pin"] = display.dc_pin;
+    display_obj["rst_pin"] = display.rst_pin;
+    display_obj["backlight_pin"] = display.backlight_pin;
+    
+    JsonArray fields_arr = display_obj.createNestedArray("fields");
+    for (const String& f : display.fields) {
+        fields_arr.add(f);
+    }
+    
+    // PID
+    JsonObject pid_obj = doc.createNestedObject("pid");
+    PidConfig pid = getPidConfig();
+    pid_obj["kp"] = pid.kp;
+    pid_obj["ki"] = pid.ki;
+    pid_obj["kd"] = pid.kd;
+    pid_obj["calibrated"] = pid.calibrated;
+    
+    JsonArray profiles_arr = doc.createNestedArray("profiles");
     for (const auto& p : getProfiles()) {
         JsonObject obj = profiles_arr.add<JsonObject>();
         obj["id"] = p.id;
@@ -454,7 +505,7 @@ String ConfigManager::toJson() const {
         obj["updated_at"] = p.updated_at;
     }
     
-    JsonArray objects_arr = doc["objects"].to<JsonArray>();
+    JsonArray objects_arr = doc.createNestedArray("objects");
     for (const String& obj : listObjectConfigs()) {
         objects_arr.add(obj);
     }

@@ -3,13 +3,20 @@
  * PID temperature control with anti-windup and output clamping
  */
 #include "PIDControl.hpp"
-#include "../core/LogManager.hpp"
-
-extern filament_dryer::LogManager logMgr;
+#include <Arduino.h>
 
 namespace filament_dryer {
 
 PIDControl::PIDControl() {}
+
+PIDControl::PIDControl(const JsonObject& config) {
+    config_.kp = config["kp"] | 0.0f;
+    config_.ki = config["ki"] | 0.0f;
+    config_.kd = config["kd"] | 0.0f;
+    config_.max_integral = config["max_integral"] | 1000.0f;
+    config_.min_output = config["min_output"] | 0.0f;
+    config_.max_output = config["max_output"] | 100.0f;
+}
 
 PIDControl::~PIDControl() {}
 
@@ -24,9 +31,7 @@ bool PIDControl::begin(const JsonObject& config) {
     reset();
     initialized_ = true;
     
-    logMgr.logSystem(LogLevel::INFO, LogModule::CONTROL, 
-                     "PID Control initialized: Kp=%.2f, Ki=%.2f, Kd=%.2f",
-                     config_.kp, config_.ki, config_.kd);
+    Serial.println("[PIDControl] Initialized");
     return true;
 }
 
@@ -70,7 +75,7 @@ void PIDControl::reset() {
     last_output_ = 0.0f;
 }
 
-String PIDControl::getParameters() {
+JsonObject PIDControl::getParameters() {
     JsonDocument doc;
     JsonObject obj = doc.to<JsonObject>();
     obj["kp"] = config_.kp;

@@ -29,7 +29,7 @@ bool ControlEngine::begin() {
     };
     
     initialized_ = true;
-    logMgr.logSystem(LogLevel::INFO, LogModule::CONTROL, "ControlEngine initialized with %d algorithms", factories_.size());
+    Serial.println("[ControlEngine] Initialized with 3 algorithms");
     return true;
 }
 
@@ -38,14 +38,14 @@ bool ControlEngine::setAlgorithm(const String& type, const JsonObject& config) {
     
     auto it = factories_.find(type);
     if (it == factories_.end()) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::CONTROL, "Unknown algorithm: %s", type.c_str());
+        Serial.printf("[ControlEngine] Unknown algorithm: %s\n", type.c_str());
         return false;
     }
     
     // Create new algorithm instance
     IControlAlgorithm* new_algo = it->second(config);
     if (!new_algo->begin(config)) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::CONTROL, "Failed to initialize algorithm: %s", type.c_str());
+        Serial.printf("[ControlEngine] Failed to initialize algorithm: %s\n", type.c_str());
         delete new_algo;
         return false;
     }
@@ -56,7 +56,7 @@ bool ControlEngine::setAlgorithm(const String& type, const JsonObject& config) {
     current_algorithm_ = new_algo;
     current_type_ = type;
     
-    logMgr.logSystem(LogLevel::INFO, LogModule::CONTROL, "Switched to algorithm: %s", type.c_str());
+    Serial.printf("[ControlEngine] Switched to algorithm: %s\n", type.c_str());
     return true;
 }
 

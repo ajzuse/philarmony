@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * NextionDisplay - Implementation
  * Sends data updates over UART to Nextion HMI display.
@@ -50,6 +32,7 @@ bool NextionDisplay::begin(const JsonObject& config) {
     // Use UART2 (Serial2) for the Nextion; avoids conflicts with debug Serial
     serial_ = &Serial2;
     serial_->begin(baudrate_, SERIAL_8N1, rx_pin_, tx_pin_);
+    delay(100); // Allow Nextion to power up and be ready
 
     // Send reset + baud-rate negotiation
     sendCmd(""); // Wake up / flush
@@ -62,6 +45,8 @@ bool NextionDisplay::begin(const JsonObject& config) {
     sendCmd("page " + page_prefix_);
 
     initialized_ = true;
+    Serial.printf("[Nextion] UART RX:%d TX:%d baud:%u initialized\n",
+                  rx_pin_, tx_pin_, baudrate_);
     return true;
 }
 
@@ -139,6 +124,7 @@ void NextionDisplay::showBootScreen(const String& firmware_version) {
     if (!initialized_) return;
     sendCmd("page boot");
     setAttr("boot.t_ver", "txt", "v" + firmware_version);
+    delay(2000);
     sendCmd("page " + page_prefix_);
 }
 

@@ -12,6 +12,7 @@
 
 namespace filament_dryer {
 
+// Structs at namespace scope (not inside class)
 struct PidConfig {
     float kp = 0.0f;
     float ki = 0.0f;
@@ -100,7 +101,7 @@ public:
     
     // WiFi Configuration
     WifiConfig getWifiConfig() const;
-    void setWifiConfig(const WifiConfig& config);
+    bool setWifiConfig(const WifiConfig& config);
     
     // Sensor Configuration
     SensorConfig getSensorConfig() const;
@@ -167,6 +168,9 @@ private:
     bool writeString(const char* key, const String& value);
     bool readJsonArray(const char* key, std::vector<String>& array);
     bool writeJsonArray(const char* key, const std::vector<String>& array);
+    
+    // Private helper for profile operations
+    bool saveProfiles(const std::vector<FilamentProfile>& profiles);
 };
 
 } // namespace filament_dryer

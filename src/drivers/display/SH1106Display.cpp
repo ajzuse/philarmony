@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * SH1106Display - Implementation
  * 1.3" 128x64 OLED (I2C). The SH1106 controller has a 132-column frame buffer;
@@ -50,14 +32,15 @@ bool SH1106Display::begin(const JsonObject& config) {
     if (rst_pin_ >= 0) {
         pinMode(rst_pin_, OUTPUT);
         digitalWrite(rst_pin_, LOW);
-        delayMicroseconds(100);
+        delay(10);
         digitalWrite(rst_pin_, HIGH);
-        delayMicroseconds(100);
+        delay(10);
     }
 
     display_ = new Adafruit_SH1106G(metrics_.width, metrics_.height, &Wire, rst_pin_);
 
     if (!display_->begin(i2c_address_, true)) {
+        Serial.printf("[SH1106] Init failed at 0x%02X\n", i2c_address_);
         delete display_;
         display_ = nullptr;
         return false;
@@ -70,6 +53,8 @@ bool SH1106Display::begin(const JsonObject& config) {
     display_->display();
 
     initialized_ = true;
+    Serial.printf("[SH1106] %dx%d initialized at 0x%02X\n",
+                  metrics_.width, metrics_.height, i2c_address_);
     return true;
 }
 
@@ -115,6 +100,7 @@ void SH1106Display::showBootScreen(const String& firmware_version) {
     display_->print("v");
     display_->println(firmware_version);
     display_->display();
+    delay(2000);
 }
 
 DisplayMetrics SH1106Display::getMetrics() const {

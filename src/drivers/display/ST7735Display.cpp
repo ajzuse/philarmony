@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * ST7735Display - Implementation
  * 1.44" (128x128) / 1.8" (128x160) color TFT via SPI with LovyanGFX DMA.
@@ -52,6 +34,7 @@ bool ST7735Display::begin(const JsonObject& config) {
                                 rst_pin_, bl_pin_, width_, height_, rotation_);
 
     if (!display_->init()) {
+        Serial.println("[ST7735] Init failed");
         delete display_;
         display_ = nullptr;
         return false;
@@ -64,6 +47,7 @@ bool ST7735Display::begin(const JsonObject& config) {
     display_->setTextSize(1);
 
     initialized_ = true;
+    Serial.printf("[ST7735] %dx%d initialized\n", width_, height_);
     return true;
 }
 
@@ -103,6 +87,7 @@ void ST7735Display::showBootScreen(const String& firmware_version) {
     display_->setCursor(4, 90);
     display_->print("v");
     display_->print(firmware_version);
+    delay(2000);
 }
 
 DisplayMetrics ST7735Display::getMetrics() const {

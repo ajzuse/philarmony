@@ -80,9 +80,9 @@
 
 - [x] T018 [US2] Implement WebSocketServer handling control/start, control/stop, and config/hardware in src/network/WebSocketServer.hpp and src/network/WebSocketServer.cpp
 - [x] T019 [US2] Implement 1Hz status update broadcast on topic status/update in src/network/WebSocketServer.cpp
-- [ ] T019a [US2] Implement generic hardware config WebSocket handler (config/hardware) with full JSON schema validation in src/network/WebSocketServer.cpp
-- [ ] T019b [US2] Implement HTTP GET/POST /api/hardware/config endpoints in src/network/WebServer.cpp
-- [ ] T019c [US2] Implement generic status payload builder reflecting all configured sensors/actuators in src/network/WebSocketServer.cpp
+- [x] T019a [US2] Implement generic hardware config WebSocket handler (config/hardware) with full JSON schema validation in src/network/WebSocketServer.cpp
+- [x] T019b [US2] Implement HTTP GET/POST /api/hardware/config endpoints in src/network/WebServer.cpp
+- [x] T019c [US2] Implement generic status payload builder reflecting all configured sensors/actuators in src/network/WebSocketServer.cpp
 
 **Checkpoint**: User Story 2 complete and testable independently.
 

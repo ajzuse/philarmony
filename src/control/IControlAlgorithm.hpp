@@ -30,6 +30,12 @@ public:
     
     // Check if algorithm is initialized
     virtual bool isInitialized() const = 0;
+    
+    // Additional methods for algorithm metadata and configuration
+    virtual String getName() const = 0;
+    virtual bool needsTuning() const = 0;
+    virtual JsonObject getParameters() = 0;
+    virtual void setParameters(const JsonObject& params) = 0;
 };
 
 } // namespace filament_dryer

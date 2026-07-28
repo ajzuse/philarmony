@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * HD44780Display - Implementation
  * 16x2 or 20x4 character LCD over I2C PCF8574 backpack.
@@ -59,6 +41,7 @@ bool HD44780Display::begin(const JsonObject& config) {
     // Verify presence via I2C ACK
     Wire.beginTransmission(i2c_address_);
     if (Wire.endTransmission() != 0) {
+        Serial.printf("[HD44780] No ACK at 0x%02X\n", i2c_address_);
         delete display_;
         display_ = nullptr;
         return false;
@@ -71,6 +54,8 @@ bool HD44780Display::begin(const JsonObject& config) {
     initialized_  = true;
     backlight_on_ = true;
 
+    Serial.printf("[HD44780] %dx%d LCD initialized at 0x%02X\n",
+                  cols_, rows_, i2c_address_);
     return true;
 }
 
@@ -103,6 +88,7 @@ void HD44780Display::showBootScreen(const String& firmware_version) {
     display_->setCursor(0, 1);
     display_->print("v");
     display_->print(firmware_version);
+    delay(2000);
     display_->clear();
 }
 

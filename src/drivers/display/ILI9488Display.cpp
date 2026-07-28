@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 /**
  * ILI9488Display - Implementation
  * 3.5" / 4.0" 320x480 TFT with LovyanGFX SPI DMA.
@@ -53,6 +35,7 @@ bool ILI9488Display::begin(const JsonObject& config) {
                                   rst_pin_, bl_pin_, width_, height_, rotation_);
 
     if (!display_->init()) {
+        Serial.println("[ILI9488] Init failed");
         delete display_;
         display_ = nullptr;
         return false;
@@ -65,6 +48,7 @@ bool ILI9488Display::begin(const JsonObject& config) {
     display_->setTextSize(1);
 
     initialized_ = true;
+    Serial.printf("[ILI9488] %dx%d initialized\n", width_, height_);
     return true;
 }
 
@@ -105,6 +89,7 @@ void ILI9488Display::showBootScreen(const String& firmware_version) {
     display_->setCursor(20, 220);
     display_->print("v");
     display_->print(firmware_version);
+    delay(2000);
 }
 
 DisplayMetrics ILI9488Display::getMetrics() const {
@@ -193,10 +178,8 @@ void ILI9488Display::renderStatus(const JsonObject& fields) {
                   String(r / 3600) + "h " + String((r % 3600) / 60) + "m", TFT_WHITE);
         y += row_h;
     }
-    if (fields.containsKey("memory_free_bytes") || fields.containsKey("free_heap_bytes")) {
-        uint32_t heap = fields.containsKey("memory_free_bytes")
-                            ? fields["memory_free_bytes"].as<uint32_t>()
-                            : fields["free_heap_bytes"].as<uint32_t>();
+    if (fields.containsKey("free_heap_bytes")) {
+        uint32_t heap = fields["free_heap_bytes"];
         drawField(10, y, "Free RAM:", String(heap / 1024) + " KB", TFT_DARKGREY);
     }
 }
