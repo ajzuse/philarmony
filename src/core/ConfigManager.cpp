@@ -22,7 +22,6 @@ bool ConfigManager::begin() {
     
     initialized_ = prefs_.begin(NVS_NAMESPACE, false);
     if (!initialized_) {
-        Serial.println("[ConfigManager] ERROR: Failed to initialize Preferences");
         return false;
     }
     
@@ -363,11 +362,60 @@ bool ConfigManager::saveProfiles(const std::vector<FilamentProfile>& profiles) {
 std::vector<FilamentProfile> ConfigManager::getDefaultProfiles() {
     std::vector<FilamentProfile> profiles;
     
-    FilamentProfile pla = {"pla", "PLA", "PLA", 50.0f, 240, 15.0f, true, 0, 0};
-    FilamentProfile petg = {"petg", "PETG", "PETG", 65.0f, 240, 15.0f, true, 0, 0};
-    FilamentProfile abs = {"abs", "ABS", "ABS", 80.0f, 120, 10.0f, true, 0, 0};
-    FilamentProfile tpu = {"tpu", "TPU", "TPU", 45.0f, 240, 20.0f, true, 0, 0};
-    FilamentProfile nylon = {"nylon", "Nylon", "Nylon", 70.0f, 360, 10.0f, true, 0, 0};
+    FilamentProfile pla;
+    pla.id = "pla";
+    pla.name_pt = "PLA";
+    pla.name_en = "PLA";
+    pla.target_temp_c = 50.0f;
+    pla.default_duration_min = 240;
+    pla.target_humidity_pct = 15.0f;
+    pla.is_builtin = true;
+    pla.created_at = 0;
+    pla.updated_at = 0;
+
+    FilamentProfile petg;
+    petg.id = "petg";
+    petg.name_pt = "PETG";
+    petg.name_en = "PETG";
+    petg.target_temp_c = 65.0f;
+    petg.default_duration_min = 240;
+    petg.target_humidity_pct = 15.0f;
+    petg.is_builtin = true;
+    petg.created_at = 0;
+    petg.updated_at = 0;
+
+    FilamentProfile abs;
+    abs.id = "abs";
+    abs.name_pt = "ABS";
+    abs.name_en = "ABS";
+    abs.target_temp_c = 80.0f;
+    abs.default_duration_min = 120;
+    abs.target_humidity_pct = 10.0f;
+    abs.is_builtin = true;
+    abs.created_at = 0;
+    abs.updated_at = 0;
+
+    FilamentProfile tpu;
+    tpu.id = "tpu";
+    tpu.name_pt = "TPU";
+    tpu.name_en = "TPU";
+    tpu.target_temp_c = 45.0f;
+    tpu.default_duration_min = 240;
+    tpu.target_humidity_pct = 20.0f;
+    tpu.is_builtin = true;
+    tpu.created_at = 0;
+    tpu.updated_at = 0;
+
+    FilamentProfile nylon;
+    nylon.id = "nylon";
+    nylon.name_pt = "Nylon";
+    nylon.name_en = "Nylon";
+    nylon.target_temp_c = 70.0f;
+    nylon.default_duration_min = 360;
+    nylon.target_humidity_pct = 10.0f;
+    nylon.is_builtin = true;
+    nylon.created_at = 0;
+    nylon.updated_at = 0;
     
     profiles.push_back(pla);
     profiles.push_back(petg);
@@ -406,7 +454,7 @@ bool ConfigManager::setObjectConfig(const String& object_name, const JsonObject&
     return writeString(key.c_str(), json);
 }
 
-JsonObject ConfigManager::getObjectConfig(const String& object_name) const {
+JsonObject ConfigManager::getObjectConfig(const String& object_name) {
     JsonDocument doc;
     if (!initialized_) return doc.as<JsonObject>();
     
@@ -645,7 +693,7 @@ bool ConfigManager::writeString(const char* key, const String& value) {
     return prefs_.putString(key, value);
 }
 
-bool ConfigManager::readJsonArray(const char* key, std::vector<String>& array) {
+bool ConfigManager::readJsonArray(const char* key, std::vector<String>& array) const {
     if (!initialized_) return false;
     String json = prefs_.getString(key, "[]");
     JsonDocument doc;

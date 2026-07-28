@@ -31,7 +31,6 @@ bool PIDControl::begin(const JsonObject& config) {
     reset();
     initialized_ = true;
     
-    Serial.println("[PIDControl] Initialized");
     return true;
 }
 

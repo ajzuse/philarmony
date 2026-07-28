@@ -30,10 +30,6 @@ bool DS18B20Sensor::begin(const JsonObject& config) {
         onewire_->write(res_reg); // Configuration
         
         initialized_ = true;
-        Serial.printf("[DS18B20Sensor] Found at GPIO %d, resolution %d-bit\n", 
-                      gpio_pin_, resolution_);
-    } else {
-        Serial.printf("[DS18B20Sensor] No device found on GPIO %d\n", gpio_pin_);
     }
     
     return initialized_;

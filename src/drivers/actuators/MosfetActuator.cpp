@@ -28,12 +28,8 @@ bool MosfetActuator::begin(const JsonObject& config) {
     // Ensure off at start
     ledcWrite(pwm_channel_, 0);
     
-    state_ = {false, 0.0f, false, ""};
+    state_ = ActuatorState{};
     initialized_ = true;
-    
-    Serial.printf("[MosfetActuator] AOD4184 on GPIO %d, freq=%luHz, ch=%d, max=%d%%\n",
-                  gpio_pin_, pwm_freq_, pwm_channel_, max_power_pct_);
-    
     return true;
 }
 
@@ -66,7 +62,6 @@ void MosfetActuator::emergencyStop() {
     state_.fault = true;
     state_.fault_message = "Emergency stop";
     
-    Serial.println("[MosfetActuator] EMERGENCY STOP - Heater PWM forced to 0%");
 }
 
 ActuatorState MosfetActuator::getState() const {
@@ -80,7 +75,6 @@ void MosfetActuator::setPidConfig(float kp, float ki, float kd) {
     pid_enabled_ = (kp > 0.0f || ki > 0.0f || kd > 0.0f);
     resetPid();
     
-    Serial.printf("[MosfetActuator] PID configured: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", kp, ki, kd);
 }
 
 float MosfetActuator::computePid(float target_temp, float current_temp, float dt) {

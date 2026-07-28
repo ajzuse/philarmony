@@ -5,6 +5,7 @@
 #include "PIDControl.hpp"
 #include "BangBangControl.hpp"
 #include "PWMFeedforwardControl.hpp"
+#include <Arduino.h>
 
 namespace filament_dryer {
 
@@ -29,7 +30,6 @@ bool ControlEngine::begin() {
     };
     
     initialized_ = true;
-    Serial.println("[ControlEngine] Initialized with 3 algorithms");
     return true;
 }
 
@@ -38,14 +38,12 @@ bool ControlEngine::setAlgorithm(const String& type, const JsonObject& config) {
     
     auto it = factories_.find(type);
     if (it == factories_.end()) {
-        Serial.printf("[ControlEngine] Unknown algorithm: %s\n", type.c_str());
         return false;
     }
     
     // Create new algorithm instance
     IControlAlgorithm* new_algo = it->second(config);
     if (!new_algo->begin(config)) {
-        Serial.printf("[ControlEngine] Failed to initialize algorithm: %s\n", type.c_str());
         delete new_algo;
         return false;
     }
@@ -56,7 +54,6 @@ bool ControlEngine::setAlgorithm(const String& type, const JsonObject& config) {
     current_algorithm_ = new_algo;
     current_type_ = type;
     
-    Serial.printf("[ControlEngine] Switched to algorithm: %s\n", type.c_str());
     return true;
 }
 

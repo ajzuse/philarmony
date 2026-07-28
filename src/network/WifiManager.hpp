@@ -4,25 +4,21 @@
 #pragma once
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <WiFi.h>
 #include <Preferences.h>
+#include "../core/ConfigManager.hpp"
 
 namespace filament_dryer {
-
-struct WifiConfig {
-    String ssid;
-    String password;
-    bool valid = false;
-};
 
 class WifiManager {
 public:
     static constexpr const char* AP_SSID = "philarmony";
     static constexpr const char* AP_PASSWORD = "philarmony";
     static constexpr uint8_t AP_CHANNEL = 1;
-    static constexpr IPAddress AP_IP(192, 168, 4, 1);
-    static constexpr IPAddress AP_GATEWAY(192, 168, 4, 1);
-    static constexpr IPAddress AP_SUBNET(255, 255, 255, 0);
+    static const IPAddress AP_IP;
+    static const IPAddress AP_GATEWAY;
+    static const IPAddress AP_SUBNET;
     
     WifiManager();
     ~WifiManager();

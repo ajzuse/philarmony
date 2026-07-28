@@ -24,20 +24,12 @@ bool FanActuator::begin(const JsonObject& config) {
         ledcAttachPin(gpio_pin_, pwm_channel_);
         ledcWrite(pwm_channel_, 0);
         
-        Serial.printf("[FanActuator] PWM mode on GPIO %d, freq=%luHz, ch=%d\n",
-                      gpio_pin_, pwm_freq_, pwm_channel_);
     } else if (mode_ == FanMode::INDEPENDENT_DIGITAL) {
         pinMode(gpio_pin_, OUTPUT);
         digitalWrite(gpio_pin_, LOW);
-        
-        Serial.printf("[FanActuator] Digital mode on GPIO %d\n", gpio_pin_);
-    } else {
-        // Shared MOSFET mode - fan runs when heater runs
-        Serial.printf("[FanActuator] Shared MOSFET mode (fan follows heater on GPIO %d)\n",
-                      shared_heater_pin_);
     }
     
-    state_ = {false, 0.0f, false, ""};
+    state_ = ActuatorState{};
     initialized_ = true;
     return true;
 }

@@ -33,7 +33,6 @@ bool ILI9341Display::begin(const JsonObject& config) {
     display_ = new LGFX_CYD(mosi_pin_, sclk_pin_, cs_pin_, dc_pin_, rst_pin_, bl_pin_, width_, height_, rotation_);
     
     if (!display_->init()) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::DISPLAY, "ILI9341 init failed");
         return false;
     }
     
@@ -44,9 +43,6 @@ bool ILI9341Display::begin(const JsonObject& config) {
     display_->setTextSize(1);
     
     initialized_ = true;
-    logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY, 
-                     "ILI9341 %dx%d initialized (SPI DMA)", width_, height_);
-    
     return true;
 }
 

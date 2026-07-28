@@ -8,16 +8,18 @@
  * Klipper-inspired object architecture with plugin system
  */
 #include <Arduino.h>
+#include <LittleFS.h>
+#include <cmath>
 #include "firmware_version.h"
-#include "ConfigManager.hpp"
-#include "StateMachine.hpp"
-#include "LogManager.hpp"
-#include "SafetyEngine.hpp"
-#include "PidAutotuneController.hpp"
-#include "WifiManager.hpp"
-#include "WebServer.hpp"
-#include "WebSocketServer.hpp"
-#include "SystemMetrics.hpp"
+#include "core/ConfigManager.hpp"
+#include "core/StateMachine.hpp"
+#include "core/LogManager.hpp"
+#include "core/SafetyEngine.hpp"
+#include "core/PidAutotuneController.hpp"
+#include "network/WifiManager.hpp"
+#include "network/WebServer.hpp"
+#include "network/WebSocketServer.hpp"
+#include "utils/SystemMetrics.hpp"
 #include "drivers/interfaces/IDriverInterfaces.hpp"
 #include "drivers/sensors/SHT31Sensor.hpp"
 #include "drivers/sensors/DHT22Sensor.hpp"
@@ -27,7 +29,6 @@
 #include "drivers/display/ST7789Display.hpp"
 #include "drivers/display/ILI9341Display.hpp"
 #include "drivers/display/SSD1306Display.hpp"
-#include "plugins/PluginManager.hpp"
 
 using namespace filament_dryer;
 
@@ -53,7 +54,6 @@ FanActuator fanActuator;
 ST7789Display st7789Display;
 ILI9341Display ili9341Display;
 SSD1306Display ssd1306Display;
-PluginManager pluginMgr;
 
 // Current active sensor driver
 ISensorDriver* activeTempSensor = nullptr;
@@ -103,9 +103,9 @@ void controlLoopTask(void* pvParameters) {
                              (uint8_t)heaterActuator.getState().power_pct : 0;
         
         bool sensorConnected = tempReading.valid;
-        if (!safetyEngine.checkSafety(chamberTemp, 
+        if (!safetyEngine.checkSafety(chamberTemp,
                                        stateMachine.getCurrentSession().target_temp_c,
-                                       heaterPower, sensorConnected)) {
+                                       heaterPower, heaterPower > 0, sensorConnected)) {
             // Safety fault - state machine will handle transition
             stateMachine.stopDrying(DryingStopReason::SENSOR_ERROR);
             continue;
@@ -140,7 +140,7 @@ void controlLoopTask(void* pvParameters) {
             
             if (!isnan(chamberTemp) && chamberTemp >= 80.0f) {
                 stop = true;
-                reason = DryingStopReason::OVER_TEMP;
+                reason = DryingStopReason::SAFETY_CUTOFF;
             }
             
             if (!sensorConnected) {
@@ -224,11 +224,11 @@ void controlLoopTask(void* pvParameters) {
             telemetry["exhaust_fan_power_pct"] = fanActuator.getState().power_pct;
             telemetry["elapsed_time_sec"] = stateMachine.getCurrentSession().elapsed_sec;
             telemetry["remaining_time_sec"] = stateMachine.getCurrentSession().remaining_sec;
-            telemetry["cpu_usage_pct"] = sysMetrics.getCpuUsage();
-            telemetry["memory_free_bytes"] = sysMetrics.getFreeHeap();
+            telemetry["cpu_usage_pct"] = sysMetrics.getCpuUsagePercent();
+            telemetry["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
             telemetry["uptime_sec"] = millis() / 1000;
             
-            wsServer.broadcastTelemetry(telemetry);
+            wsServer.broadcastTelemetry(telemetry.as<JsonObject>());
         }
     }
 }
@@ -247,7 +247,7 @@ void networkTask(void* pvParameters) {
         wifiMgr.loop();
         
         // WebSocket cleanup
-        wsServer.cleanupClients();
+        wsServer.loop();
         
         // Log streaming to WebSocket
         static uint32_t lastLogStream = 0;
@@ -272,14 +272,15 @@ void displayTask(void* pvParameters) {
         if (!dispConfig.enabled) continue;
         
         // Build status fields for display
-        JsonObject statusFields = wsServer.makeJsonObject();
+        JsonDocument statusDoc;
+        JsonObject statusFields = statusDoc.to<JsonObject>();
         DryingSession session = stateMachine.getCurrentSession();
         
-        statusFields["chamber_temp_c"] = session.target_temp_c; // Will be filled by control loop
+        statusFields["chamber_temp_c"] = session.target_temp_c; // Placeholder until shared telemetry cache exists
         statusFields["target_temp_c"] = session.target_temp_c;
         statusFields["humidity_pct"] = session.target_humidity_pct;
-        statusFields["heater_power_pct"] = 0; // Filled by control loop
-        telemetry["status"] = stateMachine.getStateName();
+        statusFields["heater_power_pct"] = 0;
+        statusFields["status"] = stateMachine.getStateName();
         
         // Update active display
         if (ssd1306Display.isConnected()) {
@@ -297,7 +298,16 @@ void displayTask(void* pvParameters) {
 // ============================================================
 void onStateChange(SystemState oldState, SystemState newState) {
     String oldStr = stateMachine.getStateName();
-    String newStr = StateMachine::getStateName(newState);
+    String newStr;
+    switch (newState) {
+        case SystemState::BOOT: newStr = "BOOT"; break;
+        case SystemState::WIFI_CONNECT: newStr = "WIFI_CONNECT"; break;
+        case SystemState::HOTSPOT: newStr = "HOTSPOT"; break;
+        case SystemState::READY: newStr = "READY"; break;
+        case SystemState::DRYING: newStr = "DRYING"; break;
+        case SystemState::STOPPED: newStr = "STOPPED"; break;
+        case SystemState::FAULT_STOPPED: newStr = "FAULT_STOPPED"; break;
+    }
     logMgr.logSystem(LogLevel::INFO, LogModule::SYSTEM, 
                      "State transition: %s -> %s", oldStr.c_str(), newStr.c_str());
     
@@ -331,13 +341,13 @@ void onPidCalibrateProgress(int cycle, int total, float temp, float kp, float ki
     doc["kd"] = kd;
     doc["saved_to_nvs"] = done;
     
-    wsServer.broadcastPidCalibrate(doc);
+    wsServer.broadcastPidCalibrate(doc.as<JsonObject>());
 }
 
 void onPidCalibrateComplete(const PidAutotuneController::Result& result) {
     if (result.success) {
         // Save to NVS
-        PidConfig cfg = {result.kp, result.ki, result.kd, true};
+        PidConfig cfg(result.kp, result.ki, result.kd);
         configMgr.setPidConfig(cfg);
         
         logMgr.logSystem(LogLevel::INFO, LogModule::PID, 
@@ -358,7 +368,7 @@ void onPidCalibrateComplete(const PidAutotuneController::Result& result) {
     } else {
         doc["error"] = result.error;
     }
-    wsServer.broadcastPidCalibrate(doc);
+    wsServer.broadcastPidCalibrate(doc.as<JsonObject>());
 }
 
 void onLogCallback(const String& line, bool isDryingLog) {
@@ -369,7 +379,16 @@ void onLogCallback(const String& line, bool isDryingLog) {
 // Setup & Initialization
 // ============================================================
 void initializeSensors() {
-    JsonObject sensorConfig = configMgr.getSensorConfig();
+    SensorConfig sensorCfg = configMgr.getSensorConfig();
+    JsonDocument sensorDoc;
+    JsonObject sensorConfig = sensorDoc.to<JsonObject>();
+    sensorConfig["type"] = sensorCfg.type;
+    sensorConfig["is_integrated"] = sensorCfg.is_integrated;
+    sensorConfig["i2c_bus"] = sensorCfg.i2c_bus;
+    sensorConfig["i2c_address"] = sensorCfg.i2c_address;
+    sensorConfig["gpio_pin"] = sensorCfg.gpio_pin;
+    sensorConfig["sda_pin"] = sensorCfg.sda_pin;
+    sensorConfig["scl_pin"] = sensorCfg.scl_pin;
     
     // Initialize based on configured type
     String type = sensorConfig["type"] | "sht31";
@@ -424,7 +443,16 @@ void initializeSensors() {
 }
 
 void initializeActuators() {
-    JsonObject actuatorConfig = configMgr.getActuatorConfig();
+    ActuatorConfig actuatorCfg = configMgr.getActuatorConfig();
+    JsonDocument actuatorDoc;
+    JsonObject actuatorConfig = actuatorDoc.to<JsonObject>();
+    actuatorConfig["heater_pin"] = actuatorCfg.heater_pin;
+    actuatorConfig["heater_pwm_freq"] = actuatorCfg.heater_pwm_freq;
+    actuatorConfig["heater_max_power_pct"] = actuatorCfg.heater_max_power_pct;
+    actuatorConfig["fan_mode"] = actuatorCfg.fan_mode;
+    actuatorConfig["fan_pin"] = actuatorCfg.fan_pin;
+    actuatorConfig["fan_pwm_freq"] = actuatorCfg.fan_pwm_freq;
+    actuatorConfig["cooldown_duration_sec"] = actuatorCfg.cooldown_duration_sec;
     
     // Heater MOSFET AOD4184
     if (heaterActuator.begin(actuatorConfig)) {
@@ -449,9 +477,28 @@ void initializeActuators() {
 }
 
 void initializeDisplays() {
-    JsonObject dispConfig = configMgr.getDisplayConfig();
+    DisplayConfig displayCfg = configMgr.getDisplayConfig();
     
-    if (!dispConfig["enabled"] | false) return;
+    if (!displayCfg.enabled) return;
+    
+    JsonDocument displayDoc;
+    JsonObject dispConfig = displayDoc.to<JsonObject>();
+    dispConfig["enabled"] = displayCfg.enabled;
+    dispConfig["driver"] = displayCfg.driver;
+    dispConfig["bus_type"] = displayCfg.bus_type;
+    dispConfig["width"] = displayCfg.width;
+    dispConfig["height"] = displayCfg.height;
+    dispConfig["rotation"] = displayCfg.rotation;
+    dispConfig["spi_mosi"] = displayCfg.spi_mosi;
+    dispConfig["spi_sclk"] = displayCfg.spi_sclk;
+    dispConfig["spi_cs"] = displayCfg.spi_cs;
+    dispConfig["dc_pin"] = displayCfg.dc_pin;
+    dispConfig["rst_pin"] = displayCfg.rst_pin;
+    dispConfig["backlight_pin"] = displayCfg.backlight_pin;
+    JsonArray fieldArray = dispConfig["fields"].to<JsonArray>();
+    for (const String& field : displayCfg.fields) {
+        fieldArray.add(field);
+    }
     
     String driver = dispConfig["driver"] | "auto";
     bool initialized = false;
@@ -475,7 +522,7 @@ void initializeDisplays() {
     }
     
     if (initialized) {
-        logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY, 
+        logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY_MODULE, 
                          "Display %s initialized (%dx%d)", 
                          driver.c_str(),
                          dispConfig["width"] | 128,
@@ -502,47 +549,32 @@ void initializeNetwork() {
     }
     
     // Start WebSocket server
-    if (wsServer.begin(&configMgr, &stateMachine, &heaterActuator, &fanActuator, &pidAutotune)) {
+    if (wsServer.begin(&configMgr, &stateMachine, &safetyEngine, &logMgr, &pidAutotune)) {
         logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK, 
                          "WebSocket server started on ws://<ip>/ws");
     }
 }
 
 void setup() {
-    // Serial for debugging
-    Serial.begin(115200);
-    delay(100);
-    
-    Serial.printf("\n\n=== %s v%s ===\n", FIRMWARE_NAME, FIRMWARE_VERSION);
-    Serial.printf("Build: %s\n", FIRMWARE_BUILD_DATE);
-    Serial.printf("Chip: %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
-    Serial.printf("CPU Freq: %d MHz\n", ESP.getCpuFreqMHz());
-    Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
-    
     // Initialize LittleFS
     if (!LittleFS.begin()) {
-        Serial.println("ERROR: LittleFS mount failed!");
     }
     
     // Initialize ConfigManager (loads all NVS configs)
     if (!configMgr.begin()) {
-        Serial.println("ERROR: ConfigManager init failed");
     }
     
     // Initialize core subsystems
     if (!stateMachine.begin()) {
-        Serial.println("ERROR: StateMachine init failed");
     }
     
     if (!logMgr.begin()) {
-        Serial.println("ERROR: LogManager init failed");
     }
     
-    SafetyEngine::SafetyConfig safetyCfg;
+    SafetyConfig safetyCfg;
     safetyCfg.hard_temp_limit_c = 80.0f;
     safetyCfg.watchdog_enabled = true;
     if (!safetyEngine.begin(safetyCfg)) {
-        Serial.println("ERROR: SafetyEngine init failed");
     }
     
     // Setup callbacks
@@ -552,8 +584,6 @@ void setup() {
     pidAutotune.setHeaterCallback([](float power) { 
         // This will be called by PID autotune during calibration
     });
-    pidAutotune.setProgressCallback(onPidCalibrateProgress);
-    pidAutotune.setCompleteCallback(onPidCalibrateComplete);
     logMgr.setLogCallback(onLogCallback);
     
     // Initialize PID auto-tune with heater callback
@@ -588,8 +618,6 @@ void setup() {
     logMgr.logSystem(LogLevel::INFO, LogModule::SYSTEM, 
                      "Filament Dryer ESP32 v%s started", FIRMWARE_VERSION);
     
-    Serial.println("=== Initialization Complete ===");
-    Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
 }
 
 void loop() {

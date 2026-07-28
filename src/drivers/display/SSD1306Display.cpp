@@ -39,8 +39,6 @@ bool SSD1306Display::begin(const JsonObject& config) {
     display_ = new Adafruit_SSD1306(metrics_.width, metrics_.height, &Wire, rst_pin_);
     
     if (!display_->begin(SSD1306_SWITCHCAPVCC, i2c_address_)) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::DISPLAY, 
-                         "SSD1306 allocation failed at 0x%02X", i2c_address_);
         return false;
     }
     
@@ -52,10 +50,6 @@ bool SSD1306Display::begin(const JsonObject& config) {
     display_->display();
     
     initialized_ = true;
-    logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY, 
-                     "SSD1306 %dx%d initialized at 0x%02X", 
-                     metrics_.width, metrics_.height, i2c_address_);
-    
     return true;
 }
 

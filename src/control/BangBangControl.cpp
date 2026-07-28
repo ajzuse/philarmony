@@ -3,7 +3,6 @@
  * Hysteresis-based on/off temperature control
  */
 #include <Arduino.h>
-#include <HardwareSerial.h>
 #include "BangBangControl.hpp"
 
 namespace filament_dryer {
@@ -30,7 +29,6 @@ bool BangBangControl::begin(const JsonObject& config) {
     reset();
     initialized_ = true;
     
-    Serial.println("[BangBangControl] Initialized");
     return true;
 }
 

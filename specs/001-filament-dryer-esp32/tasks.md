@@ -239,3 +239,21 @@ Complete Setup, Foundational, and User Story 1 (WiFi Setup Hotspot) to produce a
 
 ### Incremental Delivery
 Add US2 (Control & Telemetry) -> Add US3 (Safety Engine & Logs) -> Add US4 (Displays) -> Add US5 (Profiles) -> Add US6 (PID Calibration) -> Add US7 (Generic Control Algorithms) -> Add US8 (Calibration & Advanced Safety).
+
+## Phase 12: Convergence
+
+- [x] T048 Fix the current PlatformIO build failures in the core configuration, logging, and PID modules by correcting const-correctness issues, adding required Arduino/ESP headers, and resolving the remaining compile errors per plan: foundational infrastructure (partial)
+- [x] T049 Repair the firmware initialization wiring in src/main.cpp so the WebSocket/WebServer startup uses the correct dependency objects and signatures per FR-002 (partial)
+- [x] T050 Remove or refactor the duplicate helper module in src/helpers.cpp so it no longer includes src/main.cpp directly and causes conflicting translation-unit definitions per plan: main firmware entrypoint (partial)
+
+## Phase 13: Convergence
+
+- [ ] T051 Add PlatformIO Unity test infrastructure (native or host test env) and implement test suites in test/test_state_machine/, test/test_safety_engine/, test/test_log_manager/, and test/test_config_parser/ so `pio test` runs and passes per plan: testing structure and Constitution: Teste Automatizado e Qualidade (missing)
+- [ ] T052 Wire WebSocketServer::dispatchTopic to all FR-002 topics and implement control/start, control/stop, config/hardware, config/control, config/display, config/profiles, and control/pid_calibrate handlers instead of no-op stubs in src/network/WebSocketServer.cpp per FR-002 and FR-005 (partial)
+- [ ] T053 Implement ProfileManager with built-in material presets and custom profile NVS persistence in src/core/ProfileManager.hpp and src/core/ProfileManager.cpp per FR-008 and T029 (missing)
+- [ ] T054 Re-enable src/core/DriverRegistry.cpp in the firmware build, implement DriverRegistry::registerBuiltins() with all built-in driver factories, and replace hardcoded driver instances in src/main.cpp with generic config-driven loading per FR-003 (partial)
+- [ ] T055 Fix compile errors in sensor, actuator, and display drivers currently excluded via build_src_filter in platformio.ini and remove those exclusions so the full driver catalog builds per FR-003 and US2/US4 (partial)
+- [ ] T056 Re-enable src/drivers/display/DisplayManager.cpp in the build and complete auto-detection, auto-layout, and configurable refresh-rate behavior per FR-004 and T028 (partial)
+- [ ] T057 Implement GET/POST /api/hardware/config HTTP endpoints in src/network/WebServer.cpp (register routes in setupRoutes and replace unsupported stubs) per FR-003 and T019b (partial)
+- [ ] T058 Add a GitHub Actions CI workflow that runs `pio run` and `pio test` on pull requests and fails the build when tests fail per Constitution: Teste Automatizado e Qualidade (missing)
+- [ ] T059 Integrate ControlEngine and config/control WebSocket handling into the firmware runtime (main loop and WebSocketServer) so algorithm selection and parameters apply during drying per FR-010 and US7 (partial)
