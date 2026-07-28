@@ -4,6 +4,7 @@
 #include "../../src/core/SafetyEngine.hpp"
 #include "../../src/core/ConfigManager.hpp"
 #include "../../src/core/HardwareConfigParser.hpp"
+#include "../../include/timing_contracts.h"
 
 using namespace filament_dryer;
 
@@ -231,15 +232,19 @@ void test_flow_configurable_safety_limit_applied() {
     TEST_ASSERT_TRUE(g_actuators_cut);
 }
 
-// T142 — Success Criteria timing bounds (host-measurable)
+// T142/T163 — Success Criteria timing bounds (shared contracts with firmware)
 void test_sc01_hotspot_failfast_under_5s() {
-    // Domain proxy: missing credentials → HOTSPOT transition completes well under 5s wall budget
+    // Bound comes from WifiManager::CONNECT_TIMEOUT_MS via timing_contracts.h
+    TEST_ASSERT_TRUE(kWifiStaConnectTimeoutMs < kWifiStaFailFastMaxMs);
+    TEST_ASSERT_TRUE(kWifiStaConnectTimeoutMs > 0);
+
+    // Domain path: missing credentials → HOTSPOT transition under wall budget
     const uint32_t t0 = millis();
     StateMachine sm;
     sm.begin();
     TEST_ASSERT_TRUE(sm.transitionTo(SystemState::HOTSPOT));
     const uint32_t elapsed = millis() - t0;
-    TEST_ASSERT_TRUE(elapsed < 5000);
+    TEST_ASSERT_TRUE(elapsed < kWifiStaFailFastMaxMs);
     TEST_ASSERT_EQUAL_STRING("hotspot", sm.getStatusStreamName().c_str());
 }
 
@@ -262,11 +267,14 @@ void test_sc_safety_cutoff_under_100ms() {
 }
 
 void test_sc_status_interval_1hz_within_100ms() {
-    // 1Hz ±100ms → period in [900, 1100] ms
-    const uint32_t period_ms = 1000;
-    TEST_ASSERT_TRUE(period_ms >= 900 && period_ms <= 1100);
-    const uint32_t control_loops_per_status = 50; // 50Hz → 1Hz
-    TEST_ASSERT_EQUAL_UINT32(50, control_loops_per_status);
+    // Production control loop uses these contracts — mutating them outside SC fails the suite
+    TEST_ASSERT_TRUE(statusPeriodWithinScTolerance(kStatusBroadcastPeriodMs));
+    TEST_ASSERT_EQUAL_UINT32(kStatusBroadcastPeriodMs / kControlLoopPeriodMs,
+                             kStatusLoopsPerBroadcast);
+    TEST_ASSERT_EQUAL_UINT32(20, kControlLoopPeriodMs);
+    // Derived period must stay in 1Hz ±100ms
+    const uint32_t derived_ms = kStatusLoopsPerBroadcast * kControlLoopPeriodMs;
+    TEST_ASSERT_TRUE(statusPeriodWithinScTolerance(derived_ms));
 }
 
 void test_flow_stop_during_cooldown() {

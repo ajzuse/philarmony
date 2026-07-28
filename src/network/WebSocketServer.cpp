@@ -489,6 +489,11 @@ void WebSocketServer::handlePidCalibrate(AsyncWebSocketClient* client, const Jso
     cfg.pwm_step = payload["pwm_step"] | 80.0f;
     cfg.max_cycles = payload["cycles"] | payload["max_cycles"] | 5;
     cfg.max_temp = payload["max_temp_c"] | 80.0f;
+    cfg.algorithm = payload["algorithm"] | "pid";
+    if (cfg.algorithm != "pid" && cfg.algorithm != "bang_bang" &&
+        cfg.algorithm != "pwm_feedforward") {
+        cfg.algorithm = "pid";
+    }
 
   const bool started = pid_autotune_->startCalibration(
         cfg,
@@ -505,6 +510,7 @@ void WebSocketServer::handlePidCalibrate(AsyncWebSocketClient* client, const Jso
     JsonDocument response;
     JsonObject body = response.to<JsonObject>();
     body["status"] = "started";
+    body["algorithm"] = cfg.algorithm;
     sendResponse(client, "control/pid_calibrate", body);
 }
 

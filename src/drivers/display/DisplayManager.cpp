@@ -17,35 +17,32 @@
  */
 
 /**
- * DisplayManager - Implementation
- *
- * T028g: Auto-detection of 9 display types.
- * T028h: Auto-layout engine — font scaling, field density, compact mode
- *        derived from screen resolution.
- * T028i: Configurable refresh rate (1 Hz – 5 Hz) decoupled from status stream.
+ * DisplayManager - Implementation (DriverRegistry-backed display instances)
  */
 #include "DisplayManager.hpp"
+#include "../../core/DriverRegistry.hpp"
 
 namespace filament_dryer {
 
-// ---------------------------------------------------------------------------
-// Construction / destruction
-// ---------------------------------------------------------------------------
+namespace {
+constexpr const char* kDetectOrder[] = {
+    "st7789", "ili9341", "ssd1306", "sh1106",
+    "st7735", "gc9a01", "ili9488", "hd44780", "nextion"
+};
+constexpr size_t kDetectCount = sizeof(kDetectOrder) / sizeof(kDetectOrder[0]);
+}  // namespace
 
 DisplayManager::DisplayManager() {}
 
-DisplayManager::~DisplayManager() {}
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
+DisplayManager::~DisplayManager() {
+    end();
+}
 
 bool DisplayManager::begin(const JsonObject& config) {
     end();
     String driver = config["driver"] | "auto";
 
     if (driver == "auto") {
-        // T028g: try every driver in detection order
         for (size_t i = 0; i < kDetectCount; ++i) {
             if (tryDriver(kDetectOrder[i], config)) {
                 break;
@@ -56,15 +53,12 @@ bool DisplayManager::begin(const JsonObject& config) {
     }
 
     if (active_display_) {
-        // T028h: configure layout based on actual display metrics
         autoConfigureLayout(active_display_->getMetrics());
 
-        // Apply user layout overrides if present
         if (config.containsKey("layout")) {
             setLayout(config["layout"].as<JsonObject>());
         }
 
-        // T028i: refresh rate from config (default 1 Hz)
         layout_.refresh_rate_hz =
             constrain((uint8_t)(config["refresh_rate_hz"] | 1), 1, 5);
     }
@@ -73,22 +67,18 @@ bool DisplayManager::begin(const JsonObject& config) {
 }
 
 void DisplayManager::end() {
-    if (active_display_) {
-        active_display_->clear();
-        active_display_ = nullptr;
-        active_type_ = "none";
+    if (owned_display_) {
+        owned_display_->clear();
+        delete owned_display_;
+        owned_display_ = nullptr;
     }
+    active_display_ = nullptr;
+    active_type_ = "none";
     last_refresh_ms_ = 0;
 }
 
 bool DisplayManager::setDisplayType(const String& type, const JsonObject& config) {
-    // Deactivate current driver first
-    if (active_display_) {
-        active_display_->clear();
-        active_display_ = nullptr;
-        active_type_    = "none";
-    }
-
+    end();
     if (!tryDriver(type, config)) return false;
 
     autoConfigureLayout(active_display_->getMetrics());
@@ -128,10 +118,8 @@ void DisplayManager::setLayout(const JsonObject& layout_config) {
 void DisplayManager::update(const JsonObject& status_fields) {
     if (!active_display_ || !active_display_->isConnected()) return;
 
-    // T028i: only render when the refresh interval has elapsed
     if (!isRefreshDue()) return;
 
-    // T028h: build filtered / layout-adjusted payload
     JsonDocument render_doc;
     buildRenderPayload(status_fields, render_doc);
 
@@ -155,7 +143,6 @@ bool DisplayManager::isAnyConnected() const {
     return active_display_ && active_display_->isConnected();
 }
 
-// T028i: refresh-rate gate
 bool DisplayManager::isRefreshDue() const {
     uint32_t interval_ms = 1000u / constrain(layout_.refresh_rate_hz, 1, 5);
     return (millis() - last_refresh_ms_) >= interval_ms;
@@ -177,42 +164,29 @@ String DisplayManager::getLayoutPreview() const {
     return s;
 }
 
-// ---------------------------------------------------------------------------
-// Private helpers
-// ---------------------------------------------------------------------------
-
-IDisplayDriver* DisplayManager::driverFor(const String& type) {
-    if (type == "ssd1306")  return &ssd1306_;
-    if (type == "sh1106")   return &sh1106_;
-    if (type == "st7789")   return &st7789_;
-    if (type == "st7735")   return &st7735_;
-    if (type == "ili9341")  return &ili9341_;
-    if (type == "gc9a01")   return &gc9a01_;
-    if (type == "ili9488")  return &ili9488_;
-    if (type == "hd44780")  return &hd44780_;
-    if (type == "nextion")  return &nextion_;
-    return nullptr;
-}
-
 bool DisplayManager::tryDriver(const String& type, const JsonObject& config) {
-    IDisplayDriver* drv = driverFor(type);
+    // Factory already calls begin(); fail closed if create/begin fails.
+    IDisplayDriver* drv = DriverRegistry::instance().createDisplay(type, config);
     if (!drv) return false;
 
-    // Inject the driver key so each driver's begin() can read it
-    // We work with the config as-is; each driver reads only its own keys
-    if (drv->begin(config) && drv->isConnected()) {
-        active_display_ = drv;
-        active_type_    = type;
-        return true;
+    if (!drv->isConnected()) {
+        delete drv;
+        return false;
     }
-    return false;
+
+    if (owned_display_) {
+        delete owned_display_;
+        owned_display_ = nullptr;
+    }
+    owned_display_  = drv;
+    active_display_ = drv;
+    active_type_    = type;
+    return true;
 }
 
-// T028h: Auto-layout engine
 void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
     layout_.fields.clear();
 
-    // Determine a baseline set of fields ordered by importance
     const std::vector<String> all_fields = {
         "chamber_temp_c", "target_temp_c", "humidity_pct",
         "target_humidity_pct", "heater_power_pct", "exhaust_fan_power_pct",
@@ -221,16 +195,12 @@ void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
         "cpu_usage_pct", "memory_free_bytes"
     };
 
-    // ---- Character LCD (HD44780) ----
     if (active_type_ == "hd44780") {
-        // metrics encode cols x rows in width x height
         if (m.height >= 4) {
-            // 20x4: show 6 fields
             layout_.fields = {"chamber_temp_c", "target_temp_c",
                                "humidity_pct", "heater_power_pct",
                                "heater_on", "status"};
         } else {
-            // 16x2: show 3 fields
             layout_.fields = {"chamber_temp_c", "heater_power_pct", "status"};
         }
         layout_.font_scaling = FontScaling::NORMAL;
@@ -238,26 +208,20 @@ void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
         return;
     }
 
-    // ---- Pixel displays ----
     uint32_t pixel_count = (uint32_t)m.width * m.height;
 
     if (pixel_count <= 128u * 32u) {
-        // Very small OLED (128x32)
         layout_.fields       = {"chamber_temp_c", "heater_power_pct", "status"};
         layout_.font_scaling = FontScaling::TINY;
         layout_.compact_mode = true;
-
     } else if (pixel_count <= 128u * 64u) {
-        // Standard 128x64 OLED (SSD1306, SH1106)
         layout_.fields       = {"chamber_temp_c", "target_temp_c",
                                  "humidity_pct",   "heater_power_pct",
                                  "heater_on",      "status",
                                  "elapsed_time_sec"};
         layout_.font_scaling = FontScaling::SMALL;
         layout_.compact_mode = false;
-
     } else if (pixel_count <= 135u * 240u) {
-        // Small TFT (ST7789 135x240, ST7735 128x160)
         layout_.fields       = {"chamber_temp_c", "target_temp_c",
                                  "humidity_pct",   "heater_power_pct",
                                  "exhaust_fan_power_pct", "heater_on",
@@ -265,44 +229,35 @@ void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
                                  "elapsed_time_sec", "uptime_sec"};
         layout_.font_scaling = FontScaling::SMALL;
         layout_.compact_mode = false;
-
     } else if (pixel_count <= 240u * 240u) {
-        // Round TFT (GC9A01 240x240)
         layout_.fields       = {"chamber_temp_c", "target_temp_c",
                                  "humidity_pct",   "heater_power_pct",
                                  "heater_on", "exhaust_fan_on", "status"};
         layout_.font_scaling = FontScaling::NORMAL;
         layout_.compact_mode = false;
-
     } else if (pixel_count <= 240u * 320u) {
-        // Medium TFT (ILI9341 240x320, ST7789 240x240)
-        layout_.fields       = all_fields; // show everything
+        layout_.fields       = all_fields;
         layout_.font_scaling = FontScaling::NORMAL;
         layout_.compact_mode = false;
-
     } else {
-        // Large TFT (ILI9488 320x480 and above)
         layout_.fields       = all_fields;
         layout_.font_scaling = FontScaling::LARGE;
         layout_.compact_mode = false;
     }
 
-    // Default refresh rate based on display size — smaller displays can go faster
     if (pixel_count <= 128u * 64u) {
-        layout_.refresh_rate_hz = 2; // OLEDs: 2 Hz default
+        layout_.refresh_rate_hz = 2;
     } else {
-        layout_.refresh_rate_hz = 1; // TFTs: 1 Hz default
+        layout_.refresh_rate_hz = 1;
     }
 }
 
-// T028h: field-selection filter — only passes fields present in layout_.fields
 void DisplayManager::buildRenderPayload(const JsonObject& src,
                                          JsonDocument& out) const {
     out.clear();
     JsonObject dst = out.to<JsonObject>();
 
     if (layout_.fields.empty()) {
-        // No filter: pass everything through
         for (JsonPair kv : src) {
             dst[kv.key()] = kv.value();
         }
@@ -311,23 +266,18 @@ void DisplayManager::buildRenderPayload(const JsonObject& src,
         return;
     }
 
-    // Pass only the fields explicitly listed in the layout
     for (const String& field : layout_.fields) {
         if (src.containsKey(field)) {
             dst[field] = src[field];
         }
     }
 
-    // Always pass layout hints so drivers can size text
     dst["font_scaling"] = static_cast<int>(layout_.font_scaling);
     dst["compact_mode"] = layout_.compact_mode;
 
-    // Always pass "status" — drivers need it for color coding even in compact mode
     if (src.containsKey("status") && !dst.containsKey("status")) {
         dst["status"] = src["status"];
     }
 }
-
-constexpr const char* DisplayManager::kDetectOrder[];
 
 } // namespace filament_dryer

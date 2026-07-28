@@ -26,6 +26,7 @@
 #include <WiFi.h>
 #include <DNSServer.h>
 #include "../core/ConfigManager.hpp"
+#include "timing_contracts.h"
 
 namespace filament_dryer {
 
@@ -35,9 +36,9 @@ public:
     static constexpr const char* AP_PASSWORD = "philarmony";
     static constexpr uint8_t AP_CHANNEL = 1;
     /** First STA attempt: fail fast so AP meets SC-01 (<5s). */
-    static constexpr uint32_t CONNECT_TIMEOUT_MS = 4500;
+    static constexpr uint32_t CONNECT_TIMEOUT_MS = kWifiStaConnectTimeoutMs;
     /** Later reconnect attempts after a prior successful join. */
-    static constexpr uint32_t RECONNECT_TIMEOUT_MS = 15000;
+    static constexpr uint32_t RECONNECT_TIMEOUT_MS = kWifiStaReconnectTimeoutMs;
     static const IPAddress AP_IP;
     static const IPAddress AP_GATEWAY;
     static const IPAddress AP_SUBNET;

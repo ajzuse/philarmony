@@ -449,3 +449,16 @@ Then T152, then T154 + T155, then T156, then T157
 ### Implementation strategy
 
 Do **not** re-open Phase 1–19 completed IDs. Implement Phase 20 only; keep wrapping `pio` (no alternate toolchain).
+
+## Phase 21: Convergence
+
+> **Anti-regression:** Do not re-open closed IDs T113–T157. Tasks below are **net-new** coverage for Done-When that still fails (T118/T133/T142) or newly confirmed gaps.
+
+- [x] T158 CRITICAL Wire real actuator fault feedback end-to-end: use `hasOpenLoopFeedback()` (not only `hasCurrentSense()`), ensure `open_loop_detect` can trip mismatch (commanded==measured alone must not be the only path), and cover non-MOSFET heaters where applicable in `src/main.cpp` and `MosfetActuator` per FR-011 / Constitution: Failsafe and T118 Done-When (partial)
+- [x] T159 Fail closed on DriverRegistry create failures in `initializeSensors`/`initializeActuators`: remove silent fallbacks to `sht3x`/`mosfet_pwm`/`fan_pwm`; log and leave drivers unset (or fault) when the configured type cannot be created per FR-003 (partial)
+- [x] T160 Make `ConfigManager::setPidConfig` return NVS write success and set `saved_to_nvs` in `onPidCalibrateComplete` only when that write succeeds per FR-009 and T133 Done-When (contradicts)
+- [x] T161 Implement Bang-Bang and PWM-Feedforward auto-tune paths in `PidAutotuneController` (or algorithm-specific tune via `IControlAlgorithm`) so `control/pid_calibrate` is not PID-only per FR-009 and T033a (missing)
+- [x] T162 Route display instantiation through `DriverRegistry::createDisplay` (or Document why DisplayManager owns fixed members) so config-driven display types match the sensor/actuator registry path in `DisplayManager`/`main.cpp` per FR-003 (partial)
+- [x] T163 Replace tautological SC timing tests with instrumented assertions that can fail: WifiManager fail-fast &lt;5s (SC-01), and a measurable 1Hz±100ms status period proxy — `test_sc_status_interval_1hz_within_100ms` must not assert literal `1000`/`50` constants per Spec Success Criteria and T142 Done-When (partial)
+- [x] T164 Align Makefile default goal with `contracts/makefile-targets.md`: bare `make` builds firmware (`all`/`build`) while keeping `make help` available per plan: Makefile Target Map (contradicts)
+- [x] T165 Stop silently remapping `fan_digital` to `fan_pwm` in `initializeActuators`; use the registered `fan_digital` factory (or reject at parse) per FR-003 (partial)

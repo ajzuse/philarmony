@@ -317,8 +317,8 @@ PidConfig ConfigManager::getPidConfig() const {
     return config;
 }
 
-void ConfigManager::setPidConfig(const PidConfig& config) {
-    if (!initialized_) return;
+bool ConfigManager::setPidConfig(const PidConfig& config) {
+    if (!initialized_) return false;
     
     JsonDocument doc;
     doc["kp"] = config.kp;
@@ -328,7 +328,7 @@ void ConfigManager::setPidConfig(const PidConfig& config) {
     
     String json;
     serializeJson(doc, json);
-    writeString(KEY_PID, json);
+    return writeString(KEY_PID, json);
 }
 
 // Filament Profiles

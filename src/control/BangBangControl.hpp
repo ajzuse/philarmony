@@ -41,7 +41,7 @@ public:
     void reset() override;
     String getType() const override { return "bang_bang"; }
     String getName() const override { return "Bang-Bang (Hysteresis)"; }
-    bool needsTuning() const override { return false; }
+    bool needsTuning() const override { return true; }
     JsonObject getParameters() override;
     void setParameters(const JsonObject& params) override;
     bool isInitialized() const override { return initialized_; }

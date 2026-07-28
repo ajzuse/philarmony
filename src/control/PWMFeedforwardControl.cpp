@@ -75,6 +75,7 @@ JsonObject PWMFeedforwardControl::getParameters() {
 
 void PWMFeedforwardControl::setParameters(const JsonObject& params) {
     if (params.containsKey("base_pwm")) base_pwm_ = params["base_pwm"];
+    if (params.containsKey("base_pwm_pct")) base_pwm_ = params["base_pwm_pct"];
     if (params.containsKey("temp_coefficient")) temp_coeff_ = params["temp_coefficient"];
     if (params.containsKey("max_pwm")) max_pwm_ = params["max_pwm"];
     if (params.containsKey("min_pwm")) min_pwm_ = params["min_pwm"];

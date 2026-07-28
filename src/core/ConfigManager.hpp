@@ -168,7 +168,7 @@ public:
     
     // PID Configuration
     PidConfig getPidConfig() const;
-    void setPidConfig(const PidConfig& config);
+    bool setPidConfig(const PidConfig& config);
     
     // Filament Profiles
     std::vector<FilamentProfile> getProfiles() const;

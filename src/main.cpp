@@ -29,6 +29,7 @@
 #include <LittleFS.h>
 #include <cmath>
 #include "firmware_version.h"
+#include "timing_contracts.h"
 #include "core/ConfigManager.hpp"
 #include "core/StateMachine.hpp"
 #include "core/LogManager.hpp"
@@ -43,7 +44,6 @@
 #include "network/WebSocketServer.hpp"
 #include "utils/SystemMetrics.hpp"
 #include "drivers/interfaces/IDriverInterfaces.hpp"
-#include "drivers/actuators/MosfetActuator.hpp"
 #include "drivers/display/DisplayManager.hpp"
 #include "plugins/IPlugin.hpp"
 
@@ -211,7 +211,7 @@ TaskHandle_t displayTaskHandle = nullptr;
 // Control Loop (Core 1) - 50Hz = 20ms period
 // ============================================================
 void controlLoopTask(void* pvParameters) {
-    const TickType_t period = pdMS_TO_TICKS(20); // 50Hz
+    const TickType_t period = pdMS_TO_TICKS(kControlLoopPeriodMs);
     TickType_t lastWakeTime = xTaskGetTickCount();
     
     // PID timing
@@ -272,7 +272,7 @@ void controlLoopTask(void* pvParameters) {
 
             // T121: 1Hz status/update during COOLDOWN (heater 0%, fan on)
             static int cooldownLogCounter = 0;
-            if (++cooldownLogCounter >= 50) {
+            if (++cooldownLogCounter >= kStatusLoopsPerBroadcast) {
                 cooldownLogCounter = 0;
                 const float heaterPct = 0.0f;
                 const float fanPct = fanActuator ? fanActuator->getState().power_pct : 0.0f;
@@ -309,14 +309,9 @@ void controlLoopTask(void* pvParameters) {
             bool overcurrent = false;
             bool measured_from_feedback = false;
             float measured = heaterActuator->getState().power_pct;
-            MosfetActuator* heaterMosfet = nullptr;
-            if (heaterActuator->getType() == "mosfet_aod4184" ||
-                heaterActuator->getType() == "mosfet_pwm") {
-                heaterMosfet = static_cast<MosfetActuator*>(heaterActuator);
-            }
-            if (heaterMosfet && heaterMosfet->hasCurrentSense()) {
-                overcurrent = heaterMosfet->checkOvercurrent();
-                measured = heaterMosfet->getMeasuredPowerPct();
+            if (heaterActuator->hasFeedback()) {
+                overcurrent = heaterActuator->checkOvercurrent();
+                measured = heaterActuator->getMeasuredPowerPct();
                 measured_from_feedback = true;
             }
             // Never pass !isHealthy() as overcurrent — e-stop must not count (T118)
@@ -421,7 +416,7 @@ void controlLoopTask(void* pvParameters) {
                                           heaterPct, heaterOn, fanPct, fanOn);
 
         static int logCounter = 0;
-        if (++logCounter >= 50) {
+        if (++logCounter >= kStatusLoopsPerBroadcast) {
             logCounter = 0;
 
             if (stateMachine.isDrying()) {
@@ -600,27 +595,37 @@ void onPidCalibrateComplete(const PidAutotuneController::Result& result) {
     bool saved = false;
     if (result.success) {
         PidConfig cfg(result.kp, result.ki, result.kd);
-        configMgr.setPidConfig(cfg);
-        saved = true;
+        saved = configMgr.setPidConfig(cfg);
 
         JsonDocument paramsDoc;
         JsonObject params = paramsDoc.to<JsonObject>();
         params["kp"] = result.kp;
         params["ki"] = result.ki;
         params["kd"] = result.kd;
+        if (result.hysteresis > 0.0f) {
+            params["hysteresis"] = result.hysteresis;
+        }
+        if (result.base_pwm > 0.0f) {
+            params["base_pwm"] = result.base_pwm;
+        }
+        if (result.temp_coefficient != 0.0f) {
+            params["temp_coefficient"] = result.temp_coefficient;
+        }
 
-        // T127: apply PID-like params to current algorithm when it accepts them
+        // T127/T161: apply tuned params to current algorithm when it accepts them
         IControlAlgorithm* current = controlEngine.getCurrentAlgorithm();
         const String currentType = controlEngine.getCurrentAlgorithmType();
-        if (current && (currentType == "pid" || current->needsTuning())) {
+        const String tunedAlgo = result.algorithm.length() ? result.algorithm : String("pid");
+        if (current && (currentType == tunedAlgo || current->needsTuning())) {
             current->setParameters(params);
-        } else if (currentType.isEmpty() || currentType == "pid") {
-            controlEngine.setAlgorithm("pid", params);
+        } else if (currentType.isEmpty() || currentType == tunedAlgo) {
+            controlEngine.setAlgorithm(tunedAlgo.c_str(), params);
         }
         
         logMgr.logSystem(LogLevel::INFO, LogModule::PID, 
-                         "PID auto-tune complete: Kp=%.2f, Ki=%.2f, Kd=%.2f",
-                         result.kp, result.ki, result.kd);
+                         "Auto-tune complete (%s): Kp=%.2f Ki=%.2f Kd=%.2f hyst=%.2f nvs=%d",
+                         tunedAlgo.c_str(), result.kp, result.ki, result.kd,
+                         result.hysteresis, saved ? 1 : 0);
     } else {
         logMgr.logSystem(LogLevel::ERROR, LogModule::PID, 
                          "PID auto-tune failed: %s", result.error.c_str());
@@ -633,6 +638,9 @@ void onPidCalibrateComplete(const PidAutotuneController::Result& result) {
         doc["kp"] = result.kp;
         doc["ki"] = result.ki;
         doc["kd"] = result.kd;
+        if (result.hysteresis > 0.0f) doc["hysteresis"] = result.hysteresis;
+        if (result.base_pwm > 0.0f) doc["base_pwm"] = result.base_pwm;
+        if (result.temp_coefficient != 0.0f) doc["temp_coefficient"] = result.temp_coefficient;
     } else {
         doc["error"] = result.error;
     }
@@ -685,8 +693,9 @@ void initializeSensors() {
 
     String type = sensorConfig["type"] | "sht31";
     ISensorDriver* sensor = DriverRegistry::instance().createSensor(type, sensorConfig);
-    if (!sensor && type != "sht3x") {
-        sensor = DriverRegistry::instance().createSensor("sht3x", sensorConfig);
+    if (!sensor) {
+        logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR,
+                         "Failed to create sensor type '%s' — no fallback", type.c_str());
     }
 
     activeTempSensor = sensor;
@@ -703,7 +712,9 @@ void initializeSensors() {
         activeHumiditySensor =
             DriverRegistry::instance().createSensor(sensorCfg.humidity_type, humConfig);
         if (!activeHumiditySensor) {
-            activeHumiditySensor = sensor;
+            logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR,
+                             "Failed to create humidity sensor '%s'",
+                             sensorCfg.humidity_type.c_str());
         }
     }
 
@@ -718,6 +729,11 @@ void initializeSensors() {
         extraConfig["scl_pin"] = sensorCfg.scl_pin;
         extraTempSensor =
             DriverRegistry::instance().createSensor(sensorCfg.extra_temp_type, extraConfig);
+        if (!extraTempSensor) {
+            logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR,
+                             "Failed to create extra temp sensor '%s'",
+                             sensorCfg.extra_temp_type.c_str());
+        }
     }
 
     if (!activeTempSensor) {
@@ -752,9 +768,12 @@ void initializeActuators() {
     String heaterType = actuatorCfg.heater_type.length() ? actuatorCfg.heater_type : "mosfet_pwm";
     String fanType = actuatorCfg.fan_type.length() ? actuatorCfg.fan_type : "fan_pwm";
     if (fanType == "fan_digital") {
-        fanType = "fan_pwm";
+        fanConfig["type"] = "fan_digital";
         fanConfig["fan_mode"] = "independent_digital";
+    } else {
+        fanConfig["type"] = fanType;
     }
+    heaterConfig["type"] = heaterType;
 
     actuatorsShareInstance = false;
     const bool useShared =
@@ -769,16 +788,20 @@ void initializeActuators() {
         actuatorsShareInstance = (shared != nullptr);
         heaterType = "shared_mosfet";
         fanType = "shared_mosfet";
+        if (!shared) {
+            logMgr.logSystem(LogLevel::ERROR, LogModule::ACTUATOR,
+                             "Failed to create shared_mosfet — no fallback");
+        }
     } else {
         heaterActuator = DriverRegistry::instance().createActuator(heaterType, heaterConfig);
         if (!heaterActuator) {
-            heaterActuator = DriverRegistry::instance().createActuator("mosfet_pwm", heaterConfig);
-            heaterType = "mosfet_pwm";
+            logMgr.logSystem(LogLevel::ERROR, LogModule::ACTUATOR,
+                             "Failed to create heater '%s' — no fallback", heaterType.c_str());
         }
         fanActuator = DriverRegistry::instance().createActuator(fanType, fanConfig);
         if (!fanActuator) {
-            fanActuator = DriverRegistry::instance().createActuator("fan_pwm", fanConfig);
-            fanType = "fan_pwm";
+            logMgr.logSystem(LogLevel::ERROR, LogModule::ACTUATOR,
+                             "Failed to create fan '%s' — no fallback", fanType.c_str());
         }
     }
 
