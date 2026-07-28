@@ -117,15 +117,16 @@ bool WifiManager::setConfig(const WifiConfig& config) {
     current_config_ = config;
     current_config_.valid = !config.ssid.isEmpty();
     
-    if (saveConfig()) {
-        // Try to connect with new config
-        if (connect()) {
-            stopAP();
-        } else {
-            startAP();
-        }
+    if (!saveConfig()) {
+        return false;
+    }
+
+    if (connect()) {
+        stopAP();
         return true;
     }
+
+    startAP();
     return false;
 }
 

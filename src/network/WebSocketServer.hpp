@@ -7,6 +7,7 @@
 #include <AsyncWebSocket.h>
 #include <ArduinoJson.h>
 #include "../core/SafetyEngine.hpp"
+#include "../core/PidAutotuneController.hpp"
 
 namespace filament_dryer {
 
@@ -14,7 +15,6 @@ class ConfigManager;
 class StateMachine;
 class SafetyEngine;
 class LogManager;
-class PidAutotuneController;
 class HardwareConfigParser;
 class DriverRegistry;
 class ProfileManager;
@@ -23,6 +23,7 @@ class ControlEngine;
 class WebSocketServer {
 public:
     using HardwareReloadCallback = void(*)();
+    using ActuatorCutoffCallback = void(*)();
 
     WebSocketServer(uint16_t port = 80, const char* path = "/ws");
     ~WebSocketServer();
@@ -36,6 +37,12 @@ public:
                ControlEngine* control_engine = nullptr);
 
     void setHardwareReloadCallback(HardwareReloadCallback cb) { hardware_reload_cb_ = cb; }
+    void setActuatorCutoffCallback(ActuatorCutoffCallback cb) { actuator_cutoff_cb_ = cb; }
+    void setPidCalibrateCallbacks(PidAutotuneController::ProgressCallback progress,
+                                  PidAutotuneController::CompleteCallback complete) {
+        pid_progress_cb_ = progress;
+        pid_complete_cb_ = complete;
+    }
     
     void loop();
     
@@ -66,6 +73,9 @@ private:
     ProfileManager* profile_mgr_ = nullptr;
     ControlEngine* control_engine_ = nullptr;
     HardwareReloadCallback hardware_reload_cb_ = nullptr;
+    ActuatorCutoffCallback actuator_cutoff_cb_ = nullptr;
+    PidAutotuneController::ProgressCallback pid_progress_cb_ = nullptr;
+    PidAutotuneController::CompleteCallback pid_complete_cb_ = nullptr;
     
     // Client management
     struct ClientInfo {

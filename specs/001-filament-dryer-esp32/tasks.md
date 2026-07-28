@@ -269,3 +269,20 @@ Add US2 (Control & Telemetry) -> Add US3 (Safety Engine & Logs) -> Add US4 (Disp
 - [x] T066 Implement the 30s exhaust-fan cooldown after humidity-reached or normal cycle completion before fully stopping actuators in src/main.cpp per spec clarification Session 2026-07-23 (missing)
 - [x] T067 Fix compile issues in src/plugins/PluginManager.cpp, remove its build_src_filter exclusion, and wire PluginManager hooks into firmware init/runtime per plan: plugin architecture (partial)
 - [x] T068 Create and maintain .vscode/workspace.json with the PlatformIO toolchain and documented dependencies per Constitution: Workspace de Dependências e Configurações (missing)
+
+## Phase 15: Convergence
+
+- [x] T069 CRITICAL Cut heater/fan power on control/stop and whenever leaving DRYING without cooldown in src/network/WebSocketServer.cpp and src/main.cpp per FR-005 and Constitution: Failsafe e Proteção de Hardware (missing)
+- [x] T070 CRITICAL Implement SafetyEngine::executeEmergencyShutdown actuator cutoff, attach control task to WDT via esp_task_wdt_add, and invoke I2C/SPI/actuator fault checks from the control loop in src/core/SafetyEngine.cpp and src/main.cpp per FR-011 and Constitution: Failsafe e Proteção de Hardware (partial)
+- [x] T071 CRITICAL Populate ActuatorConfig pins, types, PWM freqs, cooldown, and safety limits from the actuators JSON array in HardwareConfigParser::parseActuators in src/core/HardwareConfigParser.cpp per FR-003 (missing)
+- [x] T072 CRITICAL Instantiate sensors and actuators from persisted config types via DriverRegistry instead of hardcoding mosfet_pwm + fan_pwm in src/main.cpp per FR-003 (partial)
+- [x] T073 CRITICAL Register PidAutotune progress/complete callbacks that broadcast status/pid_calibrate and persist Kp/Ki/Kd to NVS in src/network/WebSocketServer.cpp and src/main.cpp per FR-009 (missing)
+- [x] T074 CRITICAL Feed live chamber_temp_c and humidity_pct from sensors into the display task instead of session targets in src/main.cpp per FR-007 (contradicts)
+- [x] T075 Return WiFi connect success only when STA is up and report HTTP/WS status accordingly in src/network/WifiManager.cpp and src/network/WebServer.cpp per FR-001 (partial)
+- [x] T076 Build status/update from live configured sensors/actuators/metrics and send only to status/subscribe clients in src/network/WebSocketServer.cpp and src/main.cpp per FR-006 (partial)
+- [x] T077 Tear down previous drivers on hardware reload and invoke the same reload path from HTTP POST /api/hardware/config in src/main.cpp and src/network/WebServer.cpp per FR-003 (partial)
+- [x] T078 Register captive-portal / DNS redirect handlers so AP clients reach the WiFi config page in src/network/WebServer.cpp per FR-001 (partial)
+- [x] T079 Enforce max 20 custom profiles and validate temp 30–80°C, duration 1–1440 min, humidity 5–50% on create/update in src/core/ConfigManager.cpp and ProfileManager per FR-008 (missing)
+- [x] T080 Apply config/display fields and refresh_rate_hz into DisplayManager layout in src/network/WebSocketServer.cpp per FR-004 (partial)
+- [x] T081 Invoke PluginManager session/telemetry hooks (e.g. callOnSessionStart) from drying start/runtime in src/main.cpp per plan: plugin architecture (partial)
+- [x] T082 Expand native P1 flow tests to exercise WebSocket start/stop/status and fault-abort handler paths beyond in-memory stubs in test/test_p1_flows/ per Constitution: Teste Automatizado e Qualidade (partial)

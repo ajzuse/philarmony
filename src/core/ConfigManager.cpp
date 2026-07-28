@@ -129,9 +129,11 @@ ActuatorConfig ConfigManager::getActuatorConfig() const {
     if (prefs_.getString(KEY_ACTUATOR, json)) {
         JsonDocument doc;
         if (deserializeJson(doc, json) == DeserializationError::Ok) {
+            config.heater_type = doc["heater_type"] | "mosfet_pwm";
             config.heater_pin = doc["heater_pin"] | 25;
             config.heater_pwm_freq = doc["heater_pwm_freq"] | 1000;
             config.heater_max_power_pct = doc["heater_max_power_pct"] | 100;
+            config.fan_type = doc["fan_type"] | "fan_pwm";
             config.fan_mode = doc["fan_mode"] | "independent_pwm";
             config.fan_pin = doc["fan_pin"] | 26;
             config.fan_pwm_freq = doc["fan_pwm_freq"] | 5000;
@@ -145,9 +147,11 @@ void ConfigManager::setActuatorConfig(const ActuatorConfig& config) {
     if (!initialized_) return;
     
     JsonDocument doc;
+    doc["heater_type"] = config.heater_type;
     doc["heater_pin"] = config.heater_pin;
     doc["heater_pwm_freq"] = config.heater_pwm_freq;
     doc["heater_max_power_pct"] = config.heater_max_power_pct;
+    doc["fan_type"] = config.fan_type;
     doc["fan_mode"] = config.fan_mode;
     doc["fan_pin"] = config.fan_pin;
     doc["fan_pwm_freq"] = config.fan_pwm_freq;
@@ -179,6 +183,9 @@ DisplayConfig ConfigManager::getDisplayConfig() const {
             config.dc_pin = doc["dc_pin"] | -1;
             config.rst_pin = doc["rst_pin"] | -1;
             config.backlight_pin = doc["backlight_pin"] | -1;
+            config.refresh_rate_hz = doc["refresh_rate_hz"] | 1;
+            if (config.refresh_rate_hz < 1) config.refresh_rate_hz = 1;
+            if (config.refresh_rate_hz > 5) config.refresh_rate_hz = 5;
             
             JsonArray fields = doc["fields"];
             config.fields.clear();
@@ -206,6 +213,7 @@ void ConfigManager::setDisplayConfig(const DisplayConfig& config) {
     doc["dc_pin"] = config.dc_pin;
     doc["rst_pin"] = config.rst_pin;
     doc["backlight_pin"] = config.backlight_pin;
+    doc["refresh_rate_hz"] = config.refresh_rate_hz;
     
     JsonArray fields = doc["fields"].to<JsonArray>();
     for (const String& field : config.fields) {
@@ -300,6 +308,19 @@ bool ConfigManager::addProfile(const FilamentProfile& profile) {
     for (const auto& p : profiles) {
         if (p.id == profile.id) return false;
     }
+
+    if (!validateProfileParams(profile.target_temp_c, profile.default_duration_min,
+                               profile.target_humidity_pct)) {
+        return false;
+    }
+
+    size_t custom_count = 0;
+    for (const auto& p : profiles) {
+        if (!p.is_builtin) ++custom_count;
+    }
+    if (custom_count >= kMaxCustomProfiles) {
+        return false;
+    }
     
     profiles.push_back(profile);
     return saveProfiles(profiles);
@@ -312,6 +333,11 @@ bool ConfigManager::updateProfile(const FilamentProfile& profile) {
         if (p.id == profile.id) {
             // Don't allow modifying builtin profiles
             if (p.is_builtin) return false;
+
+            if (!validateProfileParams(profile.target_temp_c, profile.default_duration_min,
+                                       profile.target_humidity_pct)) {
+                return false;
+            }
             
             p.name_pt = profile.name_pt;
             p.name_en = profile.name_en;
@@ -510,9 +536,11 @@ String ConfigManager::toJson() const {
     // Actuator
     JsonObject actuator_obj = doc.createNestedObject("actuator");
     ActuatorConfig actuator = getActuatorConfig();
+    actuator_obj["heater_type"] = actuator.heater_type;
     actuator_obj["heater_pin"] = actuator.heater_pin;
     actuator_obj["heater_pwm_freq"] = actuator.heater_pwm_freq;
     actuator_obj["heater_max_power_pct"] = actuator.heater_max_power_pct;
+    actuator_obj["fan_type"] = actuator.fan_type;
     actuator_obj["fan_mode"] = actuator.fan_mode;
     actuator_obj["fan_pin"] = actuator.fan_pin;
     actuator_obj["fan_pwm_freq"] = actuator.fan_pwm_freq;
@@ -605,9 +633,11 @@ bool ConfigManager::fromJson(const String& json) {
     if (doc["actuator"].is<JsonObject>()) {
         JsonObject actuatorObj = doc["actuator"].as<JsonObject>();
         ActuatorConfig actuator;
+        actuator.heater_type = actuatorObj["heater_type"] | "mosfet_pwm";
         actuator.heater_pin = actuatorObj["heater_pin"] | 25;
         actuator.heater_pwm_freq = actuatorObj["heater_pwm_freq"] | 1000;
         actuator.heater_max_power_pct = actuatorObj["heater_max_power_pct"] | 100;
+        actuator.fan_type = actuatorObj["fan_type"] | "fan_pwm";
         actuator.fan_mode = actuatorObj["fan_mode"] | "independent_pwm";
         actuator.fan_pin = actuatorObj["fan_pin"] | 26;
         actuator.fan_pwm_freq = actuatorObj["fan_pwm_freq"] | 5000;
@@ -631,6 +661,7 @@ bool ConfigManager::fromJson(const String& json) {
         display.dc_pin = displayObj["dc_pin"] | -1;
         display.rst_pin = displayObj["rst_pin"] | -1;
         display.backlight_pin = displayObj["backlight_pin"] | -1;
+        display.refresh_rate_hz = displayObj["refresh_rate_hz"] | 1;
         
         JsonArray fields = displayObj["fields"].as<JsonArray>();
         display.fields.clear();

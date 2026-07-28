@@ -173,15 +173,49 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseActuators(cons
             addWarning(result, "actuator[" + actuator["id"].as<String>() + "]: " + warn);
         }
 
-        // Track roles
         String role = actuator["role"] | "";
-        if (role == "heater") has_heater = true;
-        if (role == "fan") has_fan = true;
+        JsonObject pins = actuator["pins"].as<JsonObject>();
+        JsonObject control = actuator["control"].as<JsonObject>();
+        JsonObject safety = actuator["safety_limits"].as<JsonObject>();
+
+        if (role == "heater") {
+            has_heater = true;
+            config.heater_type = actuator["type"] | config.heater_type;
+            if (!pins.isNull()) {
+                config.heater_pin = pins["pwm"] | config.heater_pin;
+            }
+            if (!control.isNull()) {
+                config.heater_pwm_freq = control["pwm_freq_hz"] | config.heater_pwm_freq;
+                config.heater_max_power_pct = control["max_power_pct"] | config.heater_max_power_pct;
+            }
+            if (!safety.isNull()) {
+                config.heater_max_power_pct = safety["max_power_pct"] | config.heater_max_power_pct;
+            }
+        }
+        if (role == "fan") {
+            has_fan = true;
+            config.fan_type = actuator["type"] | config.fan_type;
+            if (!pins.isNull()) {
+                config.fan_pin = pins["pwm"] | config.fan_pin;
+            }
+            if (!control.isNull()) {
+                config.fan_pwm_freq = control["pwm_freq_hz"] | config.fan_pwm_freq;
+                config.cooldown_duration_sec = control["cooldown_sec"] | config.cooldown_duration_sec;
+            }
+            if (config.fan_type == "shared_mosfet") {
+                config.fan_mode = "shared_mosfet";
+            } else if (config.fan_type == "fan_digital") {
+                config.fan_mode = "independent_digital";
+            } else {
+                config.fan_mode = "independent_pwm";
+            }
+        }
     }
 
     if (!has_heater) {
         addError(result, "At least one actuator with role 'heater' is required");
     }
+    (void)has_fan;
 
     return result;
 }
@@ -208,11 +242,34 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseDisplay(const 
     config.rst_pin = display["rst_pin"] | -1;
     config.backlight_pin = display["backlight_pin"] | -1;
 
+    if (display.containsKey("refresh_rate_hz")) {
+        config.refresh_rate_hz = display["refresh_rate_hz"] | 1;
+        if (config.refresh_rate_hz < 1) config.refresh_rate_hz = 1;
+        if (config.refresh_rate_hz > 5) config.refresh_rate_hz = 5;
+    }
+
     if (display.containsKey("fields")) {
         JsonArray fields = display["fields"].as<JsonArray>();
         config.fields.clear();
         for (JsonVariant v : fields) {
             config.fields.push_back(v.as<String>());
+        }
+    }
+
+    // Nested layout object (spec schema)
+    if (display["layout"].is<JsonObject>()) {
+        JsonObject layout = display["layout"].as<JsonObject>();
+        if (layout.containsKey("fields")) {
+            JsonArray fields = layout["fields"].as<JsonArray>();
+            config.fields.clear();
+            for (JsonVariant v : fields) {
+                config.fields.push_back(v.as<String>());
+            }
+        }
+        if (layout.containsKey("refresh_rate_hz")) {
+            config.refresh_rate_hz = layout["refresh_rate_hz"] | config.refresh_rate_hz;
+            if (config.refresh_rate_hz < 1) config.refresh_rate_hz = 1;
+            if (config.refresh_rate_hz > 5) config.refresh_rate_hz = 5;
         }
     }
 

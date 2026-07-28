@@ -88,6 +88,12 @@ bool StateMachine::updateDryingProgress(float current_temp, float current_humidi
     
     current_session_.elapsed_sec = (millis() - current_session_.start_timestamp) / 1000;
     current_session_.remaining_sec = (current_session_.max_duration_min * 60) - current_session_.elapsed_sec;
+    current_session_.current_temp_c = current_temp;
+    current_session_.current_humidity_pct = current_humidity;
+    current_session_.heater_power_pct = heater_power_pct;
+    current_session_.heater_on = heater_on;
+    current_session_.exhaust_fan_power_pct = fan_power_pct;
+    current_session_.exhaust_fan_on = fan_on;
     
     if (session_update_cb_) {
         session_update_cb_(current_session_);
