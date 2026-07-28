@@ -1,7 +1,8 @@
 # Research: ESP32 Desktop Installer
 
 **Feature**: `002-esp32-desktop-installer` | **Date**: 2026-07-28  
-**Amended**: 2026-07-28 — stack switched from Tauri to Flutter per product direction (shared codebase with `003`).
+**Amended**: 2026-07-28 — stack switched from Tauri to Flutter per product direction (shared codebase with `003`).  
+**Amended**: 2026-07-28 — host OS installers (MSIX / DMG / Linux AppImage+deb+rpm via Make) (DEC-011).
 
 ## R1 — Desktop / shared UI framework
 
@@ -23,7 +24,7 @@
 | Chip detect + flash erase/write/verify | Indirect | Bundle **esptool** and drive via `Process` (parse stdout for progress) |
 | Config JSON profiles | Yes | `dart:convert` + shared models |
 | Post-flash network verify | Yes | HTTP/`web_socket_channel` (same stack as `003`) |
-| Win/macOS/Linux packages | Yes | `flutter build windows|macos|linux` |
+| Win/macOS/Linux packages | Yes | `flutter build` + MSIX/DMG + Linux AppImage/deb/**rpm** via Make (R7) |
 | USB flash on iOS/Android | Partial / out of MVP | Desktop installer owns flash; mobile control app uses WiFi/WS |
 
 **Alternatives considered**:
@@ -62,8 +63,37 @@ Installer remains **desktop-first** because USB flashing is the hard requirement
 
 **Decision**: Unit-test validators/mappers without hardware; mock `Flasher`/`SerialPort` interfaces for flow tests; one manual hardware smoke path in quickstart; CI runs `flutter test` on Linux (and macOS/Windows as runners allow).
 
+## R7 — Host app distribution (single-download installers)
+
+**Decision**: Ship **OS-native installers** so non-developers install with one download:
+
+| OS | Artifact | Tooling |
+|----|----------|---------|
+| Windows 10/11 x64 | **`.msix`** (primary) | `msix` pub package (`dart run msix:create`); optional Inno Setup `.exe` fallback if MSIX sideload policy blocks some orgs |
+| macOS 12+ | **`.dmg`** (drag-to-Applications) | `flutter build macos` → sign (Developer ID) → notarize → `create-dmg` / `flutter_distributor` |
+| Linux x64 | **AppImage** + **`.deb`** + **`.rpm`** | `flutter build linux` → package via `flutter_distributor` / `nfpm` / `fpm`; **entry point: `make package-installer-linux*`** |
+
+**Linux formats**:
+- **AppImage** — portable, no root; any distro
+- **`.deb`** — Debian, Ubuntu, derivatives (`apt install ./…`)
+- **`.rpm`** — Fedora, RHEL, Rocky, Alma, openSUSE-compatible rpm workflows (`dnf`/`yum`/`zypper` as applicable)
+
+**Rationale**: User requirement for single-download multi-platform install including first-class Linux and Red Hat–based distros. Zipping Flutter `Release/` folders fails Gatekeeper and non-technical UX. Make aligns with existing firmware façade (DEC-009) for builders/CI without making clone+make the end-user path.
+
+**Release pipeline**: GitHub Actions builds signed (when secrets present) or unsigned CI artifacts; GitHub Releases attach one file per OS/format. App payload **embeds** firmware + esptool so users need no second download for device flashing.
+
+**Alternatives considered**:
+- Portable ZIP only — rejected (Gatekeeper, no Start Menu, poor UX).
+- Microsoft Store / Mac App Store only — optional later; sideload MSIX/DMG required for GPLv3 DIY audience.
+- Separate “online installer” bootstrapper — unnecessary complexity for MVP.
+- Linux AppImage-only — rejected; misses native package managers and Fedora/RHEL users.
+- Flatpak/Snap as primary — deferred; AppImage + deb + rpm cover the requested surface.
+
 ## Open items deferred to tasks
 
 - Exact esptool packaging (PyInstaller vs official standalone builds) per OS
-- NVS image write format spike (same as prior plan)
-- Code signing for store/distribution
+- NVS image write format spike
+- Apple notarization credentials + Windows code-signing cert in CI
+- Whether to offer both MSIX and Inno `.exe` for Windows enterprise quirks
+- Choose Linux packager (`nfpm` vs `fpm` vs `flutter_distributor`) and Makefile wiring details
+- RPM metadata (Requires, desktop file, udev rules for serial if needed)

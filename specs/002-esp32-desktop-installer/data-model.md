@@ -87,6 +87,20 @@ Same semantic as firmware `001` (id, names PT/EN, temp 30–80, duration 1–144
 | `supported_chips` | string[] | |
 | `checksum_sha256` | string | Verified before flash |
 
+### HostReleaseArtifact
+Build/release metadata for the **desktop app installer** (not the ESP32 image).
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `app_version` | semver | Philarmony Desktop Installer version |
+| `os` | `windows` \| `macos` \| `linux` | |
+| `arch` | `x64` \| `arm64` \| `universal` | |
+| `format` | `msix` \| `dmg` \| `appimage` \| `deb` \| `rpm` \| `exe` | Win: msix; macOS: dmg; Linux: appimage+deb+rpm |
+| `download_url` | string | GitHub Release asset |
+| `checksum_sha256` | string | Published alongside asset |
+| `signed` | boolean | Code-signed / notarized |
+| `embeds_firmware_version` | string | Must match bundled `FirmwarePackage.version` |
+
 ### FlashJob
 
 | Field | Type | Notes |
@@ -108,6 +122,7 @@ DeviceProfile 1──1 WiFiConfig
 DeviceProfile 1──* FilamentProfile
 InstallerSession 0..1──1 FlashJob
 FlashJob *──1 FirmwarePackage
+HostReleaseArtifact *──1 FirmwarePackage   # embeds firmware version
 ```
 
 ## State transitions
