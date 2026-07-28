@@ -563,6 +563,13 @@ bool HardwareConfigParser::isTypeInArray(const String& type, const char* arr[], 
     return false;
 }
 
+constexpr const char* HardwareConfigParser::SENSOR_TYPES[];
+constexpr const char* HardwareConfigParser::ACTUATOR_TYPES[];
+constexpr const char* HardwareConfigParser::ACTUATOR_ROLES[];
+constexpr const char* HardwareConfigParser::CONTROL_ALGORITHMS[];
+constexpr const char* HardwareConfigParser::DISPLAY_DRIVERS[];
+constexpr const char* HardwareConfigParser::BUS_TYPES[];
+
 // Convenience function
 HardwareConfigParser::ValidationResult parseHardwareConfig(const String& json_string,
                                                            SensorConfig& sensor,
@@ -571,7 +578,7 @@ HardwareConfigParser::ValidationResult parseHardwareConfig(const String& json_st
                                                            ControlConfig& control) {
     HardwareConfigParser parser;
     JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, json_string);
+    DeserializationError err = deserializeJson(doc, json_string.c_str());
     if (err) {
         HardwareConfigParser::ValidationResult result;
         result.valid = false;

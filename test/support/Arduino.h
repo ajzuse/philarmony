@@ -1,0 +1,104 @@
+#pragma once
+
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
+
+class String {
+public:
+    String() = default;
+    String(const char* s) : data_(s ? s : "") {}
+    String(const std::string& s) : data_(s) {}
+    String(int value) : data_(std::to_string(value)) {}
+    String(unsigned int value) : data_(std::to_string(value)) {}
+    String(long value) : data_(std::to_string(value)) {}
+    String(unsigned long value) : data_(std::to_string(value)) {}
+    String(float value) : data_(std::to_string(value)) {}
+    String(double value) : data_(std::to_string(value)) {}
+
+    const char* c_str() const { return data_.c_str(); }
+    size_t length() const { return data_.length(); }
+    bool isEmpty() const { return data_.empty(); }
+    void reserve(size_t n) { data_.reserve(n); }
+
+    String& operator=(const char* s) {
+        data_ = s ? s : "";
+        return *this;
+    }
+    String& operator=(const String& other) = default;
+    String& operator+=(const char* s) {
+        if (s) data_ += s;
+        return *this;
+    }
+    String& operator+=(const String& other) {
+        data_ += other.data_;
+        return *this;
+    }
+    String& operator+=(char c) {
+        data_.push_back(c);
+        return *this;
+    }
+
+    friend String operator+(const String& lhs, const String& rhs) {
+        return String(lhs.data_ + rhs.data_);
+    }
+    friend String operator+(const String& lhs, const char* rhs) {
+        return String(lhs.data_ + (rhs ? rhs : ""));
+    }
+    friend String operator+(const char* lhs, const String& rhs) {
+        return String(std::string(lhs ? lhs : "") + rhs.data_);
+    }
+
+    bool operator==(const char* rhs) const { return data_ == (rhs ? rhs : ""); }
+    bool operator==(const String& rhs) const { return data_ == rhs.data_; }
+    bool operator!=(const char* rhs) const { return !(*this == rhs); }
+    bool operator!=(const String& rhs) const { return !(*this == rhs); }
+
+    char operator[](size_t index) const { return data_[index]; }
+
+private:
+    std::string data_;
+};
+
+inline String operator+(const String& lhs, float rhs) {
+    return lhs + String(rhs);
+}
+inline String operator+(float lhs, const String& rhs) {
+    return String(lhs) + rhs;
+}
+
+template <typename T>
+T constrain(T value, T min_val, T max_val) {
+    if (value < min_val) return min_val;
+    if (value > max_val) return max_val;
+    return value;
+}
+
+inline uint32_t& test_millis() {
+    static uint32_t now = 0;
+    return now;
+}
+
+inline void test_advance_millis(uint32_t delta) { test_millis() += delta; }
+inline void test_set_millis(uint32_t value) { test_millis() = value; }
+
+inline unsigned long millis() { return test_millis(); }
+inline void delay(unsigned long) {}
+
+#ifndef INPUT
+#define INPUT 0
+#define OUTPUT 1
+#endif
+
+inline void pinMode(int, int) {}
+inline void digitalWrite(int, int) {}
+inline int digitalRead(int) { return 0; }
+inline void ledcSetup(int, int, int) {}
+inline void ledcAttachPin(int, int) {}
+inline void ledcWrite(int, int) {}
+
+#include "ArduinoJsonString.hpp"

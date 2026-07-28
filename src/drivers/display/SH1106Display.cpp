@@ -40,7 +40,6 @@ bool SH1106Display::begin(const JsonObject& config) {
     display_ = new Adafruit_SH1106G(metrics_.width, metrics_.height, &Wire, rst_pin_);
 
     if (!display_->begin(i2c_address_, true)) {
-        Serial.printf("[SH1106] Init failed at 0x%02X\n", i2c_address_);
         delete display_;
         display_ = nullptr;
         return false;
@@ -53,8 +52,6 @@ bool SH1106Display::begin(const JsonObject& config) {
     display_->display();
 
     initialized_ = true;
-    Serial.printf("[SH1106] %dx%d initialized at 0x%02X\n",
-                  metrics_.width, metrics_.height, i2c_address_);
     return true;
 }
 

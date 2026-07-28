@@ -35,6 +35,7 @@ private:
 
     bool sendCommand(uint8_t cmd, const uint8_t* data = nullptr, size_t len = 0);
     bool readData(uint8_t* data, size_t len);
+    bool readStatus(uint8_t& status);
     float calcTemperature(uint32_t raw);
     float calcHumidity(uint32_t raw);
     bool waitForReady(uint32_t timeout_ms = 100);

@@ -29,8 +29,6 @@ bool DisplayManager::begin(const JsonObject& config) {
         // T028g: try every driver in detection order
         for (size_t i = 0; i < kDetectCount; ++i) {
             if (tryDriver(kDetectOrder[i], config)) {
-                Serial.printf("[DisplayManager] Auto-detected: %s\n",
-                              active_type_.c_str());
                 break;
             }
         }
@@ -292,5 +290,7 @@ void DisplayManager::buildRenderPayload(const JsonObject& src,
         dst["status"] = src["status"];
     }
 }
+
+constexpr const char* DisplayManager::kDetectOrder[];
 
 } // namespace filament_dryer

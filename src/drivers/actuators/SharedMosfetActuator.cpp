@@ -23,7 +23,7 @@ bool SharedMosfetActuator::begin(const JsonObject& config) {
     ledcAttachPin(pwm_pin_, pwm_channel_);
     ledcWrite(pwm_channel_, 0);
     
-    state_ = {};
+    state_ = ActuatorState{};
     state_.enabled = false;
     state_.power_pct = 0.0f;
     state_.fault = false;
@@ -32,8 +32,6 @@ bool SharedMosfetActuator::begin(const JsonObject& config) {
     
     initialized_ = true;
     
-    logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, 
-                     "Shared MOSFET on GPIO %d (%luHz, ch%d)", pwm_pin_, pwm_freq_, pwm_channel_);
     return true;
 }
 
@@ -62,7 +60,6 @@ void SharedMosfetActuator::emergencyStop() {
     heater_power_ = 0;
     fan_power_ = 0;
     
-    logMgr.logSystem(LogLevel::WARNING, LogModule::ACTUATOR, "Shared MOSFET emergency stop");
 }
 
 ActuatorState SharedMosfetActuator::getState() const {

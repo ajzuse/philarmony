@@ -23,7 +23,6 @@ bool StepperActuator::begin(const JsonObject& config) {
     microsteps_ = config["microsteps"] | 16;
     
     if (step_pin_ < 0 || dir_pin_ < 0) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::ACTUATOR, "Stepper: step_pin and dir_pin required");
         return false;
     }
     
@@ -43,16 +42,13 @@ bool StepperActuator::begin(const JsonObject& config) {
     
     setMicrostepping(microsteps_);
     
-    state_ = {};
+    state_ = ActuatorState{};
     state_.enabled = false;
     state_.power_pct = 0.0f;
     state_.fault = false;
     
     initialized_ = true;
     
-    logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, 
-                     "Stepper initialized (step=%d, dir=%d, microsteps=%d)", 
-                     step_pin_, dir_pin_, microsteps_);
     return true;
 }
 
@@ -86,7 +82,6 @@ void StepperActuator::emergencyStop() {
     state_.fault = true;
     state_.fault_message = "Emergency stop";
     
-    logMgr.logSystem(LogLevel::WARNING, LogModule::ACTUATOR, "Stepper emergency stop");
 }
 
 ActuatorState StepperActuator::getState() const {
@@ -123,7 +118,6 @@ bool StepperActuator::home() {
     
     // Simple homing: move negative until limit switch (not implemented)
     // In practice, would use limit switch on a dedicated pin
-    logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, "Stepper homing not fully implemented");
     return true;
 }
 

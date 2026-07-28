@@ -31,7 +31,6 @@ bool GC9A01Display::begin(const JsonObject& config) {
     display_ = new LGFX_GC9A01(mosi_pin_, sclk_pin_, cs_pin_, dc_pin_, rst_pin_, bl_pin_);
 
     if (!display_->init()) {
-        Serial.println("[GC9A01] Init failed");
         delete display_;
         display_ = nullptr;
         return false;
@@ -42,7 +41,6 @@ bool GC9A01Display::begin(const JsonObject& config) {
     display_->fillScreen(TFT_BLACK);
 
     initialized_ = true;
-    Serial.println("[GC9A01] 240x240 round TFT initialized");
     return true;
 }
 

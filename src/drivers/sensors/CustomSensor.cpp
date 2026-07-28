@@ -15,23 +15,17 @@ bool CustomSensor::begin(const JsonObject& config) {
     
     // Check for required callbacks
     if (!init_cb_ || !read_cb_) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR, 
-                         "CustomSensor: Missing required callbacks (init/read)");
         return false;
     }
     
     // Call user init callback
     if (!init_cb_(config)) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR, 
-                         "CustomSensor: Plugin init callback failed");
         return false;
     }
     
     plugin_name_ = config["name"] | "custom";
     initialized_ = true;
     
-    logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR, 
-                     "CustomSensor '%s' initialized", plugin_name_.c_str());
     return true;
 }
 
@@ -41,7 +35,7 @@ SensorReading CustomSensor::read() {
     reading.valid = false;
     
     if (!initialized_ || !read_cb_) {
-        reading.error = "Not initialized or missing read callback";
+        reading.error_message = "Not initialized or missing read callback";
         return reading;
     }
     
@@ -49,7 +43,7 @@ SensorReading CustomSensor::read() {
         reading = read_cb_();
         last_reading_ = reading;
     } catch (...) {
-        reading.error = "Plugin read callback exception";
+        reading.error_message = "Plugin read callback exception";
     }
     
     return reading;

@@ -20,8 +20,8 @@ public:
     
     bool begin(const JsonObject& config) override;
     SensorReading read() override;
-    String getType() const override { return "custom"; }
-    String getName() const override { return "Custom Plugin Sensor"; }
+    String getType() const override;
+    String getName() const override;
     bool isConnected() override;
 
     // Setters for plugin callbacks

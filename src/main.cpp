@@ -16,19 +16,16 @@
 #include "core/LogManager.hpp"
 #include "core/SafetyEngine.hpp"
 #include "core/PidAutotuneController.hpp"
+#include "core/ProfileManager.hpp"
+#include "core/HardwareConfigParser.hpp"
+#include "core/DriverRegistry.hpp"
+#include "control/ControlEngine.hpp"
 #include "network/WifiManager.hpp"
 #include "network/WebServer.hpp"
 #include "network/WebSocketServer.hpp"
 #include "utils/SystemMetrics.hpp"
 #include "drivers/interfaces/IDriverInterfaces.hpp"
-#include "drivers/sensors/SHT31Sensor.hpp"
-#include "drivers/sensors/DHT22Sensor.hpp"
-#include "drivers/sensors/DS18B20Sensor.hpp"
-#include "drivers/actuators/MosfetActuator.hpp"
-#include "drivers/actuators/FanActuator.hpp"
-#include "drivers/display/ST7789Display.hpp"
-#include "drivers/display/ILI9341Display.hpp"
-#include "drivers/display/SSD1306Display.hpp"
+#include "drivers/display/DisplayManager.hpp"
 
 using namespace filament_dryer;
 
@@ -40,24 +37,20 @@ StateMachine stateMachine;
 LogManager logMgr;
 SafetyEngine safetyEngine;
 PidAutotuneController pidAutotune;
+HardwareConfigParser hwParser;
+ProfileManager profileMgr(configMgr);
+ControlEngine controlEngine;
+DisplayManager displayManager;
 WifiManager wifiMgr;
 WebServer webServer(80);
 WebSocketServer wsServer;
 SystemMetrics sysMetrics;
 
-// Driver instances
-SHT31Sensor sht31Sensor;
-DHT22Sensor dht22Sensor;
-DS18B20Sensor ds18b20Sensor;
-MosfetActuator heaterActuator;
-FanActuator fanActuator;
-ST7789Display st7789Display;
-ILI9341Display ili9341Display;
-SSD1306Display ssd1306Display;
-
-// Current active sensor driver
 ISensorDriver* activeTempSensor = nullptr;
 ISensorDriver* activeHumiditySensor = nullptr;
+IActuatorDriver* heaterActuator = nullptr;
+IActuatorDriver* fanActuator = nullptr;
+IDisplayDriver* activeDisplay = nullptr;
 
 // ============================================================
 // FreeRTOS Task Handles
@@ -98,32 +91,29 @@ void controlLoopTask(void* pvParameters) {
         float chamberTemp = tempReading.valid ? tempReading.temperature : NAN;
         float chamberHumidity = humidityReading.valid ? humidityReading.humidity : NAN;
         
-        // Safety check (runs every control loop iteration)
-        uint8_t heaterPower = heaterActuator.getState().enabled ? 
-                             (uint8_t)heaterActuator.getState().power_pct : 0;
-        
+        float heaterPowerPct = (heaterActuator && heaterActuator->getState().enabled)
+                                   ? heaterActuator->getState().power_pct
+                                   : 0.0f;
+        uint8_t heaterPower = static_cast<uint8_t>(heaterPowerPct);
+
         bool sensorConnected = tempReading.valid;
         if (!safetyEngine.checkSafety(chamberTemp,
                                        stateMachine.getCurrentSession().target_temp_c,
                                        heaterPower, heaterPower > 0, sensorConnected)) {
-            // Safety fault - state machine will handle transition
             stateMachine.stopDrying(DryingStopReason::SENSOR_ERROR);
             continue;
         }
-        
-        // Update PID auto-tune if running
+
         if (pidAutotune.isRunning()) {
             pidAutotune.update(chamberTemp, heaterPower);
         }
-        
-        // Drying cycle control logic
+
         if (stateMachine.isDrying()) {
             DryingSession& session = stateMachine.getCurrentSession();
-            
-            // Check completion conditions
+
             bool stop = false;
             DryingStopReason reason = DryingStopReason::USER_STOPPED;
-            
+
             if (session.max_duration_min > 0) {
                 uint32_t elapsed_min = (millis() - session.start_timestamp) / 60000;
                 if (elapsed_min >= session.max_duration_min) {
@@ -131,103 +121,83 @@ void controlLoopTask(void* pvParameters) {
                     reason = DryingStopReason::MAX_TIME;
                 }
             }
-            
-            if (!isnan(session.target_humidity_pct) && 
+
+            if (!isnan(session.target_humidity_pct) &&
                 chamberHumidity <= session.target_humidity_pct) {
                 stop = true;
                 reason = DryingStopReason::HUMIDITY_REACHED;
             }
-            
+
             if (!isnan(chamberTemp) && chamberTemp >= 80.0f) {
                 stop = true;
                 reason = DryingStopReason::SAFETY_CUTOFF;
             }
-            
+
             if (!sensorConnected) {
                 stop = true;
                 reason = DryingStopReason::SENSOR_ERROR;
             }
-            
+
             if (stop) {
                 stateMachine.stopDrying(reason);
+                if (heaterActuator) heaterActuator->setPower(0.0f);
                 continue;
             }
-            
-            // PID Control
+
             float targetTemp = session.target_temp_c;
-            float pidOutput = 0.0f;
-            
-            // Use auto-tuned PID if available, else fallback
-            PidConfig pidCfg = configMgr.getPidConfig();
-            if (pidCfg.calibrated && pidCfg.kp > 0) {
-                float error = targetTemp - chamberTemp;
-                static float integral = 0;
-                static float lastError = 0;
-                float dt = 0.02f; // 20ms
-                
-                integral = constrain(integral + error * dt, -1000, 1000);
-                float derivative = (error - lastError) / dt;
-                
-                pidOutput = pidCfg.kp * error + pidCfg.ki * integral + pidCfg.kd * derivative;
-                lastError = error;
-            } else {
-                // Simple bang-bang with hysteresis as fallback
-                if (chamberTemp < targetTemp - 1.0f) pidOutput = 100.0f;
-                else if (chamberTemp > targetTemp + 0.5f) pidOutput = 0.0f;
+            float controlOutput = controlEngine.compute(targetTemp, chamberTemp, dt);
+            if (isnan(controlOutput)) {
+                controlOutput = 0.0f;
             }
-            
-            // Apply power with soft limits
-            pidOutput = constrain(pidOutput, 0.0f, 100.0f);
-            heaterActuator.setPower(pidOutput);
-            
-            // Fan control based on heater state
-            if (pidOutput > 0 || chamberTemp > 40.0f) {
-                fanActuator.setPower(80.0f);
-            } else {
-                fanActuator.setPower(0.0f);
+            controlOutput = constrain(controlOutput, 0.0f, 100.0f);
+
+            if (heaterActuator) {
+                heaterActuator->setPower(controlOutput);
+            }
+            if (fanActuator) {
+                fanActuator->setPower((controlOutput > 0 || chamberTemp > 40.0f) ? 80.0f : 0.0f);
             }
         }
-        
-        // Update state machine
+
+        float heaterPct = heaterActuator ? heaterActuator->getState().power_pct : 0.0f;
+        bool heaterOn = heaterActuator ? heaterActuator->getState().enabled : false;
+        float fanPct = fanActuator ? fanActuator->getState().power_pct : 0.0f;
+        bool fanOn = fanActuator ? fanActuator->getState().enabled : false;
+
         stateMachine.updateDryingProgress(chamberTemp, chamberHumidity,
-                                          heaterActuator.getState().power_pct,
-                                          heaterActuator.getState().enabled,
-                                          fanActuator.getState().power_pct,
-                                          fanActuator.getState().enabled);
-        
-        // Log telemetry (every 10 iterations = 1Hz)
+                                          heaterPct, heaterOn, fanPct, fanOn);
+
         static int logCounter = 0;
-        if (++logCounter >= 50) { // 50 * 20ms = 1s
+        if (++logCounter >= 50) {
             logCounter = 0;
-            
+
             if (stateMachine.isDrying()) {
-                logMgr.logDryingTelemetry(chamberTemp, 
+                logMgr.logDryingTelemetry(chamberTemp,
                     stateMachine.getCurrentSession().target_temp_c,
                     chamberHumidity,
                     stateMachine.getCurrentSession().target_humidity_pct,
-                    heaterActuator.getState().power_pct,
-                    fanActuator.getState().power_pct,
+                    heaterPct, fanPct,
                     stateMachine.getCurrentSession().elapsed_sec,
                     stateMachine.getCurrentSession().remaining_sec);
             }
-            
-            // Broadcast via WebSocket
-            StaticJsonDocument<512> telemetry;
+
+            JsonDocument telemetry;
             telemetry["status"] = stateMachine.getStateName();
             telemetry["chamber_temp_c"] = chamberTemp;
             telemetry["target_temp_c"] = stateMachine.getCurrentSession().target_temp_c;
             telemetry["humidity_pct"] = chamberHumidity;
             telemetry["target_humidity_pct"] = stateMachine.getCurrentSession().target_humidity_pct;
-            telemetry["heater_on"] = heaterActuator.getState().enabled;
-            telemetry["heater_power_pct"] = heaterActuator.getState().power_pct;
-            telemetry["exhaust_fan_on"] = fanActuator.getState().enabled;
-            telemetry["exhaust_fan_power_pct"] = fanActuator.getState().power_pct;
+            telemetry["heater_on"] = heaterOn;
+            telemetry["heater_power_pct"] = heaterPct;
+            telemetry["exhaust_fan_on"] = fanOn;
+            telemetry["exhaust_fan_power_pct"] = fanPct;
             telemetry["elapsed_time_sec"] = stateMachine.getCurrentSession().elapsed_sec;
             telemetry["remaining_time_sec"] = stateMachine.getCurrentSession().remaining_sec;
             telemetry["cpu_usage_pct"] = sysMetrics.getCpuUsagePercent();
             telemetry["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
             telemetry["uptime_sec"] = millis() / 1000;
-            
+            telemetry["control_algorithm"] = controlEngine.getCurrentAlgorithmType();
+
             wsServer.broadcastTelemetry(telemetry.as<JsonObject>());
         }
     }
@@ -262,34 +232,28 @@ void networkTask(void* pvParameters) {
 // Display Task (Core 0) - Independent rendering
 // ============================================================
 void displayTask(void* pvParameters) {
-    const TickType_t period = pdMS_TO_TICKS(1000); // 1Hz default
+    const TickType_t period = pdMS_TO_TICKS(200);
     TickType_t lastWakeTime = xTaskGetTickCount();
-    
+
     for (;;) {
         vTaskDelayUntil(&lastWakeTime, period);
-        
+
         DisplayConfig dispConfig = configMgr.getDisplayConfig();
         if (!dispConfig.enabled) continue;
-        
-        // Build status fields for display
+        if (!displayManager.isRefreshDue()) continue;
+
         JsonDocument statusDoc;
         JsonObject statusFields = statusDoc.to<JsonObject>();
         DryingSession session = stateMachine.getCurrentSession();
-        
-        statusFields["chamber_temp_c"] = session.target_temp_c; // Placeholder until shared telemetry cache exists
+
+        statusFields["chamber_temp_c"] = session.target_temp_c;
         statusFields["target_temp_c"] = session.target_temp_c;
         statusFields["humidity_pct"] = session.target_humidity_pct;
-        statusFields["heater_power_pct"] = 0;
+        statusFields["heater_power_pct"] = heaterActuator ? heaterActuator->getState().power_pct : 0;
         statusFields["status"] = stateMachine.getStateName();
-        
-        // Update active display
-        if (ssd1306Display.isConnected()) {
-            ssd1306Display.update(statusFields);
-        } else if (st7789Display.isConnected()) {
-            st7789Display.update(statusFields);
-        } else if (ili9341Display.isConnected()) {
-            ili9341Display.update(statusFields);
-        }
+
+        displayManager.update(statusFields);
+        displayManager.markRefreshed();
     }
 }
 
@@ -313,8 +277,8 @@ void onStateChange(SystemState oldState, SystemState newState) {
     
     // On fault, trigger emergency stop on actuators
     if (newState == SystemState::FAULT_STOPPED) {
-        heaterActuator.emergencyStop();
-        fanActuator.emergencyStop();
+        if (heaterActuator) heaterActuator->emergencyStop();
+        if (fanActuator) fanActuator->emergencyStop();
     }
 }
 
@@ -389,98 +353,61 @@ void initializeSensors() {
     sensorConfig["gpio_pin"] = sensorCfg.gpio_pin;
     sensorConfig["sda_pin"] = sensorCfg.sda_pin;
     sensorConfig["scl_pin"] = sensorCfg.scl_pin;
-    
-    // Initialize based on configured type
+
     String type = sensorConfig["type"] | "sht31";
-    
-    if (type == "sht31" || type == "sht30") {
-        if (sht31Sensor.begin(sensorConfig)) {
-            activeTempSensor = &sht31Sensor;
-            activeHumiditySensor = &sht31Sensor;
-            logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR, 
-                             "SHT31 initialized on I2C 0x%02X", 
-                             sensorConfig["i2c_address"] | 0x44);
-        }
-    } else if (type == "dht22") {
-        if (dht22Sensor.begin(sensorConfig)) {
-            activeTempSensor = &dht22Sensor;
-            activeHumiditySensor = &dht22Sensor;
-            logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR, 
-                             "DHT22 initialized on GPIO %d", 
-                             sensorConfig["gpio_pin"] | 4);
-        }
-    } else if (type == "ds18b20") {
-        if (ds18b20Sensor.begin(sensorConfig)) {
-            activeTempSensor = &ds18b20Sensor;
-            logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR, 
-                             "DS18B20 initialized on GPIO %d", 
-                             sensorConfig["gpio_pin"] | 4);
-        }
+    ISensorDriver* sensor = DriverRegistry::instance().createSensor(type, sensorConfig);
+    if (!sensor && type != "sht3x") {
+        sensor = DriverRegistry::instance().createSensor("sht3x", sensorConfig);
     }
-    
-    // Fallback: try auto-detection if configured
-    if (!activeTempSensor && type == "auto") {
-        // Try SHT31 first
-        if (sht31Sensor.begin(sensorConfig)) {
-            activeTempSensor = &sht31Sensor;
-            activeHumiditySensor = &sht31Sensor;
-        } 
-        // Try DS18B20
-        else if (ds18b20Sensor.begin(sensorConfig)) {
-            activeTempSensor = &ds18b20Sensor;
-        }
-        // Try DHT22
-        else if (dht22Sensor.begin(sensorConfig)) {
-            activeTempSensor = &dht22Sensor;
-            activeHumiditySensor = &dht22Sensor;
-        }
-    }
-    
+
+    activeTempSensor = sensor;
+    activeHumiditySensor = sensor;
+
     if (!activeTempSensor) {
-        logMgr.logSystem(LogLevel::WARNING, LogModule::SENSOR, 
+        logMgr.logSystem(LogLevel::WARNING, LogModule::SENSOR,
                          "No temperature sensor detected!");
+    } else {
+        logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR,
+                         "Sensor %s initialized", type.c_str());
     }
 }
 
 void initializeActuators() {
     ActuatorConfig actuatorCfg = configMgr.getActuatorConfig();
-    JsonDocument actuatorDoc;
-    JsonObject actuatorConfig = actuatorDoc.to<JsonObject>();
-    actuatorConfig["heater_pin"] = actuatorCfg.heater_pin;
-    actuatorConfig["heater_pwm_freq"] = actuatorCfg.heater_pwm_freq;
-    actuatorConfig["heater_max_power_pct"] = actuatorCfg.heater_max_power_pct;
-    actuatorConfig["fan_mode"] = actuatorCfg.fan_mode;
-    actuatorConfig["fan_pin"] = actuatorCfg.fan_pin;
-    actuatorConfig["fan_pwm_freq"] = actuatorCfg.fan_pwm_freq;
-    actuatorConfig["cooldown_duration_sec"] = actuatorCfg.cooldown_duration_sec;
-    
-    // Heater MOSFET AOD4184
-    if (heaterActuator.begin(actuatorConfig)) {
-        // Set PID config if available
-        PidConfig pidCfg = configMgr.getPidConfig();
-        if (pidCfg.calibrated) {
-            heaterActuator.setPidConfig(pidCfg.kp, pidCfg.ki, pidCfg.kd);
-        }
-        
-        logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, 
-                         "Heater MOSFET AOD4184 on GPIO %d", 
-                         actuatorConfig["heater_pin"] | 25);
+    JsonDocument heaterDoc;
+    JsonObject heaterConfig = heaterDoc.to<JsonObject>();
+    heaterConfig["heater_pin"] = actuatorCfg.heater_pin;
+    heaterConfig["gpio_pin"] = actuatorCfg.heater_pin;
+    heaterConfig["pwm"] = actuatorCfg.heater_pin;
+    heaterConfig["heater_pwm_freq"] = actuatorCfg.heater_pwm_freq;
+    heaterConfig["heater_max_power_pct"] = actuatorCfg.heater_max_power_pct;
+
+    JsonDocument fanDoc;
+    JsonObject fanConfig = fanDoc.to<JsonObject>();
+    fanConfig["fan_pin"] = actuatorCfg.fan_pin;
+    fanConfig["gpio_pin"] = actuatorCfg.fan_pin;
+    fanConfig["pwm"] = actuatorCfg.fan_pin;
+    fanConfig["fan_mode"] = actuatorCfg.fan_mode;
+    fanConfig["fan_pwm_freq"] = actuatorCfg.fan_pwm_freq;
+    fanConfig["cooldown_duration_sec"] = actuatorCfg.cooldown_duration_sec;
+
+    heaterActuator = DriverRegistry::instance().createActuator("mosfet_pwm", heaterConfig);
+    fanActuator = DriverRegistry::instance().createActuator("fan_pwm", fanConfig);
+
+    if (heaterActuator) {
+        logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR,
+                         "Heater actuator on GPIO %d", actuatorCfg.heater_pin);
     }
-    
-    // Exhaust Fan
-    if (fanActuator.begin(actuatorConfig)) {
-        logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, 
-                         "Exhaust fan on GPIO %d (mode: %s)", 
-                         actuatorConfig["fan_pin"] | 26,
-                         actuatorConfig["fan_mode"] | "independent_pwm");
+    if (fanActuator) {
+        logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR,
+                         "Fan actuator on GPIO %d", actuatorCfg.fan_pin);
     }
 }
 
 void initializeDisplays() {
     DisplayConfig displayCfg = configMgr.getDisplayConfig();
-    
     if (!displayCfg.enabled) return;
-    
+
     JsonDocument displayDoc;
     JsonObject dispConfig = displayDoc.to<JsonObject>();
     dispConfig["enabled"] = displayCfg.enabled;
@@ -499,58 +426,67 @@ void initializeDisplays() {
     for (const String& field : displayCfg.fields) {
         fieldArray.add(field);
     }
-    
-    String driver = dispConfig["driver"] | "auto";
-    bool initialized = false;
-    
-    if (driver == "st7789" || driver == "auto") {
-        if (st7789Display.begin(dispConfig)) {
-            initialized = true;
-        }
-    }
-    
-    if (!initialized && (driver == "ili9341" || driver == "auto")) {
-        if (ili9341Display.begin(dispConfig)) {
-            initialized = true;
-        }
-    }
-    
-    if (!initialized && (driver == "ssd1306" || driver == "auto")) {
-        if (ssd1306Display.begin(dispConfig)) {
-            initialized = true;
-        }
-    }
-    
-    if (initialized) {
-        logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY_MODULE, 
-                         "Display %s initialized (%dx%d)", 
-                         driver.c_str(),
-                         dispConfig["width"] | 128,
-                         dispConfig["height"] | 64);
+
+    if (displayManager.begin(dispConfig)) {
+        activeDisplay = nullptr;
+        logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY_MODULE,
+                         "Display %s initialized", displayManager.getActiveType().c_str());
     }
 }
 
+void initializeControlAlgorithm() {
+    controlEngine.begin();
+    JsonObject controlConfig = configMgr.getObjectConfig("control");
+    String algorithm = "pid";
+    JsonDocument fallback;
+    JsonObject params = fallback.to<JsonObject>();
+
+    if (!controlConfig.isNull()) {
+        algorithm = controlConfig["algorithm"] | "pid";
+        if (controlConfig["parameters"].is<JsonObject>()) {
+            params = controlConfig["parameters"].as<JsonObject>();
+        }
+    } else {
+        PidConfig pidCfg = configMgr.getPidConfig();
+        params["kp"] = pidCfg.kp;
+        params["ki"] = pidCfg.ki;
+        params["kd"] = pidCfg.kd;
+    }
+
+    if (!controlEngine.setAlgorithm(algorithm, params)) {
+        JsonDocument bang;
+        JsonObject bangParams = bang.to<JsonObject>();
+        bangParams["hysteresis_c"] = 1.0f;
+        controlEngine.setAlgorithm("bang_bang", bangParams);
+    }
+}
+
+void reloadHardwareFromConfig() {
+    initializeSensors();
+    initializeActuators();
+    initializeDisplays();
+    initializeControlAlgorithm();
+}
+
 void initializeNetwork() {
-    // Start WiFi manager
     wifiMgr.begin();
-    
-    // Register callbacks
+
     wifiMgr.setStatusCallback([](WifiManager::Status s) {
         if (s == WifiManager::Status::CONNECTED) {
-            logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK, 
+            logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                              "WiFi connected: %s", wifiMgr.getLocalIP().c_str());
         }
     });
-    
-    // Start WebServer
-    if (webServer.begin(&configMgr, &logMgr)) {
-        logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK, 
+
+    if (webServer.begin(&configMgr, &logMgr, &hwParser, &DriverRegistry::instance())) {
+        logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                          "HTTP server started on port 80");
     }
-    
-    // Start WebSocket server
-    if (wsServer.begin(&configMgr, &stateMachine, &safetyEngine, &logMgr, &pidAutotune)) {
-        logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK, 
+
+    if (wsServer.begin(&configMgr, &stateMachine, &safetyEngine, &logMgr, &pidAutotune,
+                       &hwParser, &DriverRegistry::instance(), &profileMgr, &controlEngine)) {
+        wsServer.setHardwareReloadCallback(reloadHardwareFromConfig);
+        logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                          "WebSocket server started on ws://<ip>/ws");
     }
 }
@@ -586,20 +522,21 @@ void setup() {
     });
     logMgr.setLogCallback(onLogCallback);
     
-    // Initialize PID auto-tune with heater callback
     pidAutotune.setHeaterCallback([](float power) {
-        heaterActuator.setPower(power);
+        if (heaterActuator) {
+            heaterActuator->setPower(power);
+        }
     });
-    
-    // Initialize drivers
+    logMgr.setLogCallback(onLogCallback);
+
+    DriverRegistry::instance().registerBuiltins();
+
     initializeSensors();
     initializeActuators();
     initializeDisplays();
-    
-    // Initialize system metrics
+    initializeControlAlgorithm();
+
     sysMetrics.begin();
-    
-    // Initialize network (WiFi, WebServer, WebSocket)
     initializeNetwork();
     
     // Start FreeRTOS tasks

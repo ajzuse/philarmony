@@ -24,12 +24,9 @@ bool SSRActuator::begin(const JsonObject& config) {
     ledcAttachPin(gpio_pin_, pwm_channel_);
     ledcWrite(pwm_channel_, 0);
     
-    state_ = {false, 0.0f, false, ""};
+    state_ = ActuatorState{};
     initialized_ = true;
     
-    logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, 
-                     "SSR Actuator initialized on GPIO %d, freq=%luHz, ch=%d",
-                     gpio_pin_, pwm_freq_, pwm_channel_);
     return true;
 }
 
@@ -57,7 +54,6 @@ void SSRActuator::emergencyStop() {
     state_.power_pct = 0.0f;
     state_.fault = true;
     state_.fault_message = "Emergency stop";
-    logMgr.logSystem(LogLevel::WARNING, LogModule::ACTUATOR, "SSR Emergency stop");
 }
 
 ActuatorState SSRActuator::getState() const {

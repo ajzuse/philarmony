@@ -34,19 +34,15 @@ bool BME280Sensor::begin(const JsonObject& config) {
     // Read chip ID
     uint8_t id;
     if (!readRegisters(REG_ID, &id, 1)) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR, "BME280: Failed to read ID at 0x%02X", i2c_address_);
         return false;
     }
 
     // BME280 = 0x60, BMP280 = 0x58
     if (id == 0x60) {
         is_bmp280_ = false;
-        logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR, "BME280 detected at 0x%02X", i2c_address_);
     } else if (id == 0x58) {
         is_bmp280_ = true;
-        logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR, "BMP280 detected at 0x%02X (no humidity)", i2c_address_);
     } else {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR, "Unknown sensor ID: 0x%02X", id);
         return false;
     }
 
@@ -56,7 +52,6 @@ bool BME280Sensor::begin(const JsonObject& config) {
 
     // Read calibration data
     if (!readCalibration()) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR, "BME280: Failed to read calibration data");
         return false;
     }
 
@@ -73,9 +68,6 @@ bool BME280Sensor::begin(const JsonObject& config) {
     writeRegister(REG_CONFIG, 0x00);
 
     initialized_ = true;
-    logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR, 
-                     "%s initialized at 0x%02X (I2C bus %d)", 
-                     is_bmp280_ ? "BMP280" : "BME280", i2c_address_, i2c_bus_);
 
     return true;
 }
@@ -89,14 +81,14 @@ SensorReading BME280Sensor::read() {
     reading.pressure = NAN;
 
     if (!initialized_) {
-        reading.error = "Not initialized";
+        reading.error_message = "Not initialized";
         return reading;
     }
 
     // Read raw data (8 bytes: press[3], temp[3], hum[2])
     uint8_t data[8];
     if (!readRegisters(REG_PRESS_MSB, data, 8)) {
-        reading.error = "I2C read failed";
+        reading.error_message = "I2C read failed";
         return reading;
     }
 
@@ -123,7 +115,7 @@ SensorReading BME280Sensor::read() {
     }
 
     reading.valid = true;
-    reading.error = "";
+    reading.error_message = "";
     last_reading_ = reading;
     
     return reading;
@@ -219,7 +211,7 @@ float BME280Sensor::compensatePressure(int32_t adc_P) {
 float BME280Sensor::compensateHumidity(int32_t adc_H) {
     int32_t v_x1_u32r;
     v_x1_u32r = (t_fine_ - ((int32_t)76800));
-    v_x1_u32r = (((((adc_H << 14) - (((int32_t)calib_.dig_H4) << 20) - (((int32_t)calib_.dig_H5) * v_x1_u32r)) + ((int32_t)16384)) >> 15) * (((((((v_x1_u32r * ((int32_t)calib_.dig_H6)) >> 10) * (((v_x1_u32r * ((int32_t)calib_.dig_H3)) >> 11) + ((int32_t)32768))) >> 10) + ((int32_t)2097152)) * ((int32_t)calib_.dig_H2) + 8192) >> 14);
+    v_x1_u32r = (((((adc_H << 14) - (((int32_t)calib_.dig_H4) << 20) - (((int32_t)calib_.dig_H5) * v_x1_u32r)) + ((int32_t)16384)) >> 15) * (((((((v_x1_u32r * ((int32_t)calib_.dig_H6)) >> 10) * (((v_x1_u32r * ((int32_t)calib_.dig_H3)) >> 11) + ((int32_t)32768))) >> 10) + ((int32_t)2097152)) * ((int32_t)calib_.dig_H2) + 8192) >> 14));
     v_x1_u32r = (v_x1_u32r - (((((v_x1_u32r >> 15) * (v_x1_u32r >> 15)) >> 7) * ((int32_t)calib_.dig_H1)) >> 4));
     v_x1_u32r = (v_x1_u32r < 0) ? 0 : v_x1_u32r;
     v_x1_u32r = (v_x1_u32r > 419430400) ? 419430400 : v_x1_u32r;

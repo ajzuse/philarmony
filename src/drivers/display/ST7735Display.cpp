@@ -34,7 +34,6 @@ bool ST7735Display::begin(const JsonObject& config) {
                                 rst_pin_, bl_pin_, width_, height_, rotation_);
 
     if (!display_->init()) {
-        Serial.println("[ST7735] Init failed");
         delete display_;
         display_ = nullptr;
         return false;
@@ -47,7 +46,6 @@ bool ST7735Display::begin(const JsonObject& config) {
     display_->setTextSize(1);
 
     initialized_ = true;
-    Serial.printf("[ST7735] %dx%d initialized\n", width_, height_);
     return true;
 }
 
