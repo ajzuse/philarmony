@@ -52,6 +52,7 @@ temp/
 
 # PlatformIO
 .pio/
+.pio-core/
 .pioenvs/
 .piolibdeps/
 
