@@ -2,6 +2,13 @@
 description: Assess the current codebase against the feature's spec, plan, and tasks, then append any remaining unbuilt work as new tasks to tasks.md so implement can complete it.
 ---
 
+## Cavemen Protocol
+
+Apply the Cavemen Protocol (constitution §Core Principles) to ALL output:
+- No filler phrases. No preamble. No recap after findings table.
+- Findings table + metrics block only — no prose wrapper.
+- Questions to user: 1 sentence max.
+
 ## User Input
 
 ```text

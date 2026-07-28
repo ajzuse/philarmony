@@ -6,6 +6,13 @@ handoffs:
     prompt: Implement the feature specification based on the updated constitution. I want to build...
 ---
 
+## Cavemen Protocol
+
+Apply the Cavemen Protocol (constitution §Core Principles) to ALL output:
+- No filler phrases. No preamble. No recap after constitution update.
+- Completion Report: version bump + changed principles list. Nothing else.
+- Questions to user: 1 sentence max.
+
 ## User Input
 
 ```text

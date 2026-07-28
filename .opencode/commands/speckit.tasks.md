@@ -11,6 +11,13 @@ handoffs:
     send: true
 ---
 
+## Cavemen Protocol
+
+Apply the Cavemen Protocol (constitution §Core Principles) to ALL output:
+- No filler phrases. No preamble. No post-code summaries unless requested.
+- Completion Report: tasks.md path + count breakdown. Nothing else.
+- Questions to user: 1 sentence max per question.
+
 ## User Input
 
 ```text

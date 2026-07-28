@@ -6,6 +6,13 @@ handoffs:
     prompt: Create a plan for the spec. I am building with...
 ---
 
+## Cavemen Protocol
+
+Apply the Cavemen Protocol (constitution §Core Principles) to ALL output:
+- No filler phrases. No preamble. No post-answer summaries.
+- Each question: label + recommended option + table. That's it.
+- Completion Report: spec path + checklist delta. Nothing else.
+
 ## User Input
 
 ```text

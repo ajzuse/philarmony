@@ -2,6 +2,13 @@
 description: Perform a non-destructive cross-artifact consistency and quality analysis across spec.md, plan.md, and tasks.md after task generation.
 ---
 
+## Cavemen Protocol
+
+Apply the Cavemen Protocol (constitution §Core Principles) to ALL output:
+- No filler phrases. No preamble. No recap unless requested.
+- Analysis report rows only — no prose wrapping the table.
+- Questions to user: 1 sentence max per question.
+
 ## User Input
 
 ```text

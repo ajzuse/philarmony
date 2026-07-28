@@ -2,6 +2,13 @@
 description: Generate a custom checklist for the current feature based on user requirements.
 ---
 
+## Cavemen Protocol
+
+Apply the Cavemen Protocol (constitution §Core Principles) to ALL output:
+- No filler phrases. No preamble. No narrative wrapping checklist output.
+- Completion Report: file path + item count. Nothing else.
+- Questions to user: 1 sentence max per question.
+
 ## Checklist Purpose: "Unit Tests for English"
 
 **CRITICAL CONCEPT**: Checklists are **UNIT TESTS FOR REQUIREMENTS WRITING** - they validate the quality, clarity, and completeness of requirements in a given domain.

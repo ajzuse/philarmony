@@ -1,13 +1,22 @@
 <!-- 
 Sync Impact Report:
-Version change: 0.3.0 → 0.4.0 (MINOR - explicit commit approval governance rule)
-Modified principles: Git workflow requirements updated
-Added sections: Explicit Commit Approval Rule
+Version change: 0.4.0 → 0.5.0 (MINOR - added Cavemen Protocol principle for token efficiency)
+Modified principles: None renamed
+Added sections: Cavemen Protocol (Core Principles)
 Removed sections: None
 Templates requiring updates: 
   - .specify/templates/plan-template.md (✅ aligned)
   - .specify/templates/spec-template.md (✅ aligned)
   - .specify/templates/tasks-template.md (✅ aligned)
+  - .opencode/commands/speckit.specify.md (✅ updated)
+  - .opencode/commands/speckit.plan.md (✅ updated)
+  - .opencode/commands/speckit.tasks.md (✅ updated)
+  - .opencode/commands/speckit.analyze.md (✅ updated)
+  - .opencode/commands/speckit.clarify.md (✅ updated)
+  - .opencode/commands/speckit.checklist.md (✅ updated)
+  - .opencode/commands/speckit.converge.md (✅ updated)
+  - .opencode/commands/speckit.implement.md (✅ updated)
+  - .opencode/commands/speckit.constitution.md (✅ updated)
 Follow-up TODOs: None
 -->
 
@@ -15,17 +24,20 @@ Follow-up TODOs: None
 
 ## Core Principles
 
+### Cavemen Protocol (Token Efficiency)
+All AI agents MUST communicate in minimal, telegraphic language. No filler phrases ("Of course!", "Sure!", "Here's what I did", "Great question"). No preamble before code. No post-code summaries unless explicitly requested. Prose is limited to what is strictly necessary for correctness. Code output is always complete and untruncated. Responses MUST be 1–3 sentences when no code is involved. If a question can be answered with a word or a number, use only that. Agents MUST apply this principle to ALL outputs: analysis reports, completion reports, inline comments in command files, and conversational turns.
+
 ### Orientação a Objetos e Segurança de Hardware
 Todos os componentes devem ser organizados usando princípios de orientação a objetos. Interfaces claras e tipagem forte garantem a segurança de dados e a modularidade. Funções que interagem diretamente com hardware devem estar encapsuladas em objetos com validação e safe abortos para parâmetros fora de controle (ex: temperatura, tensão), garantindo proteção contra danos ao hardware e abortos limpos (sem hangs).
 
 ### Desempenho Máximo e Eficiência
-Code must be optimized for ESP32's constrained resources. Use deterministic algorithms, avoid dynamic allocations, and implement profiling. Each function must have a clear performance contract (timing, memory). Blocking operations are forbidden. Use hardware-specific APIs where necessary for maximum throughput.
+Code MUST be optimized for ESP32's constrained resources. Use deterministic algorithms, avoid dynamic allocations, and implement profiling. Each function MUST have a clear performance contract (timing, memory). Blocking operations are forbidden. Use hardware-specific APIs where necessary for maximum throughput.
 
 ### Failsafe e Proteção de Hardware
-All hardware-control routines MUST include parameter validation that aborts on out-of-bounds values. Implement watchdog timers and safe fallback states. Must detect error conditions within defined timeouts and transition to safe operating states automatically, preventing hardware damage.
+All hardware-control routines MUST include parameter validation that aborts on out-of-bounds values. Implement watchdog timers and safe fallback states. MUST detect error conditions within defined timeouts and transition to safe operating states automatically, preventing hardware damage.
 
 ### Workspace de Dependências e Configurações
-A shared workspace configuration file (.vscode/workspace.json) must be maintained for consistent toolchains across machines. All dependencies listed in requirements.txt/package.json. Each new development tool must be added to this workspace file with proven documentation and licensing, ensuring reproducibility.
+A shared workspace configuration file (.vscode/workspace.json) MUST be maintained for consistent toolchains across machines. All dependencies listed in requirements.txt/package.json. Each new development tool MUST be added to this workspace file with proven documentation and licensing, ensuring reproducibility.
 
 ### Teste Automatizado e Qualidade
 Automation testing pipeline is NON-NEGOTIABLE. Tests represent complete user flows only. CI system MUST fail build if any test fails. Test results cached in memory catalog for AI reference. Only flow tests (not unit tests) are mandatory, each representing complete user journeys.
@@ -97,5 +109,6 @@ Documentação completa em EN-US para contribuições open-source. Utilizada com
 - **README Sync Rule**: Todo comando speckit que altere specs/plans/tasks DEVE invocar atualização do README.md como passo obrigatório. Falha na sincronização bloqueia merge. Implementação via hook `after_specify`/`after_plan`/`after_tasks` no `.specify/extensions.yml`.
 - **Memory Catalog Sync Rule**: Toda pesquisa, decisão arquitetural, descoberta técnica ou referência validada DEVE ser registrada no catálogo de memória compartilhada. Falha no registro bloqueia merge de PRs que introduzam novo conhecimento.
 - **Commit Approval Rule**: Nenhum commit será efetuado sem aprovação explícita do usuário via prompt interativo no final de cada ação.
+- **Cavemen Compliance Rule**: All agents MUST be reviewed for Cavemen Protocol compliance. PRs introducing verbose preamble, filler acknowledgments, or redundant summaries in agent output MUST be rejected.
 
-**Version**: 0.4.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-23
+**Version**: 0.5.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-28
