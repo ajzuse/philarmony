@@ -1,3 +1,21 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 /**
  * SSD1306Display - Implementation
  */
@@ -130,27 +148,31 @@ void SSD1306Display::wake() {
 
 void SSD1306Display::renderStatus(const JsonObject& fields) {
     if (!display_) return;
-    
+
+    const int font_scale = fields["font_scaling"] | 3; // FontScaling::NORMAL
+    // FontScaling: AUTO=0 TINY=1 SMALL=2 NORMAL=3 LARGE=4
+    uint8_t text_size = 1;
+    if (font_scale >= 4) text_size = 2;
+    const bool compact = fields["compact_mode"] | false;
+    const int line_height = compact ? 8 : (8 * text_size + 2);
+
     int y = 0;
-    const int line_height = 10;
-    int row = 0;
-    
-    // Title bar
-    display_->setTextSize(1);
+
+    display_->setTextSize(text_size);
     display_->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     display_->setCursor(0, 0);
-    display_->print("Filament Dryer");
-    display_->setCursor(display_->width() - 30, 0);
-    display_->print("v0.1");
-    
-    // Divider
-    display_->drawFastHLine(0, 12, display_->width(), SSD1306_WHITE);
-    
-    // Status fields
+    if (!compact) {
+        display_->print("Filament Dryer");
+        display_->setCursor(display_->width() - 30, 0);
+        display_->print("v0.1");
+        display_->drawFastHLine(0, 10 * text_size + 2, display_->width(), SSD1306_WHITE);
+        y = 12 * text_size;
+    } else {
+        y = 0;
+    }
+
     int x = 0;
-    y = 16;
-    
-    // Helper lambda for field rendering
+
     auto renderField = [&](const String& label, const String& value) {
         if (y + line_height > display_->height()) return;
         display_->setCursor(x, y);
@@ -159,39 +181,33 @@ void SSD1306Display::renderStatus(const JsonObject& fields) {
         display_->print(value);
         y += line_height;
     };
-    
-    // Temperature
+
     if (fields.containsKey("chamber_temp_c")) {
         float temp = fields["chamber_temp_c"];
         float target = fields["target_temp_c"] | 0;
         renderField("T", String(temp, 1) + "/" + String(target, 0) + "C");
     }
-    
-    // Humidity
+
     if (fields.containsKey("humidity_pct")) {
         float hum = fields["humidity_pct"];
         float target = fields["target_humidity_pct"] | 0;
         renderField("H", String(hum, 1) + "/" + String(target, 0) + "%");
     }
-    
-    // Heater
+
     if (fields.containsKey("heater_power_pct")) {
         float pwm = fields["heater_power_pct"];
         renderField("HTR", String(pwm, 0) + "%");
     }
-    
-    // Fan
+
     if (fields.containsKey("exhaust_fan_power_pct")) {
         float pwm = fields["exhaust_fan_power_pct"];
         renderField("FAN", String(pwm, 0) + "%");
     }
-    
-    // Status
+
     if (fields.containsKey("status")) {
         renderField("STS", fields["status"].as<String>());
     }
-    
-    // Elapsed time
+
     if (fields.containsKey("elapsed_time_sec")) {
         uint32_t elapsed = fields["elapsed_time_sec"];
         uint32_t h = elapsed / 3600;

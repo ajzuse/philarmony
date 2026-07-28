@@ -1,3 +1,21 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 /**
  * AHT20Sensor - Implementation
  * AHT20/AHT10 I2C Temperature + Humidity Sensor
@@ -35,20 +53,30 @@ bool AHT20Sensor::begin(const JsonObject& config) {
     if (!sendCommand(CMD_SOFT_RESET)) {
         return false;
     }
-    delay(20);
+    // Soft reset settle (begin only)
+    const uint32_t reset_start = micros();
+    while (micros() - reset_start < 20000) {
+        yield();
+    }
 
     // Initialize - normal mode
     uint8_t init_data[2] = {0x08, 0x00};  // Normal mode, calibration enabled
     if (!sendCommand(CMD_INIT, init_data, 2)) {
         return false;
     }
-    delay(100);
+    const uint32_t init_start = micros();
+    while (micros() - init_start < 100000) {
+        yield();
+    }
 
-    // Wait for calibration bit
-    for (int i = 0; i < 10; i++) {
+    // Wait for calibration bit (poll without delay())
+    for (int i = 0; i < 50; i++) {
         uint8_t status;
         if (readStatus(status) && (status & 0x08)) break;
-        delay(10);
+        const uint32_t w = micros();
+        while (micros() - w < 2000) {
+            yield();
+        }
     }
 
     initialized_ = true;
@@ -68,24 +96,12 @@ bool AHT20Sensor::readData(uint8_t* data, size_t len) {
     wire_->requestFrom(i2c_address_, len);
     size_t received = 0;
     uint32_t start = millis();
-    while (received < len && millis() - start < 100) {
+    while (received < len && millis() - start < 5) {
         if (wire_->available()) {
             data[received++] = wire_->read();
         }
     }
     return received == len;
-}
-
-bool AHT20Sensor::waitForReady(uint32_t timeout_ms) {
-    uint32_t start = millis();
-    while (millis() - start < timeout_ms) {
-        uint8_t status;
-        if (readStatus(status)) {
-            if ((status & 0x80) == 0) return true;  // Busy bit clear
-        }
-        delay(1);
-    }
-    return false;
 }
 
 bool AHT20Sensor::readStatus(uint8_t& status) {
@@ -98,50 +114,59 @@ bool AHT20Sensor::readStatus(uint8_t& status) {
 }
 
 SensorReading AHT20Sensor::read() {
-    SensorReading reading;
+    SensorReading reading = last_reading_;
     reading.timestamp = millis();
-    reading.valid = false;
-    reading.temperature = NAN;
-    reading.humidity = NAN;
 
     if (!initialized_) {
+        reading.valid = false;
         reading.error_message = "Not initialized";
         return reading;
     }
 
-    // Trigger measurement
-    uint8_t cmd[3] = {0xAC, 0x33, 0x00};
-    if (!sendCommand(CMD_MEASURE, cmd + 1, 2)) {
-        reading.error_message = "Failed to trigger measurement";
+    if (read_phase_ == ReadPhase::IDLE) {
+        uint8_t cmd[2] = {0x33, 0x00};
+        if (!sendCommand(CMD_MEASURE, cmd, 2)) {
+            reading.valid = false;
+            reading.error_message = "Failed to trigger measurement";
+            return reading;
+        }
+        measure_ready_ms_ = millis() + 80;
+        read_phase_ = ReadPhase::WAITING;
         return reading;
     }
 
-    // Wait for measurement to complete
-    if (!waitForReady(100)) {
-        reading.error_message = "Measurement timeout";
+    uint8_t status = 0xFF;
+    if (readStatus(status) && (status & 0x80)) {
+        // still busy
+        if (millis() > measure_ready_ms_ + 50) {
+            read_phase_ = ReadPhase::IDLE;
+            reading.valid = false;
+            reading.error_message = "Measurement timeout";
+        }
         return reading;
     }
 
-    // Read 7 bytes: status + 3 temp + 3 humidity
+    if (millis() < measure_ready_ms_ && (status & 0x80)) {
+        return reading;
+    }
+
     uint8_t data[7];
+    read_phase_ = ReadPhase::IDLE;
     if (!readData(data, 7)) {
+        reading.valid = false;
         reading.error_message = "I2C read failed";
         return reading;
     }
 
-    // Parse temperature (20-bit)
-    uint32_t raw_temp = ((uint32_t)data[3] << 16) | ((uint32_t)data[4] << 8) | data[5];
-    raw_temp >>= 4;  // Only 20 bits
-
-    // Parse humidity (20-bit)
-    uint32_t raw_hum = ((uint32_t)data[3] & 0x0F) << 16 | ((uint32_t)data[5] << 8) | data[6];
+    uint32_t raw_hum = ((uint32_t)data[1] << 12) | ((uint32_t)data[2] << 4) | (data[3] >> 4);
+    uint32_t raw_temp = (((uint32_t)data[3] & 0x0F) << 16) | ((uint32_t)data[4] << 8) | data[5];
 
     reading.temperature = calcTemperature(raw_temp);
     reading.humidity = calcHumidity(raw_hum);
     reading.valid = true;
     reading.error_message = "";
     last_reading_ = reading;
-
+    last_read_time_ = millis();
     return reading;
 }
 
