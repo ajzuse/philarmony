@@ -10,10 +10,14 @@ build/
 *.bundle.js
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
+# Keep .vscode/workspace.json tracked for constitution toolchain reproducibility
+.vscode/*
+!.vscode/workspace.json
+!.vscode/extensions.json
+!.vscode/settings.json
 
 # OS
 .DS_Store

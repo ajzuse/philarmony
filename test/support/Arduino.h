@@ -92,11 +92,15 @@ inline void delay(unsigned long) {}
 #ifndef INPUT
 #define INPUT 0
 #define OUTPUT 1
+#define INPUT_PULLUP 2
+#define LOW 0
+#define HIGH 1
 #endif
 
 inline void pinMode(int, int) {}
 inline void digitalWrite(int, int) {}
-inline int digitalRead(int) { return 0; }
+inline int digitalRead(int) { return HIGH; }
+inline void delayMicroseconds(unsigned int) {}
 inline void ledcSetup(int, int, int) {}
 inline void ledcAttachPin(int, int) {}
 inline void ledcWrite(int, int) {}

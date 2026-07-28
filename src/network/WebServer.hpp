@@ -13,6 +13,7 @@ class ConfigManager;
 class LogManager;
 class HardwareConfigParser;
 class DriverRegistry;
+class WifiManager;
 
 class WebServer {
 public:
@@ -21,7 +22,10 @@ public:
     
     bool begin(ConfigManager* config_mgr, LogManager* log_mgr,
                HardwareConfigParser* hw_parser = nullptr,
-               DriverRegistry* driver_registry = nullptr);
+               DriverRegistry* driver_registry = nullptr,
+               WifiManager* wifi_mgr = nullptr);
+
+    void attachWebSocket(AsyncWebSocket* ws);
     
     // Template for captive portal
     static const char* getCaptivePortalHTML();
@@ -34,6 +38,7 @@ private:
     LogManager* log_mgr_ = nullptr;
     HardwareConfigParser* hw_parser_ = nullptr;
     DriverRegistry* driver_registry_ = nullptr;
+    WifiManager* wifi_mgr_ = nullptr;
     
     // Route handlers
     void setupRoutes();

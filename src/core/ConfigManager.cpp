@@ -90,6 +90,10 @@ SensorConfig ConfigManager::getSensorConfig() const {
             config.gpio_pin = doc["gpio_pin"] | -1;
             config.sda_pin = doc["sda_pin"] | 21;
             config.scl_pin = doc["scl_pin"] | 22;
+            config.temperature_offset = doc["temperature_offset"] | 0.0f;
+            config.temperature_scale = doc["temperature_scale"] | 1.0f;
+            config.humidity_offset = doc["humidity_offset"] | 0.0f;
+            config.humidity_scale = doc["humidity_scale"] | 1.0f;
         }
     }
     return config;
@@ -106,6 +110,10 @@ void ConfigManager::setSensorConfig(const SensorConfig& config) {
     doc["gpio_pin"] = config.gpio_pin;
     doc["sda_pin"] = config.sda_pin;
     doc["scl_pin"] = config.scl_pin;
+    doc["temperature_offset"] = config.temperature_offset;
+    doc["temperature_scale"] = config.temperature_scale;
+    doc["humidity_offset"] = config.humidity_offset;
+    doc["humidity_scale"] = config.humidity_scale;
     
     String json;
     serializeJson(doc, json);

@@ -123,6 +123,26 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseSensors(const 
         for (const auto& warn : result_sensor.warnings) {
             addWarning(result, "sensor[" + sensor["id"].as<String>() + "]: " + warn);
         }
+
+        // Apply first valid sensor into the flattened SensorConfig used by firmware.
+        if (config.type.isEmpty() || config.type == "sht31") {
+            config.type = sensor["type"] | config.type;
+            if (sensor["bus"].is<JsonObject>()) {
+                JsonObject bus = sensor["bus"].as<JsonObject>();
+                config.i2c_bus = bus["bus"] | config.i2c_bus;
+                config.i2c_address = bus["address"] | config.i2c_address;
+                config.sda_pin = bus["sda_pin"] | config.sda_pin;
+                config.scl_pin = bus["scl_pin"] | config.scl_pin;
+                config.gpio_pin = bus["pin"] | config.gpio_pin;
+            }
+            if (sensor["calibration"].is<JsonObject>()) {
+                JsonObject cal = sensor["calibration"].as<JsonObject>();
+                config.temperature_offset = cal["temperature_offset"] | 0.0f;
+                config.temperature_scale = cal["temperature_scale"] | 1.0f;
+                config.humidity_offset = cal["humidity_offset"] | 0.0f;
+                config.humidity_scale = cal["humidity_scale"] | 1.0f;
+            }
+        }
     }
 
     return result;

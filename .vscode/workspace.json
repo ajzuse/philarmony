@@ -1,0 +1,38 @@
+{
+  "folders": [
+    {
+      "path": ".."
+    }
+  ],
+  "settings": {
+    "C_Cpp.default.configurationProvider": "platformio.platformio-ide",
+    "files.associations": {
+      "*.hpp": "cpp",
+      "*.h": "c",
+      "*.ini": "ini"
+    },
+    "editor.formatOnSave": false,
+    "platformio-ide.autoRebuildIntelliSenseIndex": true
+  },
+  "extensions": {
+    "recommendations": [
+      "platformio.platformio-ide",
+      "ms-vscode.cpptools"
+    ]
+  },
+  "philarmony": {
+    "toolchain": "PlatformIO + Arduino-ESP32",
+    "dependencies": [
+      "AsyncTCP",
+      "ESPAsyncWebServer",
+      "ArduinoJson ^7",
+      "LovyanGFX",
+      "OneWire",
+      "Adafruit GFX / SSD1306 / SH110X",
+      "LiquidCrystal_I2C"
+    ],
+    "test_command": "pio test -e native",
+    "build_command": "pio run -e esp32devkitc",
+    "docs": "https://docs.platformio.org/"
+  }
+}

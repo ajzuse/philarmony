@@ -257,3 +257,15 @@ Add US2 (Control & Telemetry) -> Add US3 (Safety Engine & Logs) -> Add US4 (Disp
 - [x] T057 Implement GET/POST /api/hardware/config HTTP endpoints in src/network/WebServer.cpp (register routes in setupRoutes and replace unsupported stubs) per FR-003 and T019b (partial)
 - [x] T058 Add a GitHub Actions CI workflow that runs `pio run` and `pio test` on pull requests and fails the build when tests fail per Constitution: Teste Automatizado e Qualidade (missing)
 - [x] T059 Integrate ControlEngine and config/control WebSocket handling into the firmware runtime (main loop and WebSocketServer) so algorithm selection and parameters apply during drying per FR-010 and US7 (partial)
+
+## Phase 14: Convergence
+
+- [x] T060 CRITICAL Attach the AsyncWebSocket instance to the AsyncWebServer via addHandler so clients can connect to ws://<ip>/ws in src/network/WebServer.cpp and src/network/WebSocketServer.cpp per FR-002 (missing)
+- [x] T061 CRITICAL Wire POST /api/wifi/config (and the captive portal submit path) to WifiManager::setConfig so credentials trigger STA connection and AP disable without requiring a reboot in src/network/WebServer.cpp and src/main.cpp per FR-001 and US1 (partial)
+- [x] T062 CRITICAL Add PlatformIO Unity end-to-end flow tests covering P1 user journeys (hotspot WiFi setup, WebSocket start/stop/status, sensor-fault safe abort) under test/ per Constitution: Teste Automatizado e Qualidade (missing)
+- [x] T063 Implement a functional captive portal HTML page with SSID/password form (PT/EN) posting to /api/wifi/config in src/network/WebServer.cpp per FR-001 and US1 (partial)
+- [x] T064 Complete SafetyEngine FR-011 features: sensor range and rate-of-change checks, I2C/SPI bus lockup detection and recovery, actuator fault detection, and missing fault codes (SPI_BUS_ERROR, ACTUATOR_FAULT) in src/core/SafetyEngine.hpp/.cpp per FR-011 and US8 (partial)
+- [x] T065 Apply per-capability sensor calibration (offset/scale) from config when producing SensorReading values in sensor drivers per FR-003 and US8 (missing)
+- [x] T066 Implement the 30s exhaust-fan cooldown after humidity-reached or normal cycle completion before fully stopping actuators in src/main.cpp per spec clarification Session 2026-07-23 (missing)
+- [x] T067 Fix compile issues in src/plugins/PluginManager.cpp, remove its build_src_filter exclusion, and wire PluginManager hooks into firmware init/runtime per plan: plugin architecture (partial)
+- [x] T068 Create and maintain .vscode/workspace.json with the PlatformIO toolchain and documented dependencies per Constitution: Workspace de Dependências e Configurações (missing)
