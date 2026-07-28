@@ -130,6 +130,14 @@ A desktop application that simplifies initial configuration and firmware install
 - Log export for troubleshooting
 - Verbose/quiet mode toggle
 
+### FR-012: Host Application Distribution
+- Provide **single-download** installers for the desktop app itself (not only the ESP32 flash payload)
+- **Windows**: `.msix` (optional Inno `.exe`); **macOS**: `.dmg` (signed + notarized for public release)
+- **Linux** (first-class): **AppImage**, **`.deb`** (Debian/Ubuntu), **`.rpm`** (Fedora and other Red Hat–based: RHEL, Rocky, Alma, …)
+- Linux **package builds** exposed via repo **Makefile** targets (`package-installer-linux*`); end users install from downloaded packages, not by cloning + `make`
+- End users MUST install without Flutter SDK, Xcode, or Visual Studio
+- Installer payload embeds firmware binaries + flash tooling so device setup needs no second download
+- Public releases published with checksums (e.g. GitHub Releases)
 ## Non-Functional Requirements
 
 ### Performance
@@ -139,7 +147,8 @@ A desktop application that simplifies initial configuration and firmware install
 
 ### Usability
 - Wizard completable in <3 minutes for typical setup
-- No command-line knowledge required
+- No command-line knowledge required (except optional Linux AppImage `chmod +x` / `dnf`/`apt` one-liners documented)
+- **Host install**: one download per OS/format; no unzip of Flutter `Release/` folders
 - Tooltips for technical terms (PWM, GPIO, NVS, etc.)
 - Accessible color contrast, keyboard navigation
 
@@ -147,9 +156,11 @@ A desktop application that simplifies initial configuration and firmware install
 - Verify firmware checksum after flash
 - Automatic rollback on verification failure
 - Survive USB disconnect during configuration (not during flash)
+- Host installers use OS-native install/uninstall semantics (MSIX/DMG/deb/rpm)
 
 ### Compatibility
-- Windows 10/11 (x64), macOS 12+ (Intel/Apple Silicon), Linux (Ubuntu 20.04+, AppImage/Flatpak)
+- Windows 10/11 (x64) via **MSIX** (optional Inno `.exe` fallback); macOS 12+ via **DMG**
+- Linux x64 via **AppImage**, **`.deb`**, **`.rpm`** (Fedora / RHEL-family); builds via `make package-installer-linux*`
 - ESP32 Arduino core compatible firmware format
 - ESP-IDF bootloader compatible
 

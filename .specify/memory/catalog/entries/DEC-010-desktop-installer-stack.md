@@ -27,9 +27,14 @@ Earlier draft of DEC-010 recommending Tauri 2 + React + espflash-in-process. Tha
 | Electron + esptool.py | Large runtime; no Flutter reuse |
 | Pure-Dart ESP flash protocol | High risk / maintenance |
 
+## Related
+
+- **DEC-011** — Host OS installers: MSIX / DMG / Linux Make + AppImage + deb + **rpm** (Fedora/RHEL-family)
+
 ## Consequences
 
 - Monorepo: `packages/philarmony_core`, `apps/esp32-desktop-installer`
 - Workspace documents Flutter SDK + esptool asset packaging
 - Installer MVP is **desktop-only** for USB flash; mobile control in `003` uses network/WS
+- Host packaging (DEC-011) is required for end-user delivery, not optional polish
 - Catalog + plan/research are source of truth for this DEC
