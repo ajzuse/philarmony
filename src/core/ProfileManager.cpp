@@ -15,10 +15,13 @@ FilamentProfile ProfileManager::getProfile(const String& profile_id) const {
     return config_manager_.getProfile(profile_id);
 }
 
-bool ProfileManager::createProfile(const FilamentProfile& profile) {
+bool ProfileManager::createProfile(FilamentProfile& profile) {
     if (profile.id.isEmpty()) {
-        return false;
+        char buf[24];
+        snprintf(buf, sizeof(buf), "custom-%08lx", static_cast<unsigned long>(millis()));
+        profile.id = buf;
     }
+    profile.is_builtin = false;
     return config_manager_.addProfile(profile);
 }
 
@@ -74,7 +77,10 @@ bool ProfileManager::buildSessionFromRequest(const JsonObject& payload,
         session.target_humidity_pct = payload["target_humidity_pct"].as<float>();
     }
 
-    return session.target_temp_c > 0.0f && session.max_duration_min > 0;
+    const bool has_humidity = !isnan(session.target_humidity_pct);
+    return ConfigManager::validateStartParams(session.target_temp_c, session.max_duration_min,
+                                              has_humidity ? session.target_humidity_pct : 15.0f,
+                                              has_humidity);
 }
 
 }  // namespace filament_dryer

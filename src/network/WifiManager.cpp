@@ -1,5 +1,5 @@
 /**
- * WifiManager - Implementation
+ * WifiManager - Non-blocking STA + AP fallback + DNS captive sinkhole
  */
 #include "WifiManager.hpp"
 
@@ -12,6 +12,7 @@ const IPAddress WifiManager::AP_SUBNET(255, 255, 255, 0);
 WifiManager::WifiManager() {}
 
 WifiManager::~WifiManager() {
+    stopDnsSinkhole();
     if (ap_active_) {
         WiFi.softAPdisconnect(true);
     }
@@ -25,10 +26,7 @@ bool WifiManager::begin() {
     loadConfig();
     
     if (current_config_.valid && !current_config_.ssid.isEmpty()) {
-        updateStatus(Status::CONNECTING);
-        if (!connect()) {
-            startAP();
-        }
+        beginConnectAsync(current_config_.ssid, current_config_.password);
     } else {
         startAP();
     }
@@ -40,28 +38,19 @@ bool WifiManager::connect() {
     if (current_config_.ssid.isEmpty()) {
         return false;
     }
-    
-    return connectToWiFi(current_config_.ssid, current_config_.password);
+    beginConnectAsync(current_config_.ssid, current_config_.password);
+    return true;
 }
 
-bool WifiManager::connectToWiFi(const String& ssid, const String& password) {
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid.c_str(), password.c_str());
-    
-    uint32_t start = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - start < 20000) {
-        delay(500);
-    }
-    
-    if (WiFi.status() == WL_CONNECTED) {
-        wifi_connected_ = true;
-        updateStatus(Status::CONNECTED);
-        return true;
-    }
-    
-    WiFi.disconnect(true);
+void WifiManager::beginConnectAsync(const String& ssid, const String& password) {
     wifi_connected_ = false;
-    return false;
+    connect_start_ms_ = millis();
+    last_retry_ = connect_start_ms_;
+    updateStatus(Status::CONNECTING);
+
+    WiFi.mode(ap_active_ ? WIFI_AP_STA : WIFI_STA);
+    WiFi.disconnect(false);
+    WiFi.begin(ssid.c_str(), password.c_str());
 }
 
 void WifiManager::startAP() {
@@ -71,43 +60,82 @@ void WifiManager::startAP() {
     
     if (result) {
         ap_active_ = true;
+        startDnsSinkhole();
         updateStatus(Status::AP_ACTIVE);
     }
 }
 
 void WifiManager::stopAP() {
+    stopDnsSinkhole();
     if (ap_active_) {
         WiFi.softAPdisconnect(true);
         ap_active_ = false;
     }
 }
 
+void WifiManager::startDnsSinkhole() {
+    if (dns_active_) {
+        return;
+    }
+    dns_server_.setErrorReplyCode(DNSReplyCode::NoError);
+    dns_active_ = dns_server_.start(53, "*", AP_IP);
+}
+
+void WifiManager::stopDnsSinkhole() {
+    if (dns_active_) {
+        dns_server_.stop();
+        dns_active_ = false;
+    }
+}
+
 void WifiManager::loop() {
-    // Handle reconnection for STA mode
+    if (dns_active_) {
+        dns_server_.processNextRequest();
+    }
+
+    if (status_ == Status::CONNECTING) {
+        if (WiFi.status() == WL_CONNECTED) {
+            wifi_connected_ = true;
+            retry_count_ = 0;
+            retry_delay_ms_ = 5000;
+            stopAP();
+            updateStatus(Status::CONNECTED);
+            return;
+        }
+
+        if (millis() - connect_start_ms_ >= CONNECT_TIMEOUT_MS) {
+            WiFi.disconnect(true);
+            wifi_connected_ = false;
+            if (!ap_active_) {
+                startAP();
+            } else {
+                updateStatus(Status::AP_ACTIVE);
+            }
+        }
+        return;
+    }
+
     if (status_ == Status::CONNECTED) {
         if (WiFi.status() != WL_CONNECTED) {
             wifi_connected_ = false;
             
             if (retry_count_ < 5) {
                 retry_count_++;
-                retry_delay_ms_ = min(retry_delay_ms_ * 2, 60000); // Exponential backoff
+                retry_delay_ms_ = min(retry_delay_ms_ * 2, 60000);
                 last_retry_ = millis();
                 updateStatus(Status::CONNECTING);
             } else {
-                // Max retries reached, fall back to AP
-                stopAP();
                 startAP();
             }
         } else {
-            // Reset retry counter on successful connection
             retry_count_ = 0;
             retry_delay_ms_ = 5000;
         }
+        return;
     }
-    
-    // Attempt reconnection if in connecting state
-    if (status_ == Status::CONNECTING) {
-        if (millis() - last_retry_ >= retry_delay_ms_) {
+
+    if (status_ == Status::CONNECTING || status_ == Status::DISCONNECTED) {
+        if (millis() - last_retry_ >= retry_delay_ms_ && current_config_.valid) {
             connect();
         }
     }
@@ -121,13 +149,9 @@ bool WifiManager::setConfig(const WifiConfig& config) {
         return false;
     }
 
-    if (connect()) {
-        stopAP();
-        return true;
-    }
-
-    startAP();
-    return false;
+    retry_count_ = 0;
+    beginConnectAsync(current_config_.ssid, current_config_.password);
+    return true;
 }
 
 void WifiManager::clearConfig() {
@@ -150,7 +174,6 @@ void WifiManager::loadConfig() {
     current_config_.ssid = doc["ssid"] | "";
     current_config_.password = doc["password"] | "";
     current_config_.valid = doc["valid"] | false;
-    
 }
 
 bool WifiManager::saveConfig() {

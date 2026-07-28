@@ -111,6 +111,10 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseSensors(const 
         addWarning(result, "More than 10 sensors configured, may impact performance");
     }
 
+    bool primary_set = false;
+    bool humidity_set = false;
+    bool extra_temp_set = false;
+
     for (JsonVariant v : sensors) {
         JsonObject sensor = v.as<JsonObject>();
         auto result_sensor = validateSensor(sensor);
@@ -124,17 +128,32 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseSensors(const 
             addWarning(result, "sensor[" + sensor["id"].as<String>() + "]: " + warn);
         }
 
-        // Apply first valid sensor into the flattened SensorConfig used by firmware.
-        if (config.type.isEmpty() || config.type == "sht31") {
-            config.type = sensor["type"] | config.type;
-            if (sensor["bus"].is<JsonObject>()) {
-                JsonObject bus = sensor["bus"].as<JsonObject>();
-                config.i2c_bus = bus["bus"] | config.i2c_bus;
-                config.i2c_address = bus["address"] | config.i2c_address;
-                config.sda_pin = bus["sda_pin"] | config.sda_pin;
-                config.scl_pin = bus["scl_pin"] | config.scl_pin;
-                config.gpio_pin = bus["pin"] | config.gpio_pin;
+        bool has_temp = false;
+        bool has_humidity = false;
+        if (sensor["capabilities"].is<JsonArray>()) {
+            for (JsonVariant cap : sensor["capabilities"].as<JsonArray>()) {
+                String c = cap.as<String>();
+                if (c == "temperature") has_temp = true;
+                if (c == "humidity") has_humidity = true;
             }
+        }
+
+        auto applyBus = [](JsonObject sensor_obj, int8_t& gpio, int8_t& sda, int8_t& scl,
+                           uint8_t& addr, uint8_t& bus) {
+            if (!sensor_obj["bus"].is<JsonObject>()) return;
+            JsonObject b = sensor_obj["bus"].as<JsonObject>();
+            bus = b["bus"] | bus;
+            addr = b["address"] | addr;
+            sda = b["sda_pin"] | sda;
+            scl = b["scl_pin"] | scl;
+            gpio = b["pin"] | gpio;
+        };
+
+        if (has_temp && has_humidity && !primary_set) {
+            config.type = sensor["type"] | config.type;
+            config.is_integrated = true;
+            applyBus(sensor, config.gpio_pin, config.sda_pin, config.scl_pin,
+                     config.i2c_address, config.i2c_bus);
             if (sensor["calibration"].is<JsonObject>()) {
                 JsonObject cal = sensor["calibration"].as<JsonObject>();
                 config.temperature_offset = cal["temperature_offset"] | 0.0f;
@@ -142,6 +161,35 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseSensors(const 
                 config.humidity_offset = cal["humidity_offset"] | 0.0f;
                 config.humidity_scale = cal["humidity_scale"] | 1.0f;
             }
+            primary_set = true;
+            humidity_set = true;
+        } else if (has_temp && !primary_set) {
+            config.type = sensor["type"] | config.type;
+            config.is_integrated = false;
+            applyBus(sensor, config.gpio_pin, config.sda_pin, config.scl_pin,
+                     config.i2c_address, config.i2c_bus);
+            if (sensor["calibration"].is<JsonObject>()) {
+                JsonObject cal = sensor["calibration"].as<JsonObject>();
+                config.temperature_offset = cal["temperature_offset"] | 0.0f;
+                config.temperature_scale = cal["temperature_scale"] | 1.0f;
+            }
+            primary_set = true;
+        } else if (has_temp && primary_set && !extra_temp_set) {
+            config.extra_temp_type = sensor["type"] | "";
+            applyBus(sensor, config.extra_temp_gpio_pin, config.sda_pin, config.scl_pin,
+                     config.extra_temp_i2c_address, config.i2c_bus);
+            extra_temp_set = true;
+        } else if (has_humidity && !humidity_set) {
+            config.is_integrated = false;
+            config.humidity_type = sensor["type"] | "";
+            applyBus(sensor, config.humidity_gpio_pin, config.humidity_sda_pin,
+                     config.humidity_scl_pin, config.humidity_i2c_address, config.i2c_bus);
+            if (sensor["calibration"].is<JsonObject>()) {
+                JsonObject cal = sensor["calibration"].as<JsonObject>();
+                config.humidity_offset = cal["humidity_offset"] | 0.0f;
+                config.humidity_scale = cal["humidity_scale"] | 1.0f;
+            }
+            humidity_set = true;
         }
     }
 
@@ -210,6 +258,13 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseActuators(cons
                 config.fan_mode = "independent_pwm";
             }
         }
+        if (role == "custom") {
+            config.has_custom = true;
+            config.custom_type = actuator["type"] | "gpio";
+            if (!pins.isNull()) {
+                config.custom_pin = pins["pwm"] | pins["gpio"] | config.custom_pin;
+            }
+        }
     }
 
     if (!has_heater) {
@@ -241,6 +296,30 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseDisplay(const 
     config.dc_pin = display["dc_pin"] | -1;
     config.rst_pin = display["rst_pin"] | -1;
     config.backlight_pin = display["backlight_pin"] | -1;
+
+    // Nested bus object (spec / websocket-api schema)
+    if (display["bus"].is<JsonObject>()) {
+        JsonObject bus = display["bus"].as<JsonObject>();
+        config.bus_type = bus["type"] | config.bus_type;
+        config.spi_mosi = bus["mosi"] | bus["mosi_pin"] | config.spi_mosi;
+        config.spi_sclk = bus["sclk"] | bus["sclk_pin"] | config.spi_sclk;
+        config.spi_cs = bus["cs"] | bus["cs_pin"] | config.spi_cs;
+        config.dc_pin = bus["dc"] | bus["dc_pin"] | config.dc_pin;
+        config.rst_pin = bus["rst"] | bus["rst_pin"] | config.rst_pin;
+        config.backlight_pin = bus["bl"] | bus["backlight"] | bus["backlight_pin"] | config.backlight_pin;
+        if (bus["sda_pin"].is<int>()) {
+            // I2C pins stored via existing sda/scl conventions on display drivers via flat keys if needed
+            (void)bus;
+        }
+    }
+
+    // Nested geometry object
+    if (display["geometry"].is<JsonObject>()) {
+        JsonObject geometry = display["geometry"].as<JsonObject>();
+        config.width = geometry["width"] | config.width;
+        config.height = geometry["height"] | config.height;
+        config.rotation = geometry["rotation"] | config.rotation;
+    }
 
     if (display.containsKey("refresh_rate_hz")) {
         config.refresh_rate_hz = display["refresh_rate_hz"] | 1;

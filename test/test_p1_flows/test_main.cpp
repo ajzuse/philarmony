@@ -164,6 +164,72 @@ void test_flow_profile_validation_bounds() {
     TEST_ASSERT_FALSE(ConfigManager::validateProfileParams(50.0f, 240, 60.0f));
 }
 
+void test_flow_control_start_param_ranges() {
+    // control/start explicit params must satisfy FR-008 ranges
+    TEST_ASSERT_TRUE(ConfigManager::validateStartParams(50.0f, 120, 15.0f, true));
+    TEST_ASSERT_TRUE(ConfigManager::validateStartParams(50.0f, 120, 0.0f, false));
+    TEST_ASSERT_FALSE(ConfigManager::validateStartParams(20.0f, 120, 15.0f, true));
+    TEST_ASSERT_FALSE(ConfigManager::validateStartParams(50.0f, 2000, 15.0f, true));
+}
+
+void test_flow_multi_sensor_separate_humidity() {
+    HardwareConfigParser parser;
+    const char* json = R"({
+      "sensors": [
+        {
+          "id": "temp",
+          "type": "ds18b20",
+          "capabilities": ["temperature"],
+          "bus": {"type": "onewire", "pin": 4}
+        },
+        {
+          "id": "hum",
+          "type": "aht20",
+          "capabilities": ["humidity"],
+          "bus": {"type": "i2c", "bus": 0, "address": 56, "sda_pin": 21, "scl_pin": 22}
+        }
+      ],
+      "actuators": [{
+        "id": "heater",
+        "type": "mosfet_pwm",
+        "role": "heater",
+        "pins": {"pwm": 25},
+        "control": {"algorithm": "pid", "pwm_freq_hz": 1000, "max_power_pct": 100}
+      }],
+      "display": {"enabled": false},
+      "control": {
+        "algorithm": "pid",
+        "parameters": {"kp": 1, "ki": 0, "kd": 0},
+        "safety_limits": {"hard_temp_limit_c": 75}
+      }
+    })";
+
+    JsonDocument doc;
+    TEST_ASSERT_TRUE(deserializeJson(doc, json) == DeserializationError::Ok);
+    SensorConfig sensor;
+    ActuatorConfig actuator;
+    DisplayConfig display;
+    ControlConfig control;
+    auto result = parser.parse(doc.as<JsonObject>(), sensor, actuator, display, control);
+    TEST_ASSERT_TRUE(result.valid);
+    TEST_ASSERT_FALSE(sensor.is_integrated);
+    TEST_ASSERT_EQUAL_STRING("ds18b20", sensor.type.c_str());
+    TEST_ASSERT_EQUAL_STRING("aht20", sensor.humidity_type.c_str());
+    TEST_ASSERT_FLOAT_WITHIN(0.1f, 75.0f, control.safety_limits.hard_temp_limit_c);
+}
+
+void test_flow_configurable_safety_limit_applied() {
+    SafetyEngine safety;
+    SafetyConfig cfg;
+    cfg.watchdog_enabled = false;
+    cfg.hard_temp_limit_c = 70.0f;
+    safety.begin(cfg);
+    safety.setEmergencyShutdownCallback(fakeActuatorCutoff);
+    TEST_ASSERT_FALSE(safety.checkSafety(71.0f, 50.0f, 0, false, true));
+    TEST_ASSERT_EQUAL((int)FaultCode::OVER_TEMPERATURE, (int)safety.getLastFault());
+    TEST_ASSERT_TRUE(g_actuators_cut);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_flow_hotspot_wifi_setup_to_ready);
@@ -172,5 +238,8 @@ int main(int, char**) {
     RUN_TEST(test_flow_calibration_and_overtemp_cutoff);
     RUN_TEST(test_flow_hardware_config_parses_actuator_pins);
     RUN_TEST(test_flow_profile_validation_bounds);
+    RUN_TEST(test_flow_control_start_param_ranges);
+    RUN_TEST(test_flow_multi_sensor_separate_humidity);
+    RUN_TEST(test_flow_configurable_safety_limit_applied);
     return UNITY_END();
 }

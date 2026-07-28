@@ -127,8 +127,8 @@ void WebSocketServer::dispatchTopic(AsyncWebSocketClient* client, const JsonObje
         handleConfigHardware(client, payload);
     } else if (topic == "config/display") {
         handleConfigDisplay(client, payload);
-    } else if (topic == "config/profiles") {
-        handleConfigProfiles(client, payload);
+    } else if (topic == "config/profiles" || topic.startsWith("config/profiles/")) {
+        handleConfigProfiles(client, payload, topic);
     } else if (topic == "config/control") {
         handleConfigControl(client, payload);
     } else if (topic == "control/pid_calibrate") {
@@ -277,13 +277,25 @@ void WebSocketServer::handleConfigDisplay(AsyncWebSocketClient* client, const Js
     sendResponse(client, "config/display", body);
 }
 
-void WebSocketServer::handleConfigProfiles(AsyncWebSocketClient* client, const JsonObject& payload) {
+void WebSocketServer::handleConfigProfiles(AsyncWebSocketClient* client, const JsonObject& payload,
+                                           const String& topic) {
     if (!profile_mgr_) {
-        sendError(client, "config/profiles", "Profile manager unavailable");
+        sendError(client, topic, "Profile manager unavailable");
         return;
     }
 
-    const String action = payload["action"] | "list";
+    String action = payload["action"] | "";
+    if (topic == "config/profiles/list") action = "list";
+    else if (topic == "config/profiles/get") action = "get";
+    else if (topic == "config/profiles/create") action = "create";
+    else if (topic == "config/profiles/update") action = "update";
+    else if (topic == "config/profiles/delete") action = "delete";
+    else if (topic == "config/profiles/reset_defaults") action = "reset";
+    else if (action.isEmpty()) action = "list";
+
+    const String response_topic = (topic == "config/profiles") ? String("config/profiles")
+                                                               : (topic + "/response");
+
     JsonDocument response;
     JsonObject body = response.to<JsonObject>();
 
@@ -299,13 +311,31 @@ void WebSocketServer::handleConfigProfiles(AsyncWebSocketClient* client, const J
             item["target_humidity_pct"] = profile.target_humidity_pct;
             item["is_builtin"] = profile.is_builtin;
         }
-        sendResponse(client, "config/profiles", body);
+        sendResponse(client, response_topic, body);
+        return;
+    }
+
+    if (action == "get") {
+        const String id = payload["profile_id"] | payload["id"] | "";
+        FilamentProfile profile = profile_mgr_->getProfile(id);
+        if (profile.id.isEmpty()) {
+            sendError(client, topic, "Profile not found");
+            return;
+        }
+        body["id"] = profile.id;
+        body["name_pt"] = profile.name_pt;
+        body["name_en"] = profile.name_en;
+        body["target_temp_c"] = profile.target_temp_c;
+        body["default_duration_min"] = profile.default_duration_min;
+        body["target_humidity_pct"] = profile.target_humidity_pct;
+        body["is_builtin"] = profile.is_builtin;
+        sendResponse(client, response_topic, body);
         return;
     }
 
     if (action == "create" || action == "update") {
         FilamentProfile profile;
-        profile.id = payload["id"] | "";
+        profile.id = payload["profile_id"] | payload["id"] | "";
         profile.name_pt = payload["name_pt"] | profile.id;
         profile.name_en = payload["name_en"] | profile.id;
         profile.target_temp_c = payload["target_temp_c"] | 50.0f;
@@ -317,35 +347,35 @@ void WebSocketServer::handleConfigProfiles(AsyncWebSocketClient* client, const J
         const bool ok = (action == "create") ? profile_mgr_->createProfile(profile)
                                              : profile_mgr_->updateProfile(profile);
         if (!ok) {
-            sendError(client, "config/profiles", "Failed to save profile");
+            sendError(client, topic, "Failed to save profile");
             return;
         }
         body["status"] = "saved";
         body["id"] = profile.id;
-        sendResponse(client, "config/profiles", body);
+        sendResponse(client, response_topic, body);
         return;
     }
 
     if (action == "delete") {
-        const String id = payload["id"] | "";
+        const String id = payload["profile_id"] | payload["id"] | "";
         if (!profile_mgr_->deleteProfile(id)) {
-            sendError(client, "config/profiles", "Failed to delete profile");
+            sendError(client, topic, "Failed to delete profile");
             return;
         }
         body["status"] = "deleted";
         body["id"] = id;
-        sendResponse(client, "config/profiles", body);
+        sendResponse(client, response_topic, body);
         return;
     }
 
     if (action == "reset") {
         profile_mgr_->resetToDefaults();
         body["status"] = "reset";
-        sendResponse(client, "config/profiles", body);
+        sendResponse(client, response_topic, body);
         return;
     }
 
-    sendError(client, "config/profiles", "Unknown action");
+    sendError(client, topic, "Unknown action");
 }
 
 void WebSocketServer::handleConfigControl(AsyncWebSocketClient* client, const JsonObject& payload) {
@@ -385,7 +415,7 @@ void WebSocketServer::handlePidCalibrate(AsyncWebSocketClient* client, const Jso
     PidAutotuneController::Config cfg;
     cfg.target_temp = payload["target_temp_c"] | 50.0f;
     cfg.pwm_step = payload["pwm_step"] | 80.0f;
-    cfg.max_cycles = payload["max_cycles"] | 5;
+    cfg.max_cycles = payload["cycles"] | payload["max_cycles"] | 5;
     cfg.max_temp = payload["max_temp_c"] | 80.0f;
 
   const bool started = pid_autotune_->startCalibration(
@@ -473,11 +503,27 @@ void WebSocketServer::broadcastFault(FaultCode fault, const String& message) {
         return;
     }
 
+    const char* fault_code = "NONE";
+    switch (fault) {
+        case FaultCode::SENSOR_DISCONNECT: fault_code = "SENSOR_DISCONNECT"; break;
+        case FaultCode::OVER_TEMPERATURE: fault_code = "OVER_TEMPERATURE"; break;
+        case FaultCode::THERMAL_RUNAWAY: fault_code = "THERMAL_RUNAWAY"; break;
+        case FaultCode::I2C_BUS_LOCKUP: fault_code = "I2C_BUS_LOCKUP"; break;
+        case FaultCode::SPI_BUS_ERROR: fault_code = "SPI_BUS_ERROR"; break;
+        case FaultCode::ACTUATOR_FAULT: fault_code = "ACTUATOR_FAULT"; break;
+        case FaultCode::NVS_CORRUPT: fault_code = "NVS_CORRUPT"; break;
+        case FaultCode::WATCHDOG_RESET: fault_code = "WATCHDOG_RESET"; break;
+        default: break;
+    }
+
     JsonDocument doc;
     doc["topic"] = "status/fault";
     JsonObject payload = doc["payload"].to<JsonObject>();
+    payload["fault_code"] = fault_code;
     payload["fault"] = static_cast<int>(fault);
     payload["message"] = message;
+    payload["action_taken"] = "Actuators cut off. Platform online.";
+    payload["timestamp_sec"] = millis() / 1000UL;
 
     String json;
     serializeJson(doc, json);
