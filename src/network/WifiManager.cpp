@@ -5,6 +5,10 @@
 
 namespace filament_dryer {
 
+const IPAddress WifiManager::AP_IP(192, 168, 4, 1);
+const IPAddress WifiManager::AP_GATEWAY(192, 168, 4, 1);
+const IPAddress WifiManager::AP_SUBNET(255, 255, 255, 0);
+
 WifiManager::WifiManager() {}
 
 WifiManager::~WifiManager() {
@@ -14,10 +18,7 @@ WifiManager::~WifiManager() {
 }
 
 bool WifiManager::begin() {
-    Serial.println("[WifiManager] Starting...");
-    
     if (!prefs_.begin("filament_dryer", true)) {
-        Serial.println("[WifiManager] ERROR: Failed to open NVS");
         return false;
     }
     
@@ -26,11 +27,9 @@ bool WifiManager::begin() {
     if (current_config_.valid && !current_config_.ssid.isEmpty()) {
         updateStatus(Status::CONNECTING);
         if (!connect()) {
-            Serial.println("[WifiManager] STA connection failed, starting AP");
             startAP();
         }
     } else {
-        Serial.println("[WifiManager] No WiFi config, starting AP");
         startAP();
     }
     
@@ -46,8 +45,6 @@ bool WifiManager::connect() {
 }
 
 bool WifiManager::connectToWiFi(const String& ssid, const String& password) {
-    Serial.printf("[WifiManager] Connecting to '%s'...\n", ssid.c_str());
-    
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), password.c_str());
     
@@ -59,8 +56,6 @@ bool WifiManager::connectToWiFi(const String& ssid, const String& password) {
     if (WiFi.status() == WL_CONNECTED) {
         wifi_connected_ = true;
         updateStatus(Status::CONNECTED);
-        Serial.printf("[WifiManager] Connected! IP: %s, RSSI: %d\n", 
-                      WiFi.localIP().toString().c_str(), WiFi.RSSI());
         return true;
     }
     
@@ -70,8 +65,6 @@ bool WifiManager::connectToWiFi(const String& ssid, const String& password) {
 }
 
 void WifiManager::startAP() {
-    Serial.println("[WifiManager] Starting AP 'philarmony'...");
-    
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET);
     bool result = WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL);
@@ -79,9 +72,6 @@ void WifiManager::startAP() {
     if (result) {
         ap_active_ = true;
         updateStatus(Status::AP_ACTIVE);
-        Serial.printf("[WifiManager] AP started at %s\n", AP_IP.toString().c_str());
-    } else {
-        Serial.println("[WifiManager] ERROR: Failed to start AP");
     }
 }
 
@@ -89,7 +79,6 @@ void WifiManager::stopAP() {
     if (ap_active_) {
         WiFi.softAPdisconnect(true);
         ap_active_ = false;
-        Serial.println("[WifiManager] AP stopped");
     }
 }
 
@@ -97,7 +86,6 @@ void WifiManager::loop() {
     // Handle reconnection for STA mode
     if (status_ == Status::CONNECTED) {
         if (WiFi.status() != WL_CONNECTED) {
-            Serial.println("[WifiManager] WiFi disconnected, attempting reconnect...");
             wifi_connected_ = false;
             
             if (retry_count_ < 5) {
@@ -107,7 +95,6 @@ void WifiManager::loop() {
                 updateStatus(Status::CONNECTING);
             } else {
                 // Max retries reached, fall back to AP
-                Serial.println("[WifiManager] Max retries reached, falling back to AP");
                 stopAP();
                 startAP();
             }
@@ -121,15 +108,9 @@ void WifiManager::loop() {
     // Attempt reconnection if in connecting state
     if (status_ == Status::CONNECTING) {
         if (millis() - last_retry_ >= retry_delay_ms_) {
-            if (!connect()) {
-                Serial.println("[WifiManager] Reconnect failed");
-            }
+            connect();
         }
     }
-}
-
-WifiManager::WifiConfig WifiManager::getConfig() const {
-    return current_config_;
 }
 
 bool WifiManager::setConfig(const WifiConfig& config) {
@@ -149,7 +130,7 @@ bool WifiManager::setConfig(const WifiConfig& config) {
 }
 
 void WifiManager::clearConfig() {
-    current_config_ = { "", "", false };
+    current_config_ = WifiConfig{};
     saveConfig();
     if (wifi_connected_) {
         WiFi.disconnect(true);
@@ -162,19 +143,17 @@ void WifiManager::clearConfig() {
 
 void WifiManager::loadConfig() {
     String json = prefs_.getString("wifi", "{}");
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     deserializeJson(doc, json);
     
     current_config_.ssid = doc["ssid"] | "";
     current_config_.password = doc["password"] | "";
     current_config_.valid = doc["valid"] | false;
     
-    Serial.printf("[WifiManager] Loaded config: ssid='%s', valid=%d\n", 
-                  current_config_.ssid.c_str(), current_config_.valid);
 }
 
 bool WifiManager::saveConfig() {
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     doc["ssid"] = current_config_.ssid;
     doc["password"] = current_config_.password;
     doc["valid"] = current_config_.valid;

@@ -9,8 +9,10 @@
 #include <map>
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "drivers/interfaces/IDriverInterfaces.hpp"
+#include "control/IControlAlgorithm.hpp"
 
 namespace filament_dryer {
 
@@ -35,6 +37,7 @@ public:
             return new T(config);
         };
     }
+    void registerSensor(const String& type, SensorFactory factory);
 
     // Register actuator driver by type string
     template<typename T>
@@ -43,6 +46,7 @@ public:
             return new T(config);
         };
     }
+    void registerActuator(const String& type, ActuatorFactory factory);
 
     // Register display driver by type string
     template<typename T>
@@ -51,6 +55,7 @@ public:
             return new T(config);
         };
     }
+    void registerDisplay(const String& type, DisplayFactory factory);
 
     // Register control algorithm by type string
     template<typename T>
@@ -59,6 +64,7 @@ public:
             return new T(config);
         };
     }
+    void registerControl(const String& type, ControlFactory factory);
 
     // ===========================================
     // CREATION METHODS (called at runtime)
@@ -89,7 +95,7 @@ public:
     bool hasControl(const String& type) const;
 
     // Initialize - registers all built-in drivers
-    void initializeBuiltins();
+    void registerBuiltins();
 
 private:
     DriverRegistry() = default;
@@ -102,34 +108,6 @@ private:
     std::map<String, std::function<IDisplayDriver*(const JsonObject&)>> display_factories_;
     std::map<String, std::function<IControlAlgorithm*(const JsonObject&)>> control_factories_;
 
-    // Explicit template instantiations for common drivers
-    template void registerSensor<DHT22Sensor>(const String&);
-    template void registerSensor<DS18B20Sensor>(const String&);
-    template void registerSensor<NTCSensor>(const String&);
-    template void registerSensor<BME280Sensor>(const String&);
-    template void registerSensor<AHT20Sensor>(const String&);
-    template void registerSensor<CustomSensor>(const String&);
-
-    template void registerActuator<MosfetActuator>(const String&);
-    template void registerActuator<SSRActuator>(const String&);
-    template void registerActuator<FanActuator>(const String&);
-    template void registerActuator<StepperActuator>(const String&);
-    template void registerActuator<ServoActuator>(const String&);
-    template void registerActuator<GPIOActuator>(const String&);
-    template void registerActuator<SharedMosfetActuator>(const String&);
-
-    template void registerDisplay<SSD1306Display>(const String&);
-    template void registerDisplay<ST7789Display>(const String&);
-    template void registerDisplay<ILI9341Display>(const String&);
-    template void registerDisplay<ST7735Display>(const String&);
-    template void registerDisplay<GC9A01Display>(const String&);
-    template void registerDisplay<ILI9488Display>(const String&);
-    template void registerDisplay<HD44780Display>(const String&);
-    template void registerDisplay<NextionDisplay>(const String&);
-
-    template void registerControl<PIDControl>(const String&);
-    template void registerControl<BangBangControl>(const String&);
-    template void registerControl<PWMFeedforwardControl>(const String&);
 };
 
 } // namespace filament_dryer

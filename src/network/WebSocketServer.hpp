@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <AsyncWebSocket.h>
 #include <ArduinoJson.h>
+#include "../core/SafetyEngine.hpp"
 
 namespace filament_dryer {
 

@@ -19,12 +19,6 @@ bool DHT22Sensor::begin(const JsonObject& config) {
     last_reading_ = read();
     initialized_ = last_reading_.valid;
     
-    if (initialized_) {
-        Serial.printf("[DHT22Sensor] Initialized on GPIO %d\n", gpio_pin_);
-    } else {
-        Serial.printf("[DHT22Sensor] WARNING: Initial read failed on GPIO %d\n", gpio_pin_);
-    }
-    
     return initialized_;
 }
 

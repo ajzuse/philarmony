@@ -92,7 +92,6 @@ bool ST7789Display::begin(const JsonObject& config) {
     display_ = new LGFX_TDisplay(mosi_pin_, sclk_pin_, cs_pin_, dc_pin_, rst_pin_, bl_pin_, width_, height_, rotation_);
     
     if (!display_->init()) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::DISPLAY, "ST7789 init failed");
         return false;
     }
     
@@ -103,9 +102,6 @@ bool ST7789Display::begin(const JsonObject& config) {
     display_->setTextSize(1);
     
     initialized_ = true;
-    logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY, 
-                     "ST7789 %dx%d initialized (SPI DMA)", width_, height_);
-    
     return true;
 }
 

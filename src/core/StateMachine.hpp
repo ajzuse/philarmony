@@ -50,7 +50,7 @@ public:
     
     // State access
     SystemState getState() const { return current_state_; }
-    const String getStateName() const;
+    String getStateName() const;
     
     // State transitions
     bool transitionTo(SystemState new_state);

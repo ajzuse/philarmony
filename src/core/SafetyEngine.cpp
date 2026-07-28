@@ -24,12 +24,8 @@ bool SafetyEngine::begin(const SafetyConfig& config) {
     
     // Initialize hardware watchdog using esp_task_wdt (new API)
     if (config_.watchdog_enabled) {
-        esp_task_wdt_config_t wdt_config = {
-            .timeout_ms = config_.watchdog_timeout_ms,
-            .idle_core_mask = (1 << 0) | (1 << 1), // Both cores
-            .trigger_panic = true
-        };
-        esp_err_t err = esp_task_wdt_init(&wdt_config);
+        const uint32_t timeout_sec = (config_.watchdog_timeout_ms + 999U) / 1000U;
+        esp_err_t err = esp_task_wdt_init(timeout_sec > 0 ? timeout_sec : 1U, true);
         if (err == ESP_OK) {
             watchdog_active_ = true;
         }
@@ -147,12 +143,8 @@ void SafetyEngine::feedWatchdog() {
 
 void SafetyEngine::enableWatchdog(bool enable) {
     if (enable && !watchdog_active_ && config_.watchdog_enabled) {
-        esp_task_wdt_config_t wdt_config = {
-            .timeout_ms = config_.watchdog_timeout_ms,
-            .idle_core_mask = (1 << 0) | (1 << 1), // Both cores
-            .trigger_panic = true
-        };
-        esp_task_wdt_init(&wdt_config);
+        const uint32_t timeout_sec = (config_.watchdog_timeout_ms + 999U) / 1000U;
+        esp_task_wdt_init(timeout_sec > 0 ? timeout_sec : 1U, true);
         watchdog_active_ = true;
     } else if (!enable && watchdog_active_) {
         esp_task_wdt_deinit();

@@ -34,7 +34,6 @@ bool SHT31Sensor::begin(const JsonObject& config) {
     
     // Soft reset
     if (!writeCommand(CMD_SOFT_RESET)) {
-        Serial.println("[SHT31] ERROR: Soft reset failed");
         return false;
     }
     delay(10);
@@ -45,54 +44,50 @@ bool SHT31Sensor::begin(const JsonObject& config) {
     // Verify connection by reading status
     uint8_t status_data[3];
     if (!readData(CMD_READ_STATUS, status_data, 3)) {
-        Serial.println("[SHT31] ERROR: Failed to read status register");
         return false;
     }
     
     initialized_ = true;
-    Serial.printf("[SHT31] Initialized at 0x%02X (SDA=%d, SCL=%d)\n", 
-                  i2c_address_, sda_pin_, scl_pin_);
     return true;
 }
 
 SensorReading SHT31Sensor::read() {
     SensorReading reading;
-    reading.sensor_type = "sht31";
     reading.timestamp = millis();
     reading.valid = false;
-    reading.temperature_c = NAN;
-    reading.humidity_pct = NAN;
+    reading.temperature = NAN;
+    reading.humidity = NAN;
     
     if (!initialized_) {
-        reading.error = "Not initialized";
+        reading.error_message = "Not initialized";
         return reading;
     }
     
     // High repeatability measurement
     uint8_t data[6];
     if (!readData(CMD_MEAS_HIGHREP, data, 6)) {
-        reading.error = "I2C read failed";
+        reading.error_message = "I2C read failed";
         return reading;
     }
     
     // Parse temperature (bytes 0-1) with CRC (byte 2)
     uint16_t temp_raw = (data[0] << 8) | data[1];
     if (crc8(data, 2) != data[2]) {
-        reading.error = "Temperature CRC mismatch";
+        reading.error_message = "Temperature CRC mismatch";
         return reading;
     }
     
     // Parse humidity (bytes 3-4) with CRC (byte 5)
     uint16_t hum_raw = (data[3] << 8) | data[4];
     if (crc8(data + 3, 2) != data[5]) {
-        reading.error = "Humidity CRC mismatch";
+        reading.error_message = "Humidity CRC mismatch";
         return reading;
     }
     
-    reading.temperature_c = calculateTemperature(temp_raw);
-    reading.humidity_pct = calculateHumidity(hum_raw);
+    reading.temperature = calculateTemperature(temp_raw);
+    reading.humidity = calculateHumidity(hum_raw);
     reading.valid = true;
-    reading.error = "";
+    reading.error_message = "";
     
     last_reading_ = reading;
     return reading;

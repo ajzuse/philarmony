@@ -5,6 +5,8 @@
 
 namespace filament_dryer {
 
+constexpr bool StateMachine::valid_transitions[7][7];
+
 StateMachine::StateMachine() {}
 
 StateMachine::~StateMachine() {}
@@ -37,23 +39,12 @@ bool StateMachine::canTransition(SystemState from, SystemState to) const {
 
 bool StateMachine::transitionTo(SystemState new_state) {
     if (!canTransition(current_state_, new_state)) {
-        Serial.printf("[StateMachine] Invalid transition: %s -> %s\n",
-                      getStateName().c_str(), 
-                      String(new_state == SystemState::BOOT ? "BOOT" :
-                             new_state == SystemState::WIFI_CONNECT ? "WIFI_CONNECT" :
-                             new_state == SystemState::HOTSPOT ? "HOTSPOT" :
-                             new_state == SystemState::READY ? "READY" :
-                             new_state == SystemState::DRYING ? "DRYING" :
-                             new_state == SystemState::STOPPED ? "STOPPED" : "FAULT_STOPPED").c_str());
         return false;
     }
     
     previous_state_ = current_state_;
     current_state_ = new_state;
     state_enter_time_ = millis();
-    
-    Serial.printf("[StateMachine] State transition: %s -> %s\n",
-                  getStateName().c_str(), getStateName().c_str());
     
     if (state_change_cb_) {
         state_change_cb_(previous_state_, current_state_);

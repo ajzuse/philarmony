@@ -28,7 +28,7 @@ public:
     void wake() override;
 
 private:
-    LGFX* display_ = nullptr;
+    lgfx::LGFX_Device* display_ = nullptr;
     bool initialized_ = false;
     DisplayMetrics metrics_;
     int8_t mosi_pin_ = 19;

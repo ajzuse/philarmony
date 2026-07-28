@@ -23,7 +23,6 @@ bool SystemMetrics::begin(uint32_t sample_interval_ms) {
     
     initialized_ = true;
     
-    Serial.printf("[SystemMetrics] Initialized with %lums interval\n", sample_interval_ms_);
     return true;
 }
 

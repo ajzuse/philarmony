@@ -129,7 +129,7 @@ public:
     
     // Generic JSON config (Klipper-style object config)
     bool setObjectConfig(const String& object_name, const JsonObject& config);
-    JsonObject getObjectConfig(const String& object_name) const;
+    JsonObject getObjectConfig(const String& object_name);
     std::vector<String> listObjectConfigs() const;
     
     // Factory reset
@@ -143,7 +143,7 @@ public:
     Preferences& getPreferences() { return prefs_; }
 
 private:
-    Preferences prefs_;
+    mutable Preferences prefs_;
     bool initialized_ = false;
     
     // NVS Keys
@@ -166,7 +166,7 @@ private:
     bool writeStruct(const char* key, const T& value);
     bool readString(const char* key, String& value);
     bool writeString(const char* key, const String& value);
-    bool readJsonArray(const char* key, std::vector<String>& array);
+    bool readJsonArray(const char* key, std::vector<String>& array) const;
     bool writeJsonArray(const char* key, const std::vector<String>& array);
     
     // Private helper for profile operations

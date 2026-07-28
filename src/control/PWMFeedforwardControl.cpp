@@ -25,7 +25,6 @@ bool PWMFeedforwardControl::begin(const JsonObject& config) {
     
     initialized_ = true;
     
-    Serial.println("[PWMFeedforwardControl] Initialized");
     return true;
 }
 
