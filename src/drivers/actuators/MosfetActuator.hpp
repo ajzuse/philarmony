@@ -38,11 +38,12 @@ public:
     String getName() const override { return "AOD4184 Heater MOSFET"; }
     bool isHealthy() const override { return initialized_ && !state_.fault && !overcurrent_latched_; }
 
-    /** True when current-sense pin is configured and last sample exceeded threshold. */
+    /** True when current-sense pin is configured. */
     bool hasCurrentSense() const { return current_sense_pin_ >= 0; }
-    bool checkOvercurrent();
-    float getMeasuredPowerPct() const { return measured_power_pct_; }
+    bool checkOvercurrent() override;
+    float getMeasuredPowerPct() const override { return measured_power_pct_; }
     bool hasOpenLoopFeedback() const { return hasCurrentSense() || open_loop_detect_; }
+    bool hasFeedback() const override { return hasOpenLoopFeedback(); }
 
     // PID integration
     void setPidConfig(float kp, float ki, float kd);
@@ -57,8 +58,13 @@ private:
     int8_t current_sense_pin_ = -1;
     uint16_t overcurrent_adc_threshold_ = 3000;
     bool open_loop_detect_ = false;
+    /** Optional ADC pin reading MOSFET output for open-loop verify (no current shunt). */
+    int8_t open_loop_sense_pin_ = -1;
+    /** When >= 0, overrides measured power (host/tests can force ACTUATOR_FAULT). */
+    float inject_measured_power_pct_ = -1.0f;
     bool overcurrent_latched_ = false;
     float measured_power_pct_ = 0.0f;
+    float last_commanded_pct_ = 0.0f;
     bool emergency_stopped_ = false;
     bool initialized_ = false;
     ActuatorState state_;
@@ -75,6 +81,7 @@ private:
     float power_to_duty(float power_pct) const;
     void applyDuty(uint32_t duty);
     void resetPid();
+    void refreshOpenLoopMeasurement();
 };
 
 } // namespace filament_dryer

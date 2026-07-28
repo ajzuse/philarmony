@@ -38,13 +38,19 @@ bool PidAutotuneController::startCalibration(const Config& config,
 
     reset();
     config_ = config;
+    if (config_.algorithm.length() == 0) {
+        config_.algorithm = "pid";
+    }
     progress_cb_ = progress_cb;
     complete_cb_ = complete_cb;
     running_ = true;
     state_ = HEATING_UP;
     cycle_start_time_ = millis();
+    cycle_start_temp_ = -1000.0f;
     peak_temp_ = -1000.0f;
     valley_temp_ = 1000.0f;
+    heating_rate_c_per_sec_ = 0.0f;
+    result_.algorithm = config_.algorithm;
 
     if (heater_cb_) {
         heater_cb_(config_.pwm_step);
@@ -73,6 +79,10 @@ void PidAutotuneController::update(float current_temp, float heater_pwm_pct) {
         return;
     }
 
+    if (state_ == HEATING_UP && cycle_start_temp_ < -100.0f) {
+        cycle_start_temp_ = current_temp;
+    }
+
     peak_temp_ = max(peak_temp_, current_temp);
     valley_temp_ = min(valley_temp_, current_temp);
 
@@ -80,6 +90,11 @@ void PidAutotuneController::update(float current_temp, float heater_pwm_pct) {
     const uint32_t elapsed_ms = millis() - cycle_start_time_;
 
     if (state_ == HEATING_UP && current_temp >= (config_.target_temp + tolerance)) {
+        const float dt_s = max(0.001f, elapsed_ms / 1000.0f);
+        const float rise = current_temp - cycle_start_temp_;
+        if (rise > 0.0f) {
+            heating_rate_c_per_sec_ = rise / dt_s;
+        }
         state_ = COOLING_DOWN;
         heating_phase_ = false;
         last_peak_time_ = millis();
@@ -95,13 +110,14 @@ void PidAutotuneController::update(float current_temp, float heater_pwm_pct) {
         oscillation_amplitude_ = max(0.1f, (peak_temp_ - valley_temp_) / 2.0f);
 
         if (cycles_completed_ >= config_.max_cycles) {
-            calculatePid();
+            calculateResults();
             return;
         }
 
         state_ = HEATING_UP;
         heating_phase_ = true;
         cycle_start_time_ = millis();
+        cycle_start_temp_ = current_temp;
         peak_temp_ = current_temp;
         valley_temp_ = current_temp;
         if (heater_cb_) {
@@ -141,6 +157,7 @@ void PidAutotuneController::reset() {
     cycles_completed_ = 0;
     oscillation_period_ = 0.0f;
     oscillation_amplitude_ = 0.0f;
+    heating_rate_c_per_sec_ = 0.0f;
 }
 
 void PidAutotuneController::transitionTo(State new_state) {
@@ -162,6 +179,17 @@ void PidAutotuneController::checkSafety(float current_temp) {
     }
 }
 
+void PidAutotuneController::calculateResults() {
+    result_.algorithm = config_.algorithm;
+    if (config_.algorithm == "bang_bang") {
+        calculateBangBang();
+    } else if (config_.algorithm == "pwm_feedforward") {
+        calculateFeedforward();
+    } else {
+        calculatePid();
+    }
+}
+
 void PidAutotuneController::calculatePid() {
     const float amplitude = max(0.1f, oscillation_amplitude_);
     const float period = max(1.0f, oscillation_period_);
@@ -172,6 +200,7 @@ void PidAutotuneController::calculatePid() {
     result_.kd = (result_.kp * period) / 8.0f;
     result_.success = true;
     result_.error = "";
+    result_.algorithm = "pid";
 
     running_ = false;
     state_ = COMPLETE;
@@ -181,6 +210,56 @@ void PidAutotuneController::calculatePid() {
     if (progress_cb_) {
         progress_cb_(cycles_completed_, config_.max_cycles, config_.target_temp,
                      result_.kp, result_.ki, result_.kd, true);
+    }
+    if (complete_cb_) {
+        complete_cb_(result_);
+    }
+}
+
+void PidAutotuneController::calculateBangBang() {
+    // Hysteresis ≈ full peak-to-peak band that kept the plant oscillating
+    result_.hysteresis = constrain(oscillation_amplitude_ * 2.0f, 0.5f, 5.0f);
+    result_.kp = 0.0f;
+    result_.ki = 0.0f;
+    result_.kd = 0.0f;
+    result_.success = true;
+    result_.error = "";
+    result_.algorithm = "bang_bang";
+
+    running_ = false;
+    state_ = COMPLETE;
+    if (heater_cb_) {
+        heater_cb_(0.0f);
+    }
+    if (progress_cb_) {
+        progress_cb_(cycles_completed_, config_.max_cycles, config_.target_temp,
+                     result_.hysteresis, 0.0f, 0.0f, true);
+    }
+    if (complete_cb_) {
+        complete_cb_(result_);
+    }
+}
+
+void PidAutotuneController::calculateFeedforward() {
+    // Estimate hold PWM and sensitivity from observed heating rate at pwm_step
+    const float rate = max(0.05f, heating_rate_c_per_sec_);
+    result_.temp_coefficient = constrain(config_.pwm_step / (rate * 10.0f), 0.5f, 10.0f);
+    result_.base_pwm = constrain(config_.pwm_step * 0.45f, 10.0f, 90.0f);
+    result_.kp = 0.0f;
+    result_.ki = 0.0f;
+    result_.kd = 0.0f;
+    result_.success = true;
+    result_.error = "";
+    result_.algorithm = "pwm_feedforward";
+
+    running_ = false;
+    state_ = COMPLETE;
+    if (heater_cb_) {
+        heater_cb_(0.0f);
+    }
+    if (progress_cb_) {
+        progress_cb_(cycles_completed_, config_.max_cycles, config_.target_temp,
+                     result_.base_pwm, result_.temp_coefficient, 0.0f, true);
     }
     if (complete_cb_) {
         complete_cb_(result_);

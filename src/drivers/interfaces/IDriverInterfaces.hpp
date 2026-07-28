@@ -107,6 +107,12 @@ public:
     
     // Check if actuator is responding
     virtual bool isHealthy() const = 0;
+
+    /** True when measured power / overcurrent comes from sense pin or open-loop verify. */
+    virtual bool hasFeedback() const { return false; }
+    virtual float getMeasuredPowerPct() const { return 0.0f; }
+    /** Overcurrent from sense hardware only — never from emergency-stop. */
+    virtual bool checkOvercurrent() { return false; }
     
 protected:
     String last_error_;

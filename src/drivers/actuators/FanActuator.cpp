@@ -28,9 +28,17 @@ FanActuator::FanActuator() {}
 FanActuator::~FanActuator() {}
 
 bool FanActuator::begin(const JsonObject& config) {
-    gpio_pin_ = config["fan_pin"] | 26;
+    gpio_pin_ = config["fan_pin"] | config["gpio_pin"] | 26;
     pwm_freq_ = config["fan_pwm_freq"] | 5000;
-    mode_ = parseFanMode(config["fan_mode"] | "independent_pwm");
+    type_ = config["type"] | "fan_pwm";
+    String mode_str = config["fan_mode"] | "independent_pwm";
+    if (type_ == "fan_digital") {
+        mode_str = "independent_digital";
+    }
+    mode_ = parseFanMode(mode_str);
+    if (mode_ == FanMode::INDEPENDENT_DIGITAL) {
+        type_ = "fan_digital";
+    }
     shared_heater_pin_ = config["heater_pin"] | -1;
     
     // Configure PWM channel for independent modes

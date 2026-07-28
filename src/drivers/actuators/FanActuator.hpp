@@ -40,11 +40,12 @@ public:
     bool setPower(float power_pct) override;
     void emergencyStop() override;
     ActuatorState getState() const override;
-    String getType() const override { return "fan_pwm"; }
+    String getType() const override { return type_; }
     String getName() const override { return "Exhaust Fan"; }
     bool isHealthy() const override { return initialized_ && !state_.fault; }
     
 private:
+    String type_ = "fan_pwm";
     int8_t gpio_pin_ = 26;
     uint32_t pwm_freq_ = 5000;
     uint8_t pwm_channel_ = 1;
