@@ -15,6 +15,7 @@ struct BangBangConfig {
 class BangBangControl : public IControlAlgorithm {
 public:
     BangBangControl();
+    BangBangControl(const JsonObject& config);
     ~BangBangControl() override;
     
     bool begin(const JsonObject& config) override;

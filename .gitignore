@@ -49,3 +49,27 @@ yarn.lock
 # Documentation
 temp/
 *.md~
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# C++ build artifacts
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.hex
+*.map
+
+# ESP-IDF / Arduino
+sdkconfig
+sdkconfig.old
+build/
+managed_components/
+
+# Backup files created during editing
+*.bak
+*.orig

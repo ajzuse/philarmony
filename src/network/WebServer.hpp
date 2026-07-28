@@ -43,7 +43,7 @@ private:
     void handleWifiConfigPost(AsyncWebServerRequest* request);
     void handleLogDownload(AsyncWebServerRequest* request, bool drying_log);
     void handleHardwareConfigGet(AsyncWebServerRequest* request);
-    void handleHardwareConfigPost(AsyncWebServerRequest* request);
+    void handleHardwareConfigPostBody(AsyncWebServerRequest* request, const String& body);
     void handleNotFound(AsyncWebServerRequest* request);
     
     // Helpers

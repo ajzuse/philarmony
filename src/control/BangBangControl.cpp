@@ -2,14 +2,21 @@
  * BangBangControl - Implementation
  * Hysteresis-based on/off temperature control
  */
+#include <Arduino.h>
+#include <HardwareSerial.h>
 #include "BangBangControl.hpp"
-#include "../core/LogManager.hpp"
-
-extern filament_dryer::LogManager logMgr;
 
 namespace filament_dryer {
 
 BangBangControl::BangBangControl() {}
+
+BangBangControl::BangBangControl(const JsonObject& config) {
+    config_.hysteresis = config["hysteresis"] | 1.0f;
+    config_.min_cycle_time = config["min_cycle_time"] | 10.0f;
+    
+    if (config_.hysteresis <= 0) config_.hysteresis = 1.0f;
+    if (config_.min_cycle_time <= 0) config_.min_cycle_time = 10.0f;
+}
 
 BangBangControl::~BangBangControl() {}
 
@@ -23,9 +30,7 @@ bool BangBangControl::begin(const JsonObject& config) {
     reset();
     initialized_ = true;
     
-    logMgr.logSystem(LogLevel::INFO, LogModule::CONTROL, 
-                     "Bang-Bang Control initialized: hysteresis=%.1fC, min_cycle=%.1fs",
-                     config_.hysteresis, config_.min_cycle_time);
+    Serial.println("[BangBangControl] Initialized");
     return true;
 }
 

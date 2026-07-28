@@ -19,6 +19,7 @@ struct PIDConfig {
 class PIDControl : public IControlAlgorithm {
 public:
     PIDControl();
+    PIDControl(const JsonObject& config);
     ~PIDControl() override;
     
     bool begin(const JsonObject& config) override;

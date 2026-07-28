@@ -69,9 +69,14 @@ void WebSocketServer::onEvent(AsyncWebSocket* server, AsyncWebSocketClient* clie
             );
             break;
             
-        case WS_EVT_DATA:
-            handleMessage(client, *reinterpret_cast<JsonObject*>(arg));
+        case WS_EVT_DATA: {
+            AwsFrameInfo* info = reinterpret_cast<AwsFrameInfo*>(arg);
+            if (info->final && info->index == 0 && info->len == len 
+                && info->opcode == WS_TEXT) {
+                handleMessage(client, data, len);
+            }
             break;
+        }
             
         case WS_EVT_PONG:
         case WS_EVT_ERROR:
@@ -79,9 +84,23 @@ void WebSocketServer::onEvent(AsyncWebSocket* server, AsyncWebSocketClient* clie
     }
 }
 
-void WebSocketServer::handleMessage(AsyncWebSocketClient* client, const JsonObject& doc) {
+void WebSocketServer::handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t len) {
+    // Null-terminate the incoming text frame
+    data[len] = '\0';
+
+    StaticJsonDocument<4096> doc;
+    DeserializationError err = deserializeJson(doc, reinterpret_cast<char*>(data));
+    if (err) {
+        sendError(client, "error", String("JSON parse error: ") + err.c_str());
+        return;
+    }
+
+    dispatchTopic(client, doc.as<JsonObject>());
+}
+
+void WebSocketServer::dispatchTopic(AsyncWebSocketClient* client, const JsonObject& doc) {
     String topic = doc["topic"] | "";
-    JsonObject payload = doc["payload"] | JsonObject();
+    JsonObject payload = doc["payload"].as<JsonObject>();
     
     if (topic.isEmpty()) {
         sendError(client, "error", "Missing topic");
@@ -96,8 +115,18 @@ void WebSocketServer::handleMessage(AsyncWebSocketClient* client, const JsonObje
         handleConfigHardware(client, payload);
     } else if (topic == "config/display") {
         handleConfigDisplay(client, payload);
-    } else if (topic == "config/profiles/create") {
-        handleConfigProfiles(client, payload);
+    } else if (topic == "config/profiles/list"
+            || topic == "config/profiles/get"
+            || topic == "config/profiles/create"
+            || topic == "config/profiles/update"
+            || topic == "config/profiles/delete"
+            || topic == "config/profiles/reset_defaults") {
+        // Inject action from topic suffix for unified handler
+        StaticJsonDocument<256> action_doc;
+        action_doc.set(payload);
+        String action = topic.substring(topic.lastIndexOf('/') + 1);
+        action_doc["action"] = action;
+        handleConfigProfiles(client, action_doc.as<JsonObject>());
     } else if (topic == "control/pid_calibrate") {
         handlePidCalibrate(client, payload);
     } else if (topic == "status/subscribe") {
@@ -119,7 +148,7 @@ void WebSocketServer::handleControlStart(AsyncWebSocketClient* client, const Jso
         return;
     }
     
-    StateMachine::DryingSession session;
+    DryingSession session;
     session.profile_id = payload["profile_id"] | "";
     session.target_temp_c = payload["target_temp_c"] | 50.0f;
     session.max_duration_min = payload["max_duration_min"] | 240;
@@ -142,12 +171,12 @@ void WebSocketServer::handleControlStop(AsyncWebSocketClient* client, const Json
     }
     
     String reason = payload["reason"] | "user_requested";
-    StateMachine::DryingStopReason stop_reason = StateMachine::DryingStopReason::USER_STOPPED;
+    DryingStopReason stop_reason = DryingStopReason::USER_STOPPED;
     
-    if (reason == "humidity_reached") stop_reason = StateMachine::DryingStopReason::HUMIDITY_REACHED;
-    else if (reason == "max_time") stop_reason = StateMachine::DryingStopReason::MAX_TIME;
-    else if (reason == "over_temp") stop_reason = StateMachine::DryingStopReason::OVER_TEMP;
-    else if (reason == "sensor_error") stop_reason = StateMachine::DryingStopReason::SENSOR_ERROR;
+    if (reason == "humidity_reached") stop_reason = DryingStopReason::HUMIDITY_REACHED;
+    else if (reason == "max_time") stop_reason = DryingStopReason::MAX_TIME;
+    else if (reason == "over_temp") stop_reason = DryingStopReason::SAFETY_CUTOFF;
+    else if (reason == "sensor_error") stop_reason = DryingStopReason::SENSOR_ERROR;
     
     state_machine_->stopDrying(stop_reason);
     
@@ -228,9 +257,7 @@ void WebSocketServer::handleConfigHardware(AsyncWebSocketClient* client, const J
         
         // Validate actuator types
         if (payload.containsKey("actuators")) {
-            JsonArray actuators = payload["payload"].is<JsonArray>() ? 
-                                  payload["payload"].as<JsonArray>() :
-                                  payload["actuators"].as<JsonArray>();
+            JsonArray actuators = payload["actuators"].as<JsonArray>();
             for (JsonVariant v : actuators) {
                 JsonObject actuator = v.as<JsonObject>();
                 String type = actuator["type"] | "";

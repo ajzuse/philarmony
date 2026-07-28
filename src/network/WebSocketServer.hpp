@@ -66,7 +66,8 @@ private:
     // Message handlers
     void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, 
                  AwsEventType type, void* arg, uint8_t* data, size_t len);
-    void handleMessage(AsyncWebSocketClient* client, const JsonObject& doc);
+    void handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t len);
+    void dispatchTopic(AsyncWebSocketClient* client, const JsonObject& doc);
     
     // Command handlers
     void handleControlStart(AsyncWebSocketClient* client, const JsonObject& payload);
