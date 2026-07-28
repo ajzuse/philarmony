@@ -76,8 +76,8 @@
 - [ ] T025 [US1] Add script/Make target to copy firmware `001` build artifacts into `apps/esp32-desktop-installer/assets/firmware/` from PlatformIO output
 - [ ] T026 [US1] Implement FirmwareFlasher (esptool Process, stage parse, progress stream) in `apps/esp32-desktop-installer/lib/flash/esptool_firmware_flasher.dart`
 - [ ] T027 [US1] Implement NVS/config image writer using mapper output in `apps/esp32-desktop-installer/lib/flash/nvs_image_builder.dart`
-- [ ] T028 [US1] Implement Flash step UI (progress, stages, retry) in `apps/esp32-desktop-installer/lib/wizard/steps/flash_step.dart`
-- [ ] T029 [US1] Implement post-flash WebSocket/HTTP verify client in `apps/esp32-desktop-installer/lib/flash/post_flash_verifier.dart`
+- [ ] T028 [US1] Implement Flash step UI (progress, stages, Retry without restore claim) in `apps/esp32-desktop-installer/lib/wizard/steps/flash_step.dart`
+- [ ] T029 [US1] Implement soft post-flash WS/HTTP verifier (`ok`/`skipped`/`warn`; never fails Flash Success) in `apps/esp32-desktop-installer/lib/flash/post_flash_verifier.dart`
 - [ ] T030 [US1] Wire wizard navigation end-to-end in `apps/esp32-desktop-installer/lib/wizard/wizard_page.dart`
 
 **Checkpoint**: First-time setup MVP works on one desktop OS with real or mocked flasher
@@ -120,13 +120,13 @@
 
 ## Phase 6: User Story 4 — Reconfiguration of Existing Device (Priority: P3)
 
-**Goal**: Reconnect previously flashed device, adjust settings, re-flash (Scenario 2)
+**Goal**: Reconnect previously flashed device, load **local** last session / JSON, adjust settings, re-flash (Scenario 2). No on-device NVS read.
 
-**Independent Test**: Device with prior config → installer opens usable defaults or empty with clear “reconfigure” path → re-flash applies new WiFi/pins
+**Independent Test**: After one successful flash, relaunch → Load last session → change pin/WiFi → Retry flash applies new config (USB never dumps NVS)
 
 ### Implementation for User Story 4
 
-- [ ] T039 [P] [US4] Attempt optional read of device identity/chip info via esptool/`flutter_libserialport` in `apps/esp32-desktop-installer/lib/device/chip_info_reader.dart`
+- [ ] T039 [P] [US4] Implement chip/port identity helpers for UX only (no NVS dump) in `apps/esp32-desktop-installer/lib/device/chip_info_reader.dart`
 - [ ] T040 [US4] Add “Load last session / New setup” entry in `apps/esp32-desktop-installer/lib/wizard/home_entry_page.dart`
 - [ ] T041 [US4] Persist last successful DeviceProfile (sans password) to local app support dir in `apps/esp32-desktop-installer/lib/persistence/last_profile_store.dart`
 - [ ] T042 [US4] Confirm overwrite/re-erase messaging before flash in `apps/esp32-desktop-installer/lib/wizard/steps/review_step.dart`
@@ -144,7 +144,7 @@
 ### Implementation for User Story 5
 
 - [ ] T043 [P] [US5] Configure Windows MSIX (`msix` / `msix_config`) in `apps/esp32-desktop-installer/pubspec.yaml` and `apps/esp32-desktop-installer/packaging/windows/`
-- [ ] T044 [P] [US5] Configure macOS DMG packaging in `apps/esp32-desktop-installer/packaging/macos/dmg.json` (sign/notarize notes in packaging README)
+- [ ] T044 [P] [US5] Configure macOS DMG packaging + notarization checklist (REQUIRED for public) in `apps/esp32-desktop-installer/packaging/macos/dmg.json` and packaging README
 - [ ] T045 [P] [US5] Configure Linux AppImage metadata in `apps/esp32-desktop-installer/packaging/linux/appimage.yml`
 - [ ] T046 [P] [US5] Configure Linux `.deb` metadata in `apps/esp32-desktop-installer/packaging/linux/deb/`
 - [ ] T047 [P] [US5] Configure Linux `.rpm` metadata (Fedora/RHEL-family) in `apps/esp32-desktop-installer/packaging/linux/rpm/`

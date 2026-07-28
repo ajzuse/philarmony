@@ -109,6 +109,7 @@ Build/release metadata for the **desktop app installer** (not the ESP32 image).
 | `progress_pct` | 0–100 | |
 | `log_lines` | string[] | FR-011 diagnostics |
 | `error` | string \| null | |
+| `network_verify` | enum | `pending`, `ok`, `skipped`, `warn` — soft; never flips `success`→`failed` |
 | `started_at` / `finished_at` | ISO-8601 | |
 
 ## Relationships
@@ -133,7 +134,8 @@ Back allowed except during active flash. Next blocked while `validation_errors` 
 
 ### FlashJob
 `idle` → `erasing` → `writing_app` → `writing_nvs` → `verifying` → `resetting` → `success`  
-Any stage → `failed` (user may Retry from `review`/`flash`).
+Any stage → `failed` (**Retry** = restart full pipeline with same package; **no** auto-restore of prior image).  
+After `success`, optional soft `network_verify` → `ok` \| `skipped` \| `warn` (never fails the job).
 
 ## Mapping to firmware (001)
 

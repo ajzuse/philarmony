@@ -2,7 +2,7 @@
 
 **Feature**: `002-esp32-desktop-installer` | **Date**: 2026-07-28  
 **Amended**: 2026-07-28 — stack switched from Tauri to Flutter per product direction (shared codebase with `003`).  
-**Amended**: 2026-07-28 — host OS installers (MSIX / DMG / Linux AppImage+deb+rpm via Make) (DEC-011).
+**Amended**: 2026-07-28 — clarify session: soft network verify, local reconfigure, password redaction, Retry-not-restore, signing MVP policy (R8–R12).
 
 ## R1 — Desktop / shared UI framework
 
@@ -23,7 +23,7 @@
 | USB device list (CP210x/CH340/FTDI) | Yes (desktop) | `flutter_libserialport` / libserialport |
 | Chip detect + flash erase/write/verify | Indirect | Bundle **esptool** and drive via `Process` (parse stdout for progress) |
 | Config JSON profiles | Yes | `dart:convert` + shared models |
-| Post-flash network verify | Yes | HTTP/`web_socket_channel` (same stack as `003`) |
+| Post-flash network verify | Yes (optional) | Soft check only; Flash Success = esptool verify (R8) |
 | Win/macOS/Linux packages | Yes | `flutter build` + MSIX/DMG + Linux AppImage/deb/**rpm** via Make (R7) |
 | USB flash on iOS/Android | Partial / out of MVP | Desktop installer owns flash; mobile control app uses WiFi/WS |
 
@@ -80,7 +80,7 @@ Installer remains **desktop-first** because USB flashing is the hard requirement
 
 **Rationale**: User requirement for single-download multi-platform install including first-class Linux and Red Hat–based distros. Zipping Flutter `Release/` folders fails Gatekeeper and non-technical UX. Make aligns with existing firmware façade (DEC-009) for builders/CI without making clone+make the end-user path.
 
-**Release pipeline**: GitHub Actions builds signed (when secrets present) or unsigned CI artifacts; GitHub Releases attach one file per OS/format. App payload **embeds** firmware + esptool so users need no second download for device flashing.
+**Release pipeline**: GitHub Actions builds artifacts; **public macOS DMG MUST be notarized**; Windows/Linux MAY publish unsigned in MVP with README warnings (R12). App payload embeds firmware + esptool.
 
 **Alternatives considered**:
 - Portable ZIP only — rejected (Gatekeeper, no Start Menu, poor UX).
@@ -89,11 +89,46 @@ Installer remains **desktop-first** because USB flashing is the hard requirement
 - Linux AppImage-only — rejected; misses native package managers and Fedora/RHEL users.
 - Flatpak/Snap as primary — deferred; AppImage + deb + rpm cover the requested surface.
 
+## R8 — Post-flash success definition (clarify)
+
+**Decision**: **Flash Success** = esptool verify (+ reset). Optional WS/HTTP only if hotspot `philarmony` / `192.168.4.1` or user-supplied IP is reachable; otherwise non-blocking warning.
+
+**Rationale**: STA IP often unreachable from the flashing PC; hard-failing on WS causes false negatives.
+
+**Alternatives considered**: Mandatory WS; force hotspot-only verify; skip network entirely (D) — soft optional preferred.
+
+## R9 — Reconfigure data source (clarify)
+
+**Decision**: Prefill from **local last-session store** and/or **JSON import** only. No USB NVS dump / on-device config read in this phase.
+
+**Rationale**: Avoid firmware-specific dump protocol complexity for MVP; reflash still applies new config.
+
+**Alternatives considered**: Serial NVS read; hybrid device-first — deferred.
+
+## R10 — WiFi password in profiles (clarify)
+
+**Decision**: Export ALWAYS omits password or uses `***`. Never plaintext, never “encrypted in JSON”. Import requires re-entry before flash.
+
+**Rationale**: Local file crypto without KMS is false security; matches Assumptions.
+
+## R11 — Flash failure recovery (clarify)
+
+**Decision**: No automatic restore of a pre-erase dump. **Retry** = full erase→write→verify of the **current** bundled package + clear recovery copy.
+
+**Rationale**: No reliable pre-erase snapshot in MVP; “rollback” wording was misleading.
+
+## R12 — Public signing MVP (clarify)
+
+**Decision**: Public **macOS DMG MUST** be Developer ID–signed + notarized. Public **Windows/Linux MAY** be unsigned in MVP with documented SmartScreen/`dnf`/`apt` warnings. Authenticode + GPG later.
+
+**Rationale**: Gatekeeper practically blocks unsigned public macOS; Win/Linux remain usable with friction.
+
 ## Open items deferred to tasks
 
 - Exact esptool packaging (PyInstaller vs official standalone builds) per OS
 - NVS image write format spike
-- Apple notarization credentials + Windows code-signing cert in CI
+- Apple notarization credentials in CI (blocking for public macOS)
+- Optional Windows Authenticode / Linux GPG when certs available
 - Whether to offer both MSIX and Inno `.exe` for Windows enterprise quirks
 - Choose Linux packager (`nfpm` vs `fpm` vs `flutter_distributor`) and Makefile wiring details
 - RPM metadata (Requires, desktop file, udev rules for serial if needed)

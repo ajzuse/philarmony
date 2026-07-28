@@ -30,9 +30,9 @@
 - Reuse firmware pin rules: reject ESP32 input-only GPIOs 34–39 for outputs; detect duplicates; I2C pair completeness.
 - Abort flash if validation fails (constitution Failsafe).
 
-## Post-flash verify (optional but preferred)
+## Post-flash verify (soft / optional)
 
-1. Reset device.
-2. Wait for USB serial or WiFi (if credentials valid).
-3. Prefer: open WebSocket `ws://<ip>/ws` or hit `GET /api/info` when STA up; confirm `firmware_version`.
-4. If WiFi fails: device should enter hotspot `philarmony` (firmware FR-001) — installer shows troubleshooting, not as hard failure if flash+verify of binary succeeded.
+1. Reset device after esptool verify → **Flash Success**.
+2. Optionally attempt WS `ws://<ip>/ws` or `GET /api/info` only if hotspot `philarmony`/`192.168.4.1` or user-supplied IP is reachable.
+3. Unreachable network → warning only; does **not** fail the install.
+4. Do **not** read back NVS over USB for reconfigure (out of scope this phase).
