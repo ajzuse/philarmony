@@ -462,3 +462,9 @@ Do **not** re-open Phase 1–19 completed IDs. Implement Phase 20 only; keep wra
 - [x] T163 Replace tautological SC timing tests with instrumented assertions that can fail: WifiManager fail-fast &lt;5s (SC-01), and a measurable 1Hz±100ms status period proxy — `test_sc_status_interval_1hz_within_100ms` must not assert literal `1000`/`50` constants per Spec Success Criteria and T142 Done-When (partial)
 - [x] T164 Align Makefile default goal with `contracts/makefile-targets.md`: bare `make` builds firmware (`all`/`build`) while keeping `make help` available per plan: Makefile Target Map (contradicts)
 - [x] T165 Stop silently remapping `fan_digital` to `fan_pwm` in `initializeActuators`; use the registered `fan_digital` factory (or reject at parse) per FR-003 (partial)
+
+## Phase 22: Convergence
+
+> **Scope note:** Firmware FR-001–FR-011 / Phase 21 Done-When verified satisfied. Only remaining actionable gap is living-README progress (no further firmware correction loop intended).
+
+- [x] T166 CRITICAL Sync README.md project progress for Firmware Core (replace `AGUARDANDO` / `0%` with implemented status, and align feature `001` roadmap row with live firmware/WS/Make/CI) per Constitution: Documentação Sincronizada and T113 Done-When (contradicts)
