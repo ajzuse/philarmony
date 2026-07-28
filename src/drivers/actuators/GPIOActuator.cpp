@@ -18,14 +18,12 @@ bool GPIOActuator::begin(const JsonObject& config) {
     pinMode(gpio_pin_, OUTPUT);
     applyState(false);
     
-    state_ = {};
+    state_ = ActuatorState{};
     state_.enabled = false;
     state_.power_pct = 0.0f;
     state_.fault = false;
     
     initialized_ = true;
-    logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, 
-                     "GPIO Actuator on GPIO %d (%s)", gpio_pin_, active_high_ ? "active high" : "active low");
     return true;
 }
 
@@ -50,7 +48,6 @@ void GPIOActuator::emergencyStop() {
     state_.fault = true;
     state_.fault_message = "Emergency stop";
     
-    logMgr.logSystem(LogLevel::WARNING, LogModule::ACTUATOR, "GPIO Actuator emergency stop");
 }
 
 ActuatorState GPIOActuator::getState() const {

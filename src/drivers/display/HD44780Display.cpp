@@ -41,7 +41,6 @@ bool HD44780Display::begin(const JsonObject& config) {
     // Verify presence via I2C ACK
     Wire.beginTransmission(i2c_address_);
     if (Wire.endTransmission() != 0) {
-        Serial.printf("[HD44780] No ACK at 0x%02X\n", i2c_address_);
         delete display_;
         display_ = nullptr;
         return false;
@@ -54,8 +53,6 @@ bool HD44780Display::begin(const JsonObject& config) {
     initialized_  = true;
     backlight_on_ = true;
 
-    Serial.printf("[HD44780] %dx%d LCD initialized at 0x%02X\n",
-                  cols_, rows_, i2c_address_);
     return true;
 }
 

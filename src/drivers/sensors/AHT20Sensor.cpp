@@ -33,7 +33,6 @@ bool AHT20Sensor::begin(const JsonObject& config) {
 
     // Soft reset
     if (!sendCommand(CMD_SOFT_RESET)) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR, "AHT20: Soft reset failed");
         return false;
     }
     delay(20);
@@ -41,7 +40,6 @@ bool AHT20Sensor::begin(const JsonObject& config) {
     // Initialize - normal mode
     uint8_t init_data[2] = {0x08, 0x00};  // Normal mode, calibration enabled
     if (!sendCommand(CMD_INIT, init_data, 2)) {
-        logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR, "AHT20: Initialization command failed");
         return false;
     }
     delay(100);
@@ -54,9 +52,6 @@ bool AHT20Sensor::begin(const JsonObject& config) {
     }
 
     initialized_ = true;
-    logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR, 
-                     "AHT20 initialized at 0x%02X (I2C bus %d, SDA=%d, SCL=%d)", 
-                     i2c_address_, i2c_bus_, sda_pin_, scl_pin_);
     return true;
 }
 
@@ -110,27 +105,27 @@ SensorReading AHT20Sensor::read() {
     reading.humidity = NAN;
 
     if (!initialized_) {
-        reading.error = "Not initialized";
+        reading.error_message = "Not initialized";
         return reading;
     }
 
     // Trigger measurement
     uint8_t cmd[3] = {0xAC, 0x33, 0x00};
     if (!sendCommand(CMD_MEASURE, cmd + 1, 2)) {
-        reading.error = "Failed to trigger measurement";
+        reading.error_message = "Failed to trigger measurement";
         return reading;
     }
 
     // Wait for measurement to complete
     if (!waitForReady(100)) {
-        reading.error = "Measurement timeout";
+        reading.error_message = "Measurement timeout";
         return reading;
     }
 
     // Read 7 bytes: status + 3 temp + 3 humidity
     uint8_t data[7];
     if (!readData(data, 7)) {
-        reading.error = "I2C read failed";
+        reading.error_message = "I2C read failed";
         return reading;
     }
 
@@ -144,7 +139,7 @@ SensorReading AHT20Sensor::read() {
     reading.temperature = calcTemperature(raw_temp);
     reading.humidity = calcHumidity(raw_hum);
     reading.valid = true;
-    reading.error = "";
+    reading.error_message = "";
     last_reading_ = reading;
 
     return reading;

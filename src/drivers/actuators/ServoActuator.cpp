@@ -32,15 +32,12 @@ bool ServoActuator::begin(const JsonObject& config) {
         digitalWrite(enable_pin_, HIGH);
     }
 
-    state_ = {};
+    state_ = ActuatorState{};
     state_.enabled = false;
     state_.power_pct = 0.0f;
     state_.fault = false;
 
     initialized_ = true;
-    logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR, 
-                     "Servo initialized on GPIO %d (channel %d, %dHz)", 
-                     pwm_pin_, pwm_channel_, pwm_freq_);
     return true;
 }
 
@@ -71,7 +68,6 @@ void ServoActuator::emergencyStop() {
     state_.fault = true;
     state_.fault_message = "Emergency stop";
     
-    logMgr.logSystem(LogLevel::WARNING, LogModule::ACTUATOR, "Servo emergency stop");
 }
 
 ActuatorState ServoActuator::getState() const {

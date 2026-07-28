@@ -17,9 +17,13 @@ class LogManager;
 class PidAutotuneController;
 class HardwareConfigParser;
 class DriverRegistry;
+class ProfileManager;
+class ControlEngine;
 
 class WebSocketServer {
 public:
+    using HardwareReloadCallback = void(*)();
+
     WebSocketServer(uint16_t port = 80, const char* path = "/ws");
     ~WebSocketServer();
     
@@ -27,7 +31,11 @@ public:
                SafetyEngine* safety, LogManager* log_mgr,
                PidAutotuneController* pid_autotune,
                HardwareConfigParser* hw_parser = nullptr,
-               DriverRegistry* driver_registry = nullptr);
+               DriverRegistry* driver_registry = nullptr,
+               ProfileManager* profile_mgr = nullptr,
+               ControlEngine* control_engine = nullptr);
+
+    void setHardwareReloadCallback(HardwareReloadCallback cb) { hardware_reload_cb_ = cb; }
     
     void loop();
     
@@ -55,6 +63,9 @@ private:
     PidAutotuneController* pid_autotune_ = nullptr;
     HardwareConfigParser* hw_parser_ = nullptr;
     DriverRegistry* driver_registry_ = nullptr;
+    ProfileManager* profile_mgr_ = nullptr;
+    ControlEngine* control_engine_ = nullptr;
+    HardwareReloadCallback hardware_reload_cb_ = nullptr;
     
     // Client management
     struct ClientInfo {
@@ -76,6 +87,7 @@ private:
     void handleConfigHardware(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleConfigDisplay(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleConfigProfiles(AsyncWebSocketClient* client, const JsonObject& payload);
+    void handleConfigControl(AsyncWebSocketClient* client, const JsonObject& payload);
     void handlePidCalibrate(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleStatusSubscribe(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleStatusUnsubscribe(AsyncWebSocketClient* client, const JsonObject& payload);

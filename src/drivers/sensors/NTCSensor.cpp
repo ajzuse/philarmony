@@ -29,9 +29,6 @@ bool NTCSensor::begin(const JsonObject& config) {
 
     initialized_ = true;
     
-    logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR,
-                     "NTC Thermistor initialized on GPIO %d (Beta: %.0f, Series R: %.0f)",
-                     gpio_pin_, beta_coefficient_, series_resistor_);
 
     return true;
 }
@@ -45,7 +42,7 @@ SensorReading NTCSensor::read() {
     reading.pressure = NAN;
 
     if (!initialized_) {
-        reading.error = "Not initialized";
+        reading.error_message = "Not initialized";
         return reading;
     }
 
@@ -55,11 +52,11 @@ SensorReading NTCSensor::read() {
     // Convert to resistance
     uint32_t max_adc = (1 << adc_width_) - 1;  // 4095 for 12-bit
     if (adc_raw >= max_adc) {
-        reading.error = "ADC saturated (open circuit?)";
+        reading.error_message = "ADC saturated (open circuit?)";
         return reading;
     }
     if (adc_raw == 0) {
-        reading.error = "ADC zero (short circuit?)";
+        reading.error_message = "ADC zero (short circuit?)";
         return reading;
     }
 
@@ -80,7 +77,7 @@ SensorReading NTCSensor::read() {
 
     // Sanity check
     if (temp_celsius < -50.0f || temp_celsius > 200.0f) {
-        reading.error = "Temperature out of valid range";
+        reading.error_message = "Temperature out of valid range";
         return reading;
     }
 
@@ -88,7 +85,7 @@ SensorReading NTCSensor::read() {
     reading.humidity = NAN;
     reading.pressure = NAN;
     reading.valid = true;
-    reading.error = "";
+    reading.error_message = "";
     last_reading_ = reading;
 
     return reading;

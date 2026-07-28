@@ -1,21 +1,3 @@
-/*
- * Philarmony Filament Dryer ESP32 Firmware
- * Copyright (C) 2026 Philarmony Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 #include "ProfileManager.hpp"
 
 #include <Arduino.h>
@@ -26,35 +8,17 @@ ProfileManager::ProfileManager(ConfigManager& config_manager)
     : config_manager_(config_manager) {}
 
 std::vector<FilamentProfile> ProfileManager::listProfiles() const {
-    auto profiles = config_manager_.getProfiles();
-    std::vector<FilamentProfile> collapsed;
-    for (const auto& p : profiles) {
-        if (p.is_builtin) {
-            bool shadowed = false;
-            for (const auto& other : profiles) {
-                if (!other.is_builtin && other.id == p.id) {
-                    shadowed = true;
-                    break;
-                }
-            }
-            if (shadowed) continue;
-        }
-        collapsed.push_back(p);
-    }
-    return collapsed;
+    return config_manager_.getProfiles();
 }
 
 FilamentProfile ProfileManager::getProfile(const String& profile_id) const {
     return config_manager_.getProfile(profile_id);
 }
 
-bool ProfileManager::createProfile(FilamentProfile& profile) {
+bool ProfileManager::createProfile(const FilamentProfile& profile) {
     if (profile.id.isEmpty()) {
-        char buf[24];
-        snprintf(buf, sizeof(buf), "custom-%08lx", static_cast<unsigned long>(millis()));
-        profile.id = buf;
+        return false;
     }
-    profile.is_builtin = false;
     return config_manager_.addProfile(profile);
 }
 
@@ -110,10 +74,7 @@ bool ProfileManager::buildSessionFromRequest(const JsonObject& payload,
         session.target_humidity_pct = payload["target_humidity_pct"].as<float>();
     }
 
-    const bool has_humidity = !isnan(session.target_humidity_pct);
-    return ConfigManager::validateStartParams(session.target_temp_c, session.max_duration_min,
-                                              has_humidity ? session.target_humidity_pct : 15.0f,
-                                              has_humidity);
+    return session.target_temp_c > 0.0f && session.max_duration_min > 0;
 }
 
 }  // namespace filament_dryer

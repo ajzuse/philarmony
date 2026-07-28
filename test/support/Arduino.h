@@ -60,13 +60,6 @@ public:
 
     char operator[](size_t index) const { return data_[index]; }
 
-    int indexOf(const char* substr) const {
-        if (!substr) return -1;
-        const auto pos = data_.find(substr);
-        return pos == std::string::npos ? -1 : static_cast<int>(pos);
-    }
-    int indexOf(const String& substr) const { return indexOf(substr.c_str()); }
-
 private:
     std::string data_;
 };
@@ -99,15 +92,11 @@ inline void delay(unsigned long) {}
 #ifndef INPUT
 #define INPUT 0
 #define OUTPUT 1
-#define INPUT_PULLUP 2
-#define LOW 0
-#define HIGH 1
 #endif
 
 inline void pinMode(int, int) {}
 inline void digitalWrite(int, int) {}
-inline int digitalRead(int) { return HIGH; }
-inline void delayMicroseconds(unsigned int) {}
+inline int digitalRead(int) { return 0; }
 inline void ledcSetup(int, int, int) {}
 inline void ledcAttachPin(int, int) {}
 inline void ledcWrite(int, int) {}

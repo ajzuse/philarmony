@@ -45,8 +45,6 @@ bool NextionDisplay::begin(const JsonObject& config) {
     sendCmd("page " + page_prefix_);
 
     initialized_ = true;
-    Serial.printf("[Nextion] UART RX:%d TX:%d baud:%u initialized\n",
-                  rx_pin_, tx_pin_, baudrate_);
     return true;
 }
 
