@@ -24,6 +24,7 @@
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
+#include <ArduinoJson.h>
 
 namespace filament_dryer {
 
@@ -32,6 +33,8 @@ class LogManager;
 class HardwareConfigParser;
 class DriverRegistry;
 class WifiManager;
+class StateMachine;
+class PluginManager;
 
 class WebServer {
 public:
@@ -43,10 +46,13 @@ public:
     bool begin(ConfigManager* config_mgr, LogManager* log_mgr,
                HardwareConfigParser* hw_parser = nullptr,
                DriverRegistry* driver_registry = nullptr,
-               WifiManager* wifi_mgr = nullptr);
+               WifiManager* wifi_mgr = nullptr,
+               StateMachine* state_machine = nullptr);
 
     void attachWebSocket(AsyncWebSocket* ws);
     void setHardwareReloadCallback(HardwareReloadCallback cb) { hardware_reload_cb_ = cb; }
+    void setStateMachine(StateMachine* sm) { state_machine_ = sm; }
+    void setPluginManager(PluginManager* pm) { plugin_mgr_ = pm; }
     
     // Template for captive portal
     static const char* getCaptivePortalHTML();
@@ -60,6 +66,8 @@ private:
     HardwareConfigParser* hw_parser_ = nullptr;
     DriverRegistry* driver_registry_ = nullptr;
     WifiManager* wifi_mgr_ = nullptr;
+    StateMachine* state_machine_ = nullptr;
+    PluginManager* plugin_mgr_ = nullptr;
     HardwareReloadCallback hardware_reload_cb_ = nullptr;
     
     // Route handlers
@@ -68,10 +76,12 @@ private:
     void handleRoot(AsyncWebServerRequest* request);
     void handleInfo(AsyncWebServerRequest* request);
     void handleWifiConfigPost(AsyncWebServerRequest* request);
+    void handleWifiConfigApply(AsyncWebServerRequest* request, const String& ssid, const String& password);
     void handleLogDownload(AsyncWebServerRequest* request, bool drying_log);
     void handleHardwareConfigGet(AsyncWebServerRequest* request);
     void handleHardwareConfigPostBody(AsyncWebServerRequest* request, const String& body);
     void handleNotFound(AsyncWebServerRequest* request);
+    void buildKlipperHardwareConfig(JsonObject& root);
     
     // Helpers
     void sendJson(AsyncWebServerRequest* request, int code, const String& json);

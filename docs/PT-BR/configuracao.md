@@ -18,14 +18,3 @@ Schema igual ao contrato EN-US / `contracts/config-schema.json`: arrays `sensors
 ## Perfis
 
 Built-ins: pla, petg, abs, tpu, nylon. Até 20 custom. Faixas: 30–80 °C, 1–1440 min, umidade 5–50%.
-
-## Build / flash (Makefile)
-
-Comandos preferidos no host (ver `specs/001-filament-dryer-esp32/contracts/makefile-targets.md`):
-
-```bash
-make build
-make test
-make flash PORT=/dev/ttyUSB0   # precisa de ESP32 conectada; aliases: upload, install
-make help
-```

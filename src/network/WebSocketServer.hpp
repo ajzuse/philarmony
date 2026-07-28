@@ -37,11 +37,13 @@ class HardwareConfigParser;
 class DriverRegistry;
 class ProfileManager;
 class ControlEngine;
+class PluginManager;
 
 class WebSocketServer {
 public:
     using HardwareReloadCallback = void(*)();
     using ActuatorCutoffCallback = void(*)();
+    using SafetyRefreshCallback = void(*)();
 
     WebSocketServer(uint16_t port = 80, const char* path = "/ws");
     ~WebSocketServer();
@@ -56,6 +58,8 @@ public:
 
     void setHardwareReloadCallback(HardwareReloadCallback cb) { hardware_reload_cb_ = cb; }
     void setActuatorCutoffCallback(ActuatorCutoffCallback cb) { actuator_cutoff_cb_ = cb; }
+    void setSafetyRefreshCallback(SafetyRefreshCallback cb) { safety_refresh_cb_ = cb; }
+    void setPluginManager(PluginManager* pm) { plugin_mgr_ = pm; }
     void setPidCalibrateCallbacks(PidAutotuneController::ProgressCallback progress,
                                   PidAutotuneController::CompleteCallback complete) {
         pid_progress_cb_ = progress;
@@ -90,8 +94,10 @@ private:
     DriverRegistry* driver_registry_ = nullptr;
     ProfileManager* profile_mgr_ = nullptr;
     ControlEngine* control_engine_ = nullptr;
+    PluginManager* plugin_mgr_ = nullptr;
     HardwareReloadCallback hardware_reload_cb_ = nullptr;
     ActuatorCutoffCallback actuator_cutoff_cb_ = nullptr;
+    SafetyRefreshCallback safety_refresh_cb_ = nullptr;
     PidAutotuneController::ProgressCallback pid_progress_cb_ = nullptr;
     PidAutotuneController::CompleteCallback pid_complete_cb_ = nullptr;
     

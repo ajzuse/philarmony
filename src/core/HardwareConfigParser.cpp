@@ -256,6 +256,9 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseActuators(cons
             }
             if (!safety.isNull()) {
                 config.heater_max_power_pct = safety["max_power_pct"] | config.heater_max_power_pct;
+                if (safety.containsKey("max_temp_c")) {
+                    config.heater_max_temp_c = safety["max_temp_c"] | config.heater_max_temp_c;
+                }
             }
         }
         if (role == "fan") {
@@ -267,6 +270,27 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseActuators(cons
             if (!control.isNull()) {
                 config.fan_pwm_freq = control["pwm_freq_hz"] | config.fan_pwm_freq;
                 config.cooldown_duration_sec = control["cooldown_sec"] | config.cooldown_duration_sec;
+                if (control.containsKey("speed_pct")) {
+                    config.fan_duty_pct = control["speed_pct"] | config.fan_duty_pct;
+                }
+                if (control.containsKey("speed_curve") && control["speed_curve"].is<JsonArray>()) {
+                    config.fan_speed_curve.clear();
+                    for (JsonVariant point : control["speed_curve"].as<JsonArray>()) {
+                        FanCurvePoint pt;
+                        if (point.is<JsonObject>()) {
+                            JsonObject obj = point.as<JsonObject>();
+                            pt.temp_c = obj["temp_c"] | 0.0f;
+                            pt.power_pct = obj["power_pct"] | obj["pct"] | 80.0f;
+                        } else {
+                            pt.temp_c = 0.0f;
+                            pt.power_pct = point.as<float>();
+                        }
+                        config.fan_speed_curve.push_back(pt);
+                    }
+                    if (!config.fan_speed_curve.empty() && !control.containsKey("speed_pct")) {
+                        config.fan_duty_pct = config.fan_speed_curve.front().power_pct;
+                    }
+                }
             }
             if (config.fan_type == "shared_mosfet") {
                 config.fan_mode = "shared_mosfet";
@@ -314,6 +338,9 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseDisplay(const 
     config.dc_pin = display["dc_pin"] | -1;
     config.rst_pin = display["rst_pin"] | -1;
     config.backlight_pin = display["backlight_pin"] | -1;
+    config.i2c_sda = display["sda_pin"] | display["i2c_sda"] | config.i2c_sda;
+    config.i2c_scl = display["scl_pin"] | display["i2c_scl"] | config.i2c_scl;
+    config.i2c_address = display["i2c_address"] | display["address"] | config.i2c_address;
 
     // Nested bus object (spec / websocket-api schema)
     if (display["bus"].is<JsonObject>()) {
@@ -325,10 +352,9 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseDisplay(const 
         config.dc_pin = bus["dc"] | bus["dc_pin"] | config.dc_pin;
         config.rst_pin = bus["rst"] | bus["rst_pin"] | config.rst_pin;
         config.backlight_pin = bus["bl"] | bus["backlight"] | bus["backlight_pin"] | config.backlight_pin;
-        if (bus["sda_pin"].is<int>()) {
-            // I2C pins stored via existing sda/scl conventions on display drivers via flat keys if needed
-            (void)bus;
-        }
+        config.i2c_sda = bus["sda"] | bus["sda_pin"] | config.i2c_sda;
+        config.i2c_scl = bus["scl"] | bus["scl_pin"] | config.i2c_scl;
+        config.i2c_address = bus["address"] | config.i2c_address;
     }
 
     // Nested geometry object
@@ -368,6 +394,18 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseDisplay(const 
             if (config.refresh_rate_hz < 1) config.refresh_rate_hz = 1;
             if (config.refresh_rate_hz > 5) config.refresh_rate_hz = 5;
         }
+        if (layout.containsKey("font_scaling")) {
+            config.font_scaling = layout["font_scaling"].as<String>();
+        }
+        if (layout.containsKey("compact_mode")) {
+            config.compact_mode = layout["compact_mode"] | false;
+        }
+    }
+    if (display.containsKey("font_scaling")) {
+        config.font_scaling = display["font_scaling"].as<String>();
+    }
+    if (display.containsKey("compact_mode")) {
+        config.compact_mode = display["compact_mode"] | config.compact_mode;
     }
 
     auto display_result = validateDisplay(display);
@@ -389,6 +427,9 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseControl(const 
     ValidationResult result;
 
     config.algorithm = control["algorithm"] | "pid";
+    if (config.algorithm == "custom") {
+        addError(result, "custom algorithm requires registered factory");
+    }
     config.auto_tune = control["auto_tune"] | false;
 
     if (control.containsKey("parameters")) {
@@ -517,7 +558,9 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::validateActuator(co
         addError(result, "Actuator missing required 'type' field");
     } else {
         String type = actuator["type"].as<String>();
-        if (!isValidActuatorType(type)) {
+        if (type == "triac") {
+            addError(result, "Actuator type 'triac' is not supported (rejected; no driver)");
+        } else if (!isValidActuatorType(type)) {
             addError(result, "Unknown actuator type: " + type);
         }
     }
@@ -539,8 +582,9 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::validateActuator(co
             addError(result, "Actuator pins missing required 'pwm' pin");
         } else {
             int pwm_pin = pins["pwm"].as<int>();
-            if (!isValidGPIOPin(pwm_pin)) {
-                addError(result, "Invalid PWM pin: " + String(pwm_pin));
+            if (!isValidOutputGPIOPin(pwm_pin)) {
+                addError(result, "Invalid PWM output pin: " + String(pwm_pin) +
+                         " (GPIO 34-39 are input-only)");
             }
         }
     }
@@ -550,7 +594,9 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::validateActuator(co
     } else {
         JsonObject control = actuator["control"].as<JsonObject>();
         String algorithm = control["algorithm"] | "pid";
-        if (!isValidControlAlgorithm(algorithm)) {
+        if (algorithm == "custom") {
+            addError(result, "custom algorithm requires registered factory");
+        } else if (!isValidControlAlgorithm(algorithm)) {
             addError(result, "Unknown control algorithm: " + algorithm);
         }
 
@@ -597,7 +643,12 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::validateDisplay(con
     }
 
     String bus_type = display["bus_type"] | "i2c";
-    if (!isValidBusType(bus_type)) {
+    if (display["bus"].is<JsonObject>()) {
+        bus_type = display["bus"]["type"] | bus_type;
+    }
+    if (bus_type == "parallel_8bit") {
+        addError(result, "Display bus type 'parallel_8bit' is not supported (rejected; no driver)");
+    } else if (!isValidBusType(bus_type)) {
         addError(result, "Invalid display bus type: " + bus_type);
     }
 
@@ -617,17 +668,38 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::validateDisplay(con
         int pins[] = {display["spi_mosi"] | -1, display["spi_sclk"] | -1, 
                       display["spi_cs"] | -1, display["dc_pin"] | -1, 
                       display["rst_pin"] | -1, display["backlight_pin"] | -1};
+        if (display["bus"].is<JsonObject>()) {
+            JsonObject bus = display["bus"].as<JsonObject>();
+            pins[0] = bus["mosi"] | bus["mosi_pin"] | pins[0];
+            pins[1] = bus["sclk"] | bus["sclk_pin"] | pins[1];
+            pins[2] = bus["cs"] | bus["cs_pin"] | pins[2];
+            pins[3] = bus["dc"] | bus["dc_pin"] | pins[3];
+            pins[4] = bus["rst"] | bus["rst_pin"] | pins[4];
+            pins[5] = bus["bl"] | bus["backlight"] | bus["backlight_pin"] | pins[5];
+        }
         const char* names[] = {"MOSI", "SCLK", "CS", "DC", "RST", "BL"};
         for (int i = 0; i < 6; i++) {
-            if (pins[i] >= 0 && !isValidGPIOPin(pins[i])) {
-                addError(result, "Invalid SPI " + String(names[i]) + " pin: " + String(pins[i]));
+            if (pins[i] >= 0 && !isValidOutputGPIOPin(pins[i])) {
+                addError(result, "Invalid SPI " + String(names[i]) + " output pin: " + String(pins[i]) +
+                         " (GPIO 34-39 are input-only)");
             }
         }
     } else if (bus_type == "i2c") {
-        int sda = display["sda_pin"] | 21;
-        int scl = display["scl_pin"] | 22;
-        if (!isValidGPIOPin(sda)) addError(result, "Invalid I2C SDA pin: " + String(sda));
-        if (!isValidGPIOPin(scl)) addError(result, "Invalid I2C SCL pin: " + String(scl));
+        int sda = display["sda_pin"] | display["i2c_sda"] | 21;
+        int scl = display["scl_pin"] | display["i2c_scl"] | 22;
+        if (display["bus"].is<JsonObject>()) {
+            JsonObject bus = display["bus"].as<JsonObject>();
+            sda = bus["sda"] | bus["sda_pin"] | sda;
+            scl = bus["scl"] | bus["scl_pin"] | scl;
+        }
+        if (!isValidOutputGPIOPin(sda)) {
+            addError(result, "Invalid I2C SDA output pin: " + String(sda) +
+                     " (GPIO 34-39 are input-only)");
+        }
+        if (!isValidOutputGPIOPin(scl)) {
+            addError(result, "Invalid I2C SCL output pin: " + String(scl) +
+                     " (GPIO 34-39 are input-only)");
+        }
     }
 
     return result;
@@ -637,7 +709,9 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::validateControl(con
     ValidationResult result;
 
     String algorithm = control["algorithm"] | "pid";
-    if (!isValidControlAlgorithm(algorithm)) {
+    if (algorithm == "custom") {
+        addError(result, "custom algorithm requires registered factory");
+    } else if (!isValidControlAlgorithm(algorithm)) {
         addError(result, "Unknown control algorithm: " + algorithm);
     }
 
@@ -700,8 +774,13 @@ bool HardwareConfigParser::isValidBusType(const String& type) const {
 }
 
 bool HardwareConfigParser::isValidGPIOPin(int pin) const {
-    // ESP32 valid GPIO pins: 0-39 (some are input-only: 34-39)
+    // ESP32 valid GPIO pins for sensors/ADC: 0-39 (includes input-only 34-39)
     return pin >= 0 && pin <= 39;
+}
+
+bool HardwareConfigParser::isValidOutputGPIOPin(int pin) const {
+    // Output-capable GPIOs exclude input-only pins 34-39
+    return pin >= 0 && pin <= 33;
 }
 
 bool HardwareConfigParser::isValidI2CAddress(int address) const {
@@ -713,6 +792,7 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::checkPinConflicts(c
                                                                                const DisplayConfig& display) {
     ValidationResult result;
     std::map<int, String> pin_usage;
+    std::map<int, String> i2c_addresses;
 
     auto claim = [&](int pin, const String& owner) {
         if (pin < 0) return;
@@ -724,26 +804,60 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::checkPinConflicts(c
         }
     };
 
+    // I2C bus lines may be shared by multiple devices; only conflict with non-I2C claims
+    auto claimI2cBusPin = [&](int pin, const String& owner) {
+        if (pin < 0) return;
+        auto it = pin_usage.find(pin);
+        if (it != pin_usage.end() && it->second != owner) {
+            const String& prev = it->second;
+            const bool prev_i2c = prev.indexOf(".sda") >= 0 || prev.indexOf(".scl") >= 0;
+            if (prev_i2c) {
+                return;  // shared I2C bus is OK
+            }
+            addError(result, "GPIO " + String(pin) + " conflict: " + prev + " vs " + owner);
+        } else {
+            pin_usage[pin] = owner;
+        }
+    };
+
+    auto claimI2cAddress = [&](int address, const String& owner) {
+        if (address <= 0) return;
+        auto it = i2c_addresses.find(address);
+        if (it != i2c_addresses.end() && it->second != owner) {
+            char hexbuf[8];
+            snprintf(hexbuf, sizeof(hexbuf), "%02X", address);
+            addError(result, String("I2C address 0x") + hexbuf +
+                     " conflict: " + it->second + " vs " + owner);
+        } else {
+            i2c_addresses[address] = owner;
+        }
+    };
+
     auto isI2cSensor = [](const String& t) {
         return t == "sht3x" || t == "sht30" || t == "sht31" || t == "aht20" ||
-               t == "bme280" || t == "bmp280";
+               t == "aht10" || t == "bme280" || t == "bmp280";
     };
 
     if (isI2cSensor(sensor.type)) {
-        claim(sensor.sda_pin, "sensor.sda");
-        claim(sensor.scl_pin, "sensor.scl");
+        claimI2cBusPin(sensor.sda_pin, "sensor.sda");
+        claimI2cBusPin(sensor.scl_pin, "sensor.scl");
+        claimI2cAddress(sensor.i2c_address, "sensor");
     } else {
         claim(sensor.gpio_pin, "sensor.gpio");
     }
     if (!sensor.is_integrated && !sensor.humidity_type.isEmpty()) {
         if (isI2cSensor(sensor.humidity_type)) {
-            claim(sensor.humidity_sda_pin, "humidity.sda");
-            claim(sensor.humidity_scl_pin, "humidity.scl");
+            claimI2cBusPin(sensor.humidity_sda_pin, "humidity.sda");
+            claimI2cBusPin(sensor.humidity_scl_pin, "humidity.scl");
+            claimI2cAddress(sensor.humidity_i2c_address, "humidity");
         } else {
             claim(sensor.humidity_gpio_pin, "humidity.gpio");
         }
     }
     claim(sensor.extra_temp_gpio_pin, "extra_temp.gpio");
+    if (sensor.extra_temp_i2c_address > 0) {
+        claimI2cAddress(sensor.extra_temp_i2c_address, "extra_temp");
+    }
 
     claim(actuator.heater_pin, "heater");
     if (actuator.fan_mode != "shared_mosfet" && actuator.fan_type != "shared_mosfet") {
@@ -761,6 +875,10 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::checkPinConflicts(c
             claim(display.dc_pin, "display.dc");
             claim(display.rst_pin, "display.rst");
             claim(display.backlight_pin, "display.bl");
+        } else if (display.bus_type == "i2c") {
+            claimI2cBusPin(display.i2c_sda, "display.sda");
+            claimI2cBusPin(display.i2c_scl, "display.scl");
+            claimI2cAddress(display.i2c_address, "display");
         }
     }
 

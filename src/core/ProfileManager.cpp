@@ -26,7 +26,22 @@ ProfileManager::ProfileManager(ConfigManager& config_manager)
     : config_manager_(config_manager) {}
 
 std::vector<FilamentProfile> ProfileManager::listProfiles() const {
-    return config_manager_.getProfiles();
+    auto profiles = config_manager_.getProfiles();
+    std::vector<FilamentProfile> collapsed;
+    for (const auto& p : profiles) {
+        if (p.is_builtin) {
+            bool shadowed = false;
+            for (const auto& other : profiles) {
+                if (!other.is_builtin && other.id == p.id) {
+                    shadowed = true;
+                    break;
+                }
+            }
+            if (shadowed) continue;
+        }
+        collapsed.push_back(p);
+    }
+    return collapsed;
 }
 
 FilamentProfile ProfileManager::getProfile(const String& profile_id) const {

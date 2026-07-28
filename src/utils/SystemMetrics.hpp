@@ -55,10 +55,11 @@ private:
     uint32_t sample_interval_ms_ = 1000;
     uint32_t last_update_ms_ = 0;
     
-    // CPU measurement (using FreeRTOS run time stats if available)
+    // CPU measurement (run-time stats if enabled, else idle/tick hooks)
     float cpu_usage_pct_ = 0.0f;
     uint32_t last_idle_time_ = 0;
     uint32_t last_total_time_ = 0;
+    bool hooks_registered_ = false;
     
     // Memory metrics
     uint32_t free_heap_bytes_ = 0;

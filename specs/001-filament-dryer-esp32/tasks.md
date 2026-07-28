@@ -322,3 +322,74 @@ Add US2 (Control & Telemetry) -> Add US3 (Safety Engine & Logs) -> Add US4 (Disp
 - [x] T110 Fail-fast STA connect so hotspot activation meets the SC-01 <5s target when credentials are missing or invalid in src/network/WifiManager.cpp per SC-01 (partial)
 - [x] T111 Remove unrequested stale *.bak source copies under src/ per unrequested cleanup (unrequested)
 - [x] T112 Reconcile partitions.csv dual-OTA layout with spec OTA out-of-scope (single-app partition or documented intentional reserve) per plan: out-of-scope OTA (unrequested)
+
+## Phase 18: Convergence
+
+- [x] T113 CRITICAL Sync README.md progress (Firmware Core), WebSocket topic list (drop phantom `config/sensors`), and repository tree to match the live firmware per Constitution: Documentação Sincronizada (contradicts)
+- [x] T114 CRITICAL Replace blocking `delay(2000)` splash waits (and related init delays) in display drivers under src/drivers/display/ with non-blocking millis-based timing per Constitution: Desempenho Máximo e Eficiência (contradicts)
+- [x] T115 CRITICAL Honor sensor disconnect timeout (`sensor_timeout_ms`) during drying instead of immediately aborting on first invalid reading in src/main.cpp so status reports error and drying continues under SafetyEngine limits per Edge Case sensor read failure and FR-011 (contradicts)
+- [x] T116 Wire ControlEngine so `algorithm: "custom"` resolves via registered plugin/DriverRegistry factory, or reject `custom` at parse until then, in src/control/ControlEngine.cpp and HardwareConfigParser per FR-010 (missing)
+- [x] T117 Implement real SPI bus recovery (re-init bus/display) in SafetyEngine::detectAndRecoverSpiBusError and invoke it from SPI driver failure paths before faulting per FR-011 (missing)
+- [x] T118 Implement real actuator fault feedback (current sense or open-loop detect) so ACTUATOR_FAULT is not stubbed via commanded==measured and e-stop-as-overcurrent in SafetyEngine and actuator drivers per FR-011 (partial)
+- [x] T119 Map per-actuator `safety_limits` (at least `max_temp_c` / max power) into SafetyEngine on boot and reload, and enforce max heater power in the safety path, in HardwareConfigParser and main.cpp per FR-005 and FR-011 (partial)
+- [x] T120 Expand docs/PT-BR and docs/EN-US with full API payload examples, architecture detail, and configuration docs required by Constitution Language Support (partial)
+- [x] T121 Broadcast 1Hz `status/update` during COOLDOWN (heater 0%, fan on, status COOLDOWN) instead of skipping `broadcastTelemetry` in src/main.cpp per FR-005 and FR-006 (partial)
+- [x] T122 Call `displayManager.end()` on hardware hot-reload when display is disabled or removed in src/main.cpp teardown/initializeDisplays per FR-003 and FR-004 (partial)
+- [x] T123 Persist and apply `layout.font_scaling` through DisplayConfig, HardwareConfigParser, and config/display handling per FR-004 (missing)
+- [x] T124 Align DisplayManager auto-layout field names with the status stream (`memory_free_bytes` not `free_heap_bytes`) and include uptime/actuator boolean fields in default field sets per FR-007 (contradicts)
+- [x] T125 After `config/control` persist, refresh SafetyEngine from `control.safety_limits` (same path as hardware reload) in WebSocketServer/main.cpp per FR-005 (partial)
+- [x] T126 Persist I2C display bus pins/address, include them in pin/bus conflict checks, and detect I2C address clashes in HardwareConfigParser per FR-003 (partial)
+- [x] T127 Apply PID autotune results to the current algorithm when it exposes PID-like params instead of always forcing `setAlgorithm("pid")` in src/main.cpp per FR-010 (partial)
+- [x] T128 Collapse `config/profiles/list` so an overridden builtin ID appears once (custom shadows builtin) in ConfigManager/WebSocketServer per FR-008 (partial)
+- [x] T129 Dispatch unmatched WebSocket topics and HTTP paths through PluginManager extension hooks in WebSocketServer/WebServer per plan: plugin architecture (partial)
+- [x] T130 Allow `control/stop` during COOLDOWN to cancel cooldown, cut fan/heater, and mark STOPPED in WebSocketServer/main.cpp per FR-005 (partial)
+- [x] T131 Parse/persist fan `speed_curve` and use it when commanding fan power instead of a fixed duty in FanActuator/main.cpp per FR-003 (missing)
+- [x] T132 Align HardwareConfigParser allowed sensor type identifiers with DriverRegistry factories (aliases or reject unknowns; include `sht31`) per FR-003 (partial)
+- [x] T133 Align `status/pid_calibrate` completion payload with contract (`status: "complete"`, set `saved_to_nvs` only after successful NVS write) in src/main.cpp per FR-009 and plan: websocket contract (contradicts)
+- [x] T134 Use a sensor-oriented fault code for rate-of-change validation failures instead of ACTUATOR_FAULT in SafetyEngine::validateSensorReading per FR-011 (partial)
+
+## Phase 19: Convergence
+
+> **Anti-regression (read before implement/converge):** Open Phase 18 tasks **T113–T134** already track prior gaps — do **not** re-list or re-implement them under new IDs. Mark any Phase 18/19 task `[x]` only when **all Done-When** criteria pass. Next `/speckit-converge` must treat unchecked open tasks as in-progress coverage (not new findings). Gaps below are **net-new** only.
+
+### Phase 18 Done-When reference (do not create new IDs)
+
+- **T113**: README Firmware Core progress reflects implemented firmware (not 0%/AGUARDANDO); topic list has no phantom `config/sensors`; repo tree matches live `src/`/`test/`/`docs/`.
+- **T114**: No `delay(` splash/init waits on display driver begin paths; splash uses millis state or is removed from critical path.
+- **T115**: First invalid sensor sample does **not** call `stopDrying`; heater limited/cut only after `sensor_timeout_ms`; status can report sensor error while session continues until timeout/fault.
+- **T116**: `algorithm:"custom"` either loads via registered factory **or** is rejected at parse with clear error (no silent accept-then-fail).
+- **T117**: `detectAndRecoverSpiBusError` attempts bus/display re-init; faults only if recovery fails; called from SPI I/O failure paths.
+- **T118**: `ACTUATOR_FAULT` requires real feedback (sense pin / open-loop heuristic that can trip); commanded==measured alone must not be the only check; e-stop must not count as overcurrent.
+- **T119**: Actuator `safety_limits.max_temp_c` / max power applied into `SafetyEngine` on boot+reload; safety path enforces max heater power.
+- **T120**: `docs/PT-BR` + `docs/EN-US` include API payloads/examples, architecture, and configuration (not stubs).
+- **T121**: During COOLDOWN, subscribed clients receive 1Hz `status/update` with heater 0%, fan on, status reflecting cooldown.
+- **T122**: `enabled:false` or missing display on reload calls `displayManager.end()`; no stale driver left active.
+- **T123**: `font_scaling` round-trips via DisplayConfig NVS + `config/display` + hardware layout parse into DisplayManager.
+- **T124**: Auto-layout uses `memory_free_bytes` (not `free_heap_bytes`); default fields include uptime + actuator on/off where resolution allows.
+- **T125**: After `config/control` save, `SafetyEngine` limits match payload without requiring hardware reload/reboot.
+- **T126**: I2C display SDA/SCL/address persisted, claimed in pin conflicts, address clashes detected.
+- **T127**: Autotune success updates current algo PID-like params when applicable; does not unconditionally `setAlgorithm("pid")`.
+- **T128**: `config/profiles/list` returns one effective profile per ID when custom shadows builtin.
+- **T129**: Unmatched WS topics / HTTP paths invoke PluginManager hooks when registered.
+- **T130**: `control/stop` in COOLDOWN cancels cooldown, cuts actuators, reaches STOPPED.
+- **T131**: Fan `speed_curve` parsed/persisted and used for commanded fan power when present.
+- **T132**: Parser allowed sensor types ≡ DriverRegistry factories (aliases or reject); `sht31` accepted if registered.
+- **T133**: Completion broadcast `status:"complete"`; `saved_to_nvs:true` only after successful NVS write.
+- **T134**: Excessive RoC uses sensor-oriented fault code (not `ACTUATOR_FAULT`).
+
+### Net-new gaps
+
+- [x] T135 CRITICAL Reject `config/hardware` and HTTP `POST /api/hardware/config` reload while state is DRYING or COOLDOWN (return clear error; do not call `teardownDrivers`), or emergency-stop then reload — Done-When: reload during drying never tears down live heaters without e-stop; covered by native/flow assertion — per FR-003 hot-reload-where-possible and FR-011 / Constitution: Failsafe (missing)
+- [x] T136 Align WebSocket envelope with `contracts/websocket-api.md`: `sendError` payload key `error` (not only `message`); `config/hardware` ack topic `config/hardware/response` with `status:"saved"` — Done-When: contract examples match captured WS frames for error + hardware save — per plan: websocket contract (contradicts)
+- [x] T137 Emit `status/update.status` as contract/data-model lowercase values (`drying`, `cooldown`, `stopped`, `fault_stopped`, `ready`/`idle` as documented) instead of raw `DRYING`/`READY` enums — Done-When: status stream + display status field use the same lowercase vocabulary; COOLDOWN included — per FR-006 and plan: websocket/data-model contract (contradicts)
+- [x] T138 Make `GET /api/hardware/config` round-trip the same Klipper-style schema as WS `config/hardware` (`sensors[]`, `actuators[]`, nested display bus/geometry/layout, control) instead of legacy flat `sensor`/`actuator` — Done-When: GET body can be POSTed back successfully — per plan: http-api contract and FR-003 (contradicts)
+- [x] T139 Align HTTP WiFi/info/log contract: `POST /api/wifi/config` accepts form **or JSON** and returns `{status,message}` per http-api; `GET /api/info` includes `active_feature`; log downloads send `text/plain; charset=utf-8` + `Content-Disposition: attachment` — Done-When: responses match `contracts/http-api.md` examples — per plan: http-api contract (partial)
+- [x] T140 CRITICAL Fix `SystemMetrics::update` so `cpu_usage_pct` is not ~0 (enable/use FreeRTOS run-time stats or idle-task sampling); expose non-zero under load in status stream — Done-When: host or firmware test shows cpu_usage_pct responds to load; heap path unchanged — per FR-006 NFR metrics and T010 false-complete (contradicts)
+- [x] T141 Reject ESP32 input-only GPIOs 34–39 (and other non-output-capable pins) for actuator PWM/digital outputs and display CS/DC/RST/BL in `HardwareConfigParser::isValidGPIOPin` / actuator validation — Done-When: config with heater PWM on 34 fails validation with clear error; valid output pins still accepted — per FR-003 valid GPIO ranges (missing)
+- [x] T142 Add instrumented native/flow tests asserting Success Criteria timing bounds: hotspot/AP-ready fail-fast &lt;5s (SC-01), safety cutoff sensor→heater-off &lt;100ms (SC safety), status interval 1Hz ±100ms — Done-When: `pio test -e native` fails if bounds violated — per Spec Success Criteria and Constitution: Teste Automatizado (missing)
+- [x] T143 Emit `logs/stream` with `target_log: "drying"|"system"` per websocket contract (keep `drying` bool only as optional alias) — Done-When: contract §2.3 field present on every log frame — per plan: websocket contract (contradicts)
+- [x] T144 Align profile WS payloads with contract: get wraps `{profile:{…}}`; create/update ack `{status:"created"|"updated", profile_id}`; list/get include `created_at`/`updated_at` for custom profiles — Done-When: frames match `contracts/websocket-api.md` §2.7 — per FR-008 (partial)
+- [x] T145 Persist and apply `layout.compact_mode` through DisplayConfig + HardwareConfigParser + `config/display` (alongside T123 font_scaling) — Done-When: compact_mode survives reboot and affects render payload — per FR-004 and data-model layout (missing)
+- [x] T146 Resolve research/DEC-003 `triac` and display `parallel_8bit`: either register factories + parser support, or reject unknown types at parse and update shared-memory catalog/DEC-003 to match shipped matrix — Done-When: no accepted-but-unloadable type remains — per FR-003 and Constitution: Memória Compartilhada (partial)
+- [x] T147 Assign monotonic `DryingSession.session_id` (&gt;0) on `startDrying` and include `session_id` + `stop_reason` on `status/update` when a session is active/recent — Done-When: data-model fields appear in telemetry; session_id increments per start — per plan: data-model and FR-006 (missing)
+- [x] T148 Make captive-portal detection endpoints (`/generate_204`, `/fwlink`, `/hotspot-detect.html`, `/ncsi.txt`, `/connecttest.txt`) **redirect** to `/` per http-api §3 instead of returning 200 HTML inline — Done-When: those routes respond with redirect to captive root — per FR-001 and plan: http-api contract (partial)

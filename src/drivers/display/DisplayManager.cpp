@@ -114,7 +114,7 @@ void DisplayManager::setLayout(const JsonObject& layout_config) {
         String fs = layout_config["font_scaling"].as<String>();
         if      (fs == "tiny")   layout_.font_scaling = FontScaling::TINY;
         else if (fs == "small")  layout_.font_scaling = FontScaling::SMALL;
-        else if (fs == "normal") layout_.font_scaling = FontScaling::NORMAL;
+        else if (fs == "medium" || fs == "normal") layout_.font_scaling = FontScaling::NORMAL;
         else if (fs == "large")  layout_.font_scaling = FontScaling::LARGE;
         else                     layout_.font_scaling = FontScaling::AUTO;
     }
@@ -216,8 +216,9 @@ void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
     const std::vector<String> all_fields = {
         "chamber_temp_c", "target_temp_c", "humidity_pct",
         "target_humidity_pct", "heater_power_pct", "exhaust_fan_power_pct",
-        "status", "elapsed_time_sec", "remaining_time_sec",
-        "cpu_usage_pct", "free_heap_bytes"
+        "heater_on", "exhaust_fan_on", "status",
+        "elapsed_time_sec", "remaining_time_sec", "uptime_sec",
+        "cpu_usage_pct", "memory_free_bytes"
     };
 
     // ---- Character LCD (HD44780) ----
@@ -227,7 +228,7 @@ void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
             // 20x4: show 6 fields
             layout_.fields = {"chamber_temp_c", "target_temp_c",
                                "humidity_pct", "heater_power_pct",
-                               "exhaust_fan_power_pct", "status"};
+                               "heater_on", "status"};
         } else {
             // 16x2: show 3 fields
             layout_.fields = {"chamber_temp_c", "heater_power_pct", "status"};
@@ -250,7 +251,8 @@ void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
         // Standard 128x64 OLED (SSD1306, SH1106)
         layout_.fields       = {"chamber_temp_c", "target_temp_c",
                                  "humidity_pct",   "heater_power_pct",
-                                 "status",         "elapsed_time_sec"};
+                                 "heater_on",      "status",
+                                 "elapsed_time_sec"};
         layout_.font_scaling = FontScaling::SMALL;
         layout_.compact_mode = false;
 
@@ -258,8 +260,9 @@ void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
         // Small TFT (ST7789 135x240, ST7735 128x160)
         layout_.fields       = {"chamber_temp_c", "target_temp_c",
                                  "humidity_pct",   "heater_power_pct",
-                                 "exhaust_fan_power_pct", "status",
-                                 "elapsed_time_sec"};
+                                 "exhaust_fan_power_pct", "heater_on",
+                                 "exhaust_fan_on", "status",
+                                 "elapsed_time_sec", "uptime_sec"};
         layout_.font_scaling = FontScaling::SMALL;
         layout_.compact_mode = false;
 
@@ -267,7 +270,7 @@ void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
         // Round TFT (GC9A01 240x240)
         layout_.fields       = {"chamber_temp_c", "target_temp_c",
                                  "humidity_pct",   "heater_power_pct",
-                                 "status"};
+                                 "heater_on", "exhaust_fan_on", "status"};
         layout_.font_scaling = FontScaling::NORMAL;
         layout_.compact_mode = false;
 

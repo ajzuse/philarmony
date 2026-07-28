@@ -34,6 +34,7 @@ enum class FaultCode {
     I2C_BUS_LOCKUP,
     SPI_BUS_ERROR,
     ACTUATOR_FAULT,
+    SENSOR_RATE_OF_CHANGE,
     NVS_CORRUPT,
     WATCHDOG_RESET
 };
@@ -67,9 +68,14 @@ public:
 
     bool validateSensorReading(float chamber_temp, uint32_t now_ms);
     bool detectAndRecoverI2CBusLockup();
+    using SpiRecoveryCallback = bool(*)();
+    void setSpiRecoveryCallback(SpiRecoveryCallback cb) { spi_recovery_cb_ = cb; }
+
     bool detectAndRecoverSpiBusError(bool bus_error);
+    // measured_from_feedback: only compare commanded vs measured when true (real sense/open-loop).
+    // overcurrent: only from current-sense or open-loop trip — never from emergency-stop flag.
     bool checkActuatorFault(float commanded_power_pct, float measured_power_pct,
-                            bool overcurrent = false);
+                            bool overcurrent = false, bool measured_from_feedback = false);
 
     void emergencyStop(FaultCode fault, const String& message);
 
@@ -110,11 +116,13 @@ private:
 
     float last_validated_temp_ = NAN;
     uint32_t last_validated_temp_ms_ = 0;
+    bool has_last_validated_temp_ = false;
 
     bool watchdog_active_ = false;
     bool watchdog_task_attached_ = false;
     FaultCallback fault_cb_ = nullptr;
     EmergencyShutdownCallback emergency_cb_ = nullptr;
+    SpiRecoveryCallback spi_recovery_cb_ = nullptr;
 
     void triggerFault(FaultCode fault, const String& message);
     void executeEmergencyShutdown();

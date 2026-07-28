@@ -168,14 +168,29 @@ ActuatorConfig ConfigManager::getActuatorConfig() const {
             config.heater_pin = doc["heater_pin"] | 25;
             config.heater_pwm_freq = doc["heater_pwm_freq"] | 1000;
             config.heater_max_power_pct = doc["heater_max_power_pct"] | 100;
+            config.heater_max_temp_c = doc["heater_max_temp_c"] | 0.0f;
             config.fan_type = doc["fan_type"] | "fan_pwm";
             config.fan_mode = doc["fan_mode"] | "independent_pwm";
             config.fan_pin = doc["fan_pin"] | 26;
             config.fan_pwm_freq = doc["fan_pwm_freq"] | 5000;
+            config.fan_duty_pct = doc["fan_duty_pct"] | 80.0f;
             config.cooldown_duration_sec = doc["cooldown_duration_sec"] | 30;
             config.has_custom = doc["has_custom"] | false;
             config.custom_type = doc["custom_type"] | "";
             config.custom_pin = doc["custom_pin"] | -1;
+            config.fan_speed_curve.clear();
+            if (doc["fan_speed_curve"].is<JsonArray>()) {
+                for (JsonVariant v : doc["fan_speed_curve"].as<JsonArray>()) {
+                    FanCurvePoint pt;
+                    if (v.is<JsonObject>()) {
+                        pt.temp_c = v["temp_c"] | 0.0f;
+                        pt.power_pct = v["power_pct"] | 80.0f;
+                    } else {
+                        pt.power_pct = v.as<float>();
+                    }
+                    config.fan_speed_curve.push_back(pt);
+                }
+            }
         }
     }
     return config;
@@ -189,14 +204,22 @@ void ConfigManager::setActuatorConfig(const ActuatorConfig& config) {
     doc["heater_pin"] = config.heater_pin;
     doc["heater_pwm_freq"] = config.heater_pwm_freq;
     doc["heater_max_power_pct"] = config.heater_max_power_pct;
+    doc["heater_max_temp_c"] = config.heater_max_temp_c;
     doc["fan_type"] = config.fan_type;
     doc["fan_mode"] = config.fan_mode;
     doc["fan_pin"] = config.fan_pin;
     doc["fan_pwm_freq"] = config.fan_pwm_freq;
+    doc["fan_duty_pct"] = config.fan_duty_pct;
     doc["cooldown_duration_sec"] = config.cooldown_duration_sec;
     doc["has_custom"] = config.has_custom;
     doc["custom_type"] = config.custom_type;
     doc["custom_pin"] = config.custom_pin;
+    JsonArray curve = doc["fan_speed_curve"].to<JsonArray>();
+    for (const auto& pt : config.fan_speed_curve) {
+        JsonObject obj = curve.add<JsonObject>();
+        obj["temp_c"] = pt.temp_c;
+        obj["power_pct"] = pt.power_pct;
+    }
     
     String json;
     serializeJson(doc, json);
@@ -224,9 +247,14 @@ DisplayConfig ConfigManager::getDisplayConfig() const {
             config.dc_pin = doc["dc_pin"] | -1;
             config.rst_pin = doc["rst_pin"] | -1;
             config.backlight_pin = doc["backlight_pin"] | -1;
+            config.i2c_sda = doc["i2c_sda"] | 21;
+            config.i2c_scl = doc["i2c_scl"] | 22;
+            config.i2c_address = doc["i2c_address"] | 0x3C;
             config.refresh_rate_hz = doc["refresh_rate_hz"] | 1;
             if (config.refresh_rate_hz < 1) config.refresh_rate_hz = 1;
             if (config.refresh_rate_hz > 5) config.refresh_rate_hz = 5;
+            config.font_scaling = doc["font_scaling"] | "auto";
+            config.compact_mode = doc["compact_mode"] | false;
             
             JsonArray fields = doc["fields"];
             config.fields.clear();
@@ -254,7 +282,12 @@ void ConfigManager::setDisplayConfig(const DisplayConfig& config) {
     doc["dc_pin"] = config.dc_pin;
     doc["rst_pin"] = config.rst_pin;
     doc["backlight_pin"] = config.backlight_pin;
+    doc["i2c_sda"] = config.i2c_sda;
+    doc["i2c_scl"] = config.i2c_scl;
+    doc["i2c_address"] = config.i2c_address;
     doc["refresh_rate_hz"] = config.refresh_rate_hz;
+    doc["font_scaling"] = config.font_scaling;
+    doc["compact_mode"] = config.compact_mode;
     
     JsonArray fields = doc["fields"].to<JsonArray>();
     for (const String& field : config.fields) {
@@ -618,11 +651,19 @@ String ConfigManager::toJson() const {
     actuator_obj["heater_pin"] = actuator.heater_pin;
     actuator_obj["heater_pwm_freq"] = actuator.heater_pwm_freq;
     actuator_obj["heater_max_power_pct"] = actuator.heater_max_power_pct;
+    actuator_obj["heater_max_temp_c"] = actuator.heater_max_temp_c;
     actuator_obj["fan_type"] = actuator.fan_type;
     actuator_obj["fan_mode"] = actuator.fan_mode;
     actuator_obj["fan_pin"] = actuator.fan_pin;
     actuator_obj["fan_pwm_freq"] = actuator.fan_pwm_freq;
+    actuator_obj["fan_duty_pct"] = actuator.fan_duty_pct;
     actuator_obj["cooldown_duration_sec"] = actuator.cooldown_duration_sec;
+    JsonArray curve_arr = actuator_obj.createNestedArray("fan_speed_curve");
+    for (const auto& pt : actuator.fan_speed_curve) {
+        JsonObject obj = curve_arr.add<JsonObject>();
+        obj["temp_c"] = pt.temp_c;
+        obj["power_pct"] = pt.power_pct;
+    }
     
     // Display
     JsonObject display_obj = doc.createNestedObject("display");
@@ -639,6 +680,11 @@ String ConfigManager::toJson() const {
     display_obj["dc_pin"] = display.dc_pin;
     display_obj["rst_pin"] = display.rst_pin;
     display_obj["backlight_pin"] = display.backlight_pin;
+    display_obj["i2c_sda"] = display.i2c_sda;
+    display_obj["i2c_scl"] = display.i2c_scl;
+    display_obj["i2c_address"] = display.i2c_address;
+    display_obj["font_scaling"] = display.font_scaling;
+    display_obj["compact_mode"] = display.compact_mode;
     
     JsonArray fields_arr = display_obj.createNestedArray("fields");
     for (const String& f : display.fields) {
@@ -715,11 +761,26 @@ bool ConfigManager::fromJson(const String& json) {
         actuator.heater_pin = actuatorObj["heater_pin"] | 25;
         actuator.heater_pwm_freq = actuatorObj["heater_pwm_freq"] | 1000;
         actuator.heater_max_power_pct = actuatorObj["heater_max_power_pct"] | 100;
+        actuator.heater_max_temp_c = actuatorObj["heater_max_temp_c"] | 0.0f;
         actuator.fan_type = actuatorObj["fan_type"] | "fan_pwm";
         actuator.fan_mode = actuatorObj["fan_mode"] | "independent_pwm";
         actuator.fan_pin = actuatorObj["fan_pin"] | 26;
         actuator.fan_pwm_freq = actuatorObj["fan_pwm_freq"] | 5000;
+        actuator.fan_duty_pct = actuatorObj["fan_duty_pct"] | 80.0f;
         actuator.cooldown_duration_sec = actuatorObj["cooldown_duration_sec"] | 30;
+        actuator.fan_speed_curve.clear();
+        if (actuatorObj["fan_speed_curve"].is<JsonArray>()) {
+            for (JsonVariant v : actuatorObj["fan_speed_curve"].as<JsonArray>()) {
+                FanCurvePoint pt;
+                if (v.is<JsonObject>()) {
+                    pt.temp_c = v["temp_c"] | 0.0f;
+                    pt.power_pct = v["power_pct"] | 80.0f;
+                } else {
+                    pt.power_pct = v.as<float>();
+                }
+                actuator.fan_speed_curve.push_back(pt);
+            }
+        }
         setActuatorConfig(actuator);
     }
     
@@ -739,7 +800,12 @@ bool ConfigManager::fromJson(const String& json) {
         display.dc_pin = displayObj["dc_pin"] | -1;
         display.rst_pin = displayObj["rst_pin"] | -1;
         display.backlight_pin = displayObj["backlight_pin"] | -1;
+        display.i2c_sda = displayObj["i2c_sda"] | 21;
+        display.i2c_scl = displayObj["i2c_scl"] | 22;
+        display.i2c_address = displayObj["i2c_address"] | 0x3C;
         display.refresh_rate_hz = displayObj["refresh_rate_hz"] | 1;
+        display.font_scaling = displayObj["font_scaling"] | "auto";
+        display.compact_mode = displayObj["compact_mode"] | false;
         
         JsonArray fields = displayObj["fields"].as<JsonArray>();
         display.fields.clear();

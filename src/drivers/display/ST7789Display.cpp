@@ -165,7 +165,6 @@ void ST7789Display::showBootScreen(const String& firmware_version) {
     display_->setCursor(20, 150);
     display_->print("v");
     display_->print(firmware_version);
-    delay(2000);
 }
 
 DisplayMetrics ST7789Display::getMetrics() const {

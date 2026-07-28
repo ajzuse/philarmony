@@ -42,6 +42,7 @@ bool SafetyEngine::begin(const SafetyConfig& config) {
     fault_message_ = "";
     last_validated_temp_ = NAN;
     last_validated_temp_ms_ = 0;
+    has_last_validated_temp_ = false;
     sensor_disconnect_tracking_ = false;
     sensor_disconnect_since_ms_ = 0;
 
@@ -67,12 +68,12 @@ bool SafetyEngine::validateSensorReading(float chamber_temp, uint32_t now_ms) {
         return false;
     }
 
-    if (!isnan(last_validated_temp_) && last_validated_temp_ms_ > 0) {
+    if (has_last_validated_temp_) {
         const float dt_sec = (now_ms - last_validated_temp_ms_) / 1000.0f;
         if (dt_sec > 0.0f) {
             const float rate = fabsf(chamber_temp - last_validated_temp_) / dt_sec;
             if (rate > config_.max_temp_rate_c_per_sec) {
-                triggerFault(FaultCode::ACTUATOR_FAULT,
+                triggerFault(FaultCode::SENSOR_RATE_OF_CHANGE,
                              String("Temperature rate-of-change too high: ") + rate + "C/s");
                 return false;
             }
@@ -81,6 +82,7 @@ bool SafetyEngine::validateSensorReading(float chamber_temp, uint32_t now_ms) {
 
     last_validated_temp_ = chamber_temp;
     last_validated_temp_ms_ = now_ms;
+    has_last_validated_temp_ = true;
     return true;
 }
 
@@ -117,19 +119,23 @@ bool SafetyEngine::detectAndRecoverSpiBusError(bool bus_error) {
     if (!bus_error) {
         return true;
     }
-    triggerFault(FaultCode::SPI_BUS_ERROR, "SPI bus error detected");
+    if (spi_recovery_cb_ && spi_recovery_cb_()) {
+        return true;
+    }
+    triggerFault(FaultCode::SPI_BUS_ERROR, "SPI bus error — recovery failed");
     return false;
 }
 
 bool SafetyEngine::checkActuatorFault(float commanded_power_pct, float measured_power_pct,
-                                      bool overcurrent) {
+                                      bool overcurrent, bool measured_from_feedback) {
     if (overcurrent) {
         triggerFault(FaultCode::ACTUATOR_FAULT, "Actuator overcurrent detected");
         return false;
     }
 
-    if (fabsf(commanded_power_pct - measured_power_pct) > 15.0f && commanded_power_pct > 5.0f) {
-        triggerFault(FaultCode::ACTUATOR_FAULT, "PWM output mismatch");
+    if (measured_from_feedback &&
+        fabsf(commanded_power_pct - measured_power_pct) > 15.0f && commanded_power_pct > 5.0f) {
+        triggerFault(FaultCode::ACTUATOR_FAULT, "PWM output mismatch vs feedback");
         return false;
     }
     return true;
@@ -167,6 +173,13 @@ bool SafetyEngine::checkSafety(float chamber_temp, float target_temp,
         triggerFault(FaultCode::OVER_TEMPERATURE,
                      String("Chamber temperature ") + chamber_temp + "C >= " +
                          config_.hard_temp_limit_c + "C");
+        return false;
+    }
+
+    if (heater_on && heater_power_pct > config_.max_heater_power_pct) {
+        triggerFault(FaultCode::ACTUATOR_FAULT,
+                     String("Heater power ") + heater_power_pct +
+                         "% exceeds max_heater_power_pct " + config_.max_heater_power_pct + "%");
         return false;
     }
 
@@ -244,6 +257,7 @@ void SafetyEngine::clearFault() {
     sensor_disconnect_tracking_ = false;
     last_validated_temp_ = NAN;
     last_validated_temp_ms_ = 0;
+    has_last_validated_temp_ = false;
     resetThermalRunawayTimer();
 }
 

@@ -103,7 +103,6 @@ void HD44780Display::showBootScreen(const String& firmware_version) {
     display_->setCursor(0, 1);
     display_->print("v");
     display_->print(firmware_version);
-    delay(2000);
     display_->clear();
 }
 

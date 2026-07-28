@@ -42,7 +42,7 @@ public:
 
     // Configuration schemas (embedded for validation)
     static constexpr const char* SENSOR_TYPES[] = {
-        "sht3x", "sht30", "dht22", "dht11", "am2302",
+        "sht3x", "sht30", "sht31", "dht22", "dht11", "am2302",
         "ds18b20", "ds18s20", "ntc", "thermistor",
         "bme280", "bmp280", "aht20", "aht10", "custom"
     };
@@ -56,8 +56,9 @@ public:
         "heater", "fan", "custom"
     };
 
+    // "custom" is recognized but rejected until a plugin registers a factory
     static constexpr const char* CONTROL_ALGORITHMS[] = {
-        "pid", "bang_bang", "pwm_feedforward", "custom"
+        "pid", "bang_bang", "pwm_feedforward"
     };
 
     static constexpr const char* DISPLAY_DRIVERS[] = {
@@ -102,6 +103,7 @@ public:
     bool isValidDisplayDriver(const String& driver) const;
     bool isValidBusType(const String& type) const;
     bool isValidGPIOPin(int pin) const;
+    bool isValidOutputGPIOPin(int pin) const;
     bool isValidI2CAddress(int address) const;
 
     // Pin conflict detection

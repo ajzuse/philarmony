@@ -50,9 +50,9 @@ bool SH1106Display::begin(const JsonObject& config) {
     if (rst_pin_ >= 0) {
         pinMode(rst_pin_, OUTPUT);
         digitalWrite(rst_pin_, LOW);
-        delay(10);
+        delayMicroseconds(100);
         digitalWrite(rst_pin_, HIGH);
-        delay(10);
+        delayMicroseconds(100);
     }
 
     display_ = new Adafruit_SH1106G(metrics_.width, metrics_.height, &Wire, rst_pin_);
@@ -115,7 +115,6 @@ void SH1106Display::showBootScreen(const String& firmware_version) {
     display_->print("v");
     display_->println(firmware_version);
     display_->display();
-    delay(2000);
 }
 
 DisplayMetrics SH1106Display::getMetrics() const {

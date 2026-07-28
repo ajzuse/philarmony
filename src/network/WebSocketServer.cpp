@@ -25,6 +25,7 @@
 #include "../core/ProfileManager.hpp"
 #include "../core/HardwareConfigParser.hpp"
 #include "../control/ControlEngine.hpp"
+#include "../plugins/IPlugin.hpp"
 
 #include <algorithm>
 
@@ -151,6 +152,14 @@ void WebSocketServer::dispatchTopic(AsyncWebSocketClient* client, const JsonObje
         handleConfigControl(client, payload);
     } else if (topic == "control/pid_calibrate") {
         handlePidCalibrate(client, payload);
+    } else if (plugin_mgr_) {
+        JsonDocument respDoc;
+        JsonObject response = respDoc.to<JsonObject>();
+        if (plugin_mgr_->callWebSocketCommand(topic, payload, response)) {
+            sendResponse(client, topic + "/response", response);
+        } else {
+            sendError(client, topic, "Unknown topic");
+        }
     } else {
         sendError(client, topic, "Unknown topic");
     }
@@ -197,7 +206,7 @@ void WebSocketServer::handleControlStop(AsyncWebSocketClient* client, const Json
         return;
     }
 
-    if (!state_machine_->isDrying()) {
+    if (!state_machine_->isDrying() && !state_machine_->isCoolingDown()) {
         sendError(client, "control/stop", "No active drying session");
         return;
     }
@@ -219,6 +228,12 @@ void WebSocketServer::handleControlStop(AsyncWebSocketClient* client, const Json
 void WebSocketServer::handleConfigHardware(AsyncWebSocketClient* client, const JsonObject& payload) {
     if (!config_mgr_ || !hw_parser_) {
         sendError(client, "config/hardware", "Hardware parser unavailable");
+        return;
+    }
+
+    if (state_machine_ && (state_machine_->isDrying() || state_machine_->isCoolingDown())) {
+        sendError(client, "config/hardware",
+                  "Cannot reload hardware while drying or cooling down");
         return;
     }
 
@@ -245,8 +260,8 @@ void WebSocketServer::handleConfigHardware(AsyncWebSocketClient* client, const J
 
     JsonDocument response;
     JsonObject body = response.to<JsonObject>();
-    body["status"] = "applied";
-    sendResponse(client, "config/hardware", body);
+    body["status"] = "saved";
+    sendResponse(client, "config/hardware/response", body);
 }
 
 void WebSocketServer::handleConfigDisplay(AsyncWebSocketClient* client, const JsonObject& payload) {
@@ -268,6 +283,9 @@ void WebSocketServer::handleConfigDisplay(AsyncWebSocketClient* client, const Js
     display_cfg.dc_pin = payload["dc_pin"] | display_cfg.dc_pin;
     display_cfg.rst_pin = payload["rst_pin"] | display_cfg.rst_pin;
     display_cfg.backlight_pin = payload["backlight_pin"] | display_cfg.backlight_pin;
+    display_cfg.i2c_sda = payload["i2c_sda"] | payload["sda_pin"] | display_cfg.i2c_sda;
+    display_cfg.i2c_scl = payload["i2c_scl"] | payload["scl_pin"] | display_cfg.i2c_scl;
+    display_cfg.i2c_address = payload["i2c_address"] | payload["address"] | display_cfg.i2c_address;
 
     if (payload.containsKey("refresh_rate_hz")) {
         display_cfg.refresh_rate_hz = payload["refresh_rate_hz"] | display_cfg.refresh_rate_hz;
@@ -280,6 +298,33 @@ void WebSocketServer::handleConfigDisplay(AsyncWebSocketClient* client, const Js
         for (JsonVariant v : payload["fields"].as<JsonArray>()) {
             display_cfg.fields.push_back(v.as<String>());
         }
+    }
+
+    if (payload["layout"].is<JsonObject>()) {
+        JsonObject layout = payload["layout"].as<JsonObject>();
+        if (layout.containsKey("font_scaling")) {
+            display_cfg.font_scaling = layout["font_scaling"].as<String>();
+        }
+        if (layout.containsKey("compact_mode")) {
+            display_cfg.compact_mode = layout["compact_mode"] | display_cfg.compact_mode;
+        }
+        if (layout.containsKey("fields") && layout["fields"].is<JsonArray>()) {
+            display_cfg.fields.clear();
+            for (JsonVariant v : layout["fields"].as<JsonArray>()) {
+                display_cfg.fields.push_back(v.as<String>());
+            }
+        }
+        if (layout.containsKey("refresh_rate_hz")) {
+            display_cfg.refresh_rate_hz = layout["refresh_rate_hz"] | display_cfg.refresh_rate_hz;
+            if (display_cfg.refresh_rate_hz < 1) display_cfg.refresh_rate_hz = 1;
+            if (display_cfg.refresh_rate_hz > 5) display_cfg.refresh_rate_hz = 5;
+        }
+    }
+    if (payload.containsKey("font_scaling")) {
+        display_cfg.font_scaling = payload["font_scaling"].as<String>();
+    }
+    if (payload.containsKey("compact_mode")) {
+        display_cfg.compact_mode = payload["compact_mode"] | display_cfg.compact_mode;
     }
 
     config_mgr_->setDisplayConfig(display_cfg);
@@ -328,6 +373,8 @@ void WebSocketServer::handleConfigProfiles(AsyncWebSocketClient* client, const J
             item["default_duration_min"] = profile.default_duration_min;
             item["target_humidity_pct"] = profile.target_humidity_pct;
             item["is_builtin"] = profile.is_builtin;
+            item["created_at"] = profile.created_at;
+            item["updated_at"] = profile.updated_at;
         }
         sendResponse(client, response_topic, body);
         return;
@@ -340,13 +387,16 @@ void WebSocketServer::handleConfigProfiles(AsyncWebSocketClient* client, const J
             sendError(client, topic, "Profile not found");
             return;
         }
-        body["id"] = profile.id;
-        body["name_pt"] = profile.name_pt;
-        body["name_en"] = profile.name_en;
-        body["target_temp_c"] = profile.target_temp_c;
-        body["default_duration_min"] = profile.default_duration_min;
-        body["target_humidity_pct"] = profile.target_humidity_pct;
-        body["is_builtin"] = profile.is_builtin;
+        JsonObject profile_obj = body["profile"].to<JsonObject>();
+        profile_obj["id"] = profile.id;
+        profile_obj["name_pt"] = profile.name_pt;
+        profile_obj["name_en"] = profile.name_en;
+        profile_obj["target_temp_c"] = profile.target_temp_c;
+        profile_obj["default_duration_min"] = profile.default_duration_min;
+        profile_obj["target_humidity_pct"] = profile.target_humidity_pct;
+        profile_obj["is_builtin"] = profile.is_builtin;
+        profile_obj["created_at"] = profile.created_at;
+        profile_obj["updated_at"] = profile.updated_at;
         sendResponse(client, response_topic, body);
         return;
     }
@@ -368,8 +418,8 @@ void WebSocketServer::handleConfigProfiles(AsyncWebSocketClient* client, const J
             sendError(client, topic, "Failed to save profile");
             return;
         }
-        body["status"] = "saved";
-        body["id"] = profile.id;
+        body["status"] = (action == "create") ? "created" : "updated";
+        body["profile_id"] = profile.id;
         sendResponse(client, response_topic, body);
         return;
     }
@@ -411,6 +461,10 @@ void WebSocketServer::handleConfigControl(AsyncWebSocketClient* client, const Js
 
     config_mgr_->setObjectConfig("control", payload);
     config_mgr_->save();
+
+    if (safety_refresh_cb_) {
+        safety_refresh_cb_();
+    }
 
     JsonDocument response;
     JsonObject body = response.to<JsonObject>();
@@ -529,6 +583,7 @@ void WebSocketServer::broadcastFault(FaultCode fault, const String& message) {
         case FaultCode::I2C_BUS_LOCKUP: fault_code = "I2C_BUS_LOCKUP"; break;
         case FaultCode::SPI_BUS_ERROR: fault_code = "SPI_BUS_ERROR"; break;
         case FaultCode::ACTUATOR_FAULT: fault_code = "ACTUATOR_FAULT"; break;
+        case FaultCode::SENSOR_RATE_OF_CHANGE: fault_code = "SENSOR_RATE_OF_CHANGE"; break;
         case FaultCode::NVS_CORRUPT: fault_code = "NVS_CORRUPT"; break;
         case FaultCode::WATCHDOG_RESET: fault_code = "WATCHDOG_RESET"; break;
         default: break;
@@ -556,6 +611,7 @@ void WebSocketServer::broadcastLog(const String& line, bool is_drying_log) {
     JsonDocument doc;
     doc["topic"] = "logs/stream";
     JsonObject payload = doc["payload"].to<JsonObject>();
+    payload["target_log"] = is_drying_log ? "drying" : "system";
     payload["line"] = line;
     payload["drying"] = is_drying_log;
 
@@ -592,7 +648,7 @@ void WebSocketServer::buildStatusPayload(JsonObject& payload) {
     }
 
     const DryingSession& session = state_machine_->getCurrentSession();
-    payload["status"] = state_machine_->getStateName();
+    payload["status"] = state_machine_->getStatusStreamName();
     payload["target_temp_c"] = session.target_temp_c;
     payload["target_humidity_pct"] = session.target_humidity_pct;
     payload["elapsed_time_sec"] = session.elapsed_sec;
@@ -603,6 +659,11 @@ void WebSocketServer::buildStatusPayload(JsonObject& payload) {
     payload["exhaust_fan_power_pct"] = session.exhaust_fan_power_pct;
     payload["chamber_temp_c"] = session.current_temp_c;
     payload["humidity_pct"] = session.current_humidity_pct;
+
+    if (session.session_id > 0) {
+        payload["session_id"] = session.session_id;
+        payload["stop_reason"] = StateMachine::stopReasonToString(session.stop_reason);
+    }
 
     if (config_mgr_) {
         const SensorConfig sensor = config_mgr_->getSensorConfig();
@@ -635,6 +696,7 @@ void WebSocketServer::sendError(AsyncWebSocketClient* client, const String& topi
     JsonDocument doc;
     doc["topic"] = topic + "/error";
     JsonObject payload = doc["payload"].to<JsonObject>();
+    payload["error"] = error;
     payload["message"] = error;
 
     String json;

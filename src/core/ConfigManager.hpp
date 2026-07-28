@@ -65,15 +65,23 @@ struct SensorConfig {
     uint8_t extra_temp_i2c_address = 0;
 };
 
+struct FanCurvePoint {
+    float temp_c = 0.0f;
+    float power_pct = 80.0f;
+};
+
 struct ActuatorConfig {
     String heater_type = "mosfet_pwm";
     int8_t heater_pin = 25;
     uint32_t heater_pwm_freq = 1000;
     uint8_t heater_max_power_pct = 100;
+    float heater_max_temp_c = 0.0f;  // 0 = unset; from safety_limits.max_temp_c
     String fan_type = "fan_pwm";
     String fan_mode = "independent_pwm";
     int8_t fan_pin = 26;
     uint32_t fan_pwm_freq = 5000;
+    float fan_duty_pct = 80.0f;
+    std::vector<FanCurvePoint> fan_speed_curve;
     uint16_t cooldown_duration_sec = 30;
     bool has_custom = false;
     String custom_type;
@@ -83,7 +91,7 @@ struct ActuatorConfig {
 struct DisplayConfig {
     bool enabled = false;
     String driver = "auto";           // ssd1306, sh1106, st7789, ili9341, st7735, gc9a01, ili9488, hd44780, nextion, auto
-    String bus_type = "i2c";          // i2c, spi, parallel_8bit, uart
+    String bus_type = "i2c";          // i2c, spi, uart (parallel_8bit rejected at parse)
     uint16_t width = 128;
     uint16_t height = 64;
     uint16_t rotation = 0;            // 0, 90, 180, 270
@@ -93,7 +101,12 @@ struct DisplayConfig {
     int8_t dc_pin = -1;
     int8_t rst_pin = -1;
     int8_t backlight_pin = -1;
+    int8_t i2c_sda = 21;
+    int8_t i2c_scl = 22;
+    uint8_t i2c_address = 0x3C;
     uint8_t refresh_rate_hz = 1;          // Display refresh 1–5 Hz
+    String font_scaling = "auto";         // auto|small|medium|large
+    bool compact_mode = false;
     std::vector<String> fields = {"chamber_temp_c", "target_temp_c", "humidity_pct", "heater_power_pct", "status"};
 };
 
