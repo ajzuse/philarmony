@@ -38,9 +38,11 @@ struct SensorConfig {
 };
 
 struct ActuatorConfig {
+    String heater_type = "mosfet_pwm";  // DriverRegistry actuator type for heater
     int8_t heater_pin = 25;             // Heater MOSFET PWM GPIO
     uint32_t heater_pwm_freq = 1000;    // PWM frequency in Hz
     uint8_t heater_max_power_pct = 100; // Soft safety power limit %
+    String fan_type = "fan_pwm";        // DriverRegistry actuator type for fan
     String fan_mode = "independent_pwm"; // shared_mosfet, independent_pwm, independent_digital
     int8_t fan_pin = 26;                // Fan MOSFET/PWM GPIO
     uint32_t fan_pwm_freq = 5000;       // Fan PWM frequency in Hz
@@ -60,6 +62,7 @@ struct DisplayConfig {
     int8_t dc_pin = -1;
     int8_t rst_pin = -1;
     int8_t backlight_pin = -1;
+    uint8_t refresh_rate_hz = 1;          // Display refresh 1–5 Hz
     std::vector<String> fields = {"chamber_temp_c", "target_temp_c", "humidity_pct", "heater_power_pct", "status"};
 };
 
@@ -130,6 +133,13 @@ public:
     bool updateProfile(const FilamentProfile& profile);
     bool deleteProfile(const String& profile_id);
     void resetProfilesToDefaults();
+    static bool validateProfileParams(float temp_c, uint16_t duration_min, float humidity_pct) {
+        if (temp_c < 30.0f || temp_c > 80.0f) return false;
+        if (duration_min < 1 || duration_min > 1440) return false;
+        if (humidity_pct < 5.0f || humidity_pct > 50.0f) return false;
+        return true;
+    }
+    static constexpr size_t kMaxCustomProfiles = 20;
     
     // Generic JSON config (Klipper-style object config)
     bool setObjectConfig(const String& object_name, const JsonObject& config);

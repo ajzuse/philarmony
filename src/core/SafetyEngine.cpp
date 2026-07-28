@@ -194,7 +194,20 @@ void SafetyEngine::triggerFault(FaultCode fault, const String& message) {
     }
 }
 
-void SafetyEngine::executeEmergencyShutdown() {}
+void SafetyEngine::executeEmergencyShutdown() {
+    if (emergency_cb_) {
+        emergency_cb_();
+    }
+}
+
+void SafetyEngine::attachCurrentTaskToWatchdog() {
+    if (!watchdog_active_ || watchdog_task_attached_) {
+        return;
+    }
+    if (esp_task_wdt_add(nullptr) == ESP_OK) {
+        watchdog_task_attached_ = true;
+    }
+}
 
 void SafetyEngine::clearFault() {
     faulted_ = false;

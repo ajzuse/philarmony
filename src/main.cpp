@@ -58,6 +58,41 @@ static bool cooldownActive = false;
 static uint32_t cooldownEndMs = 0;
 static DryingStopReason pendingCooldownReason = DryingStopReason::COMPLETED;
 
+// Shared live readings for display/telemetry (written by control loop)
+static volatile float g_liveChamberTemp = NAN;
+static volatile float g_liveChamberHumidity = NAN;
+static volatile float g_liveHeaterPowerPct = 0.0f;
+static volatile float g_liveFanPowerPct = 0.0f;
+
+static void cutActuatorPower() {
+    if (heaterActuator) {
+        heaterActuator->setPower(0.0f);
+        heaterActuator->emergencyStop();
+    }
+    if (fanActuator) {
+        fanActuator->setPower(0.0f);
+        fanActuator->emergencyStop();
+    }
+}
+
+static void teardownDrivers() {
+    cutActuatorPower();
+    if (activeTempSensor != nullptr && activeTempSensor == activeHumiditySensor) {
+        delete activeTempSensor;
+        activeTempSensor = nullptr;
+        activeHumiditySensor = nullptr;
+    } else {
+        delete activeTempSensor;
+        activeTempSensor = nullptr;
+        delete activeHumiditySensor;
+        activeHumiditySensor = nullptr;
+    }
+    delete heaterActuator;
+    heaterActuator = nullptr;
+    delete fanActuator;
+    fanActuator = nullptr;
+}
+
 static SensorReading applySensorCalibration(const SensorReading& reading) {
     if (!reading.valid) {
         return reading;
@@ -104,6 +139,9 @@ void controlLoopTask(void* pvParameters) {
     
     // PID timing
     uint32_t lastPidTime = millis();
+    static uint32_t lastBusCheckMs = 0;
+
+    safetyEngine.attachCurrentTaskToWatchdog();
     
     for (;;) {
         vTaskDelayUntil(&lastWakeTime, period);
@@ -126,6 +164,16 @@ void controlLoopTask(void* pvParameters) {
         
         float chamberTemp = tempReading.valid ? tempReading.temperature : NAN;
         float chamberHumidity = humidityReading.valid ? humidityReading.humidity : NAN;
+        g_liveChamberTemp = chamberTemp;
+        g_liveChamberHumidity = chamberHumidity;
+
+        // Periodic I2C bus recovery when sensor reads fail
+        if (now - lastBusCheckMs >= 1000) {
+            lastBusCheckMs = now;
+            if (!tempReading.valid && activeTempSensor) {
+                safetyEngine.detectAndRecoverI2CBusLockup();
+            }
+        }
 
         if (cooldownActive) {
             if (heaterActuator) heaterActuator->setPower(0.0f);
@@ -142,14 +190,19 @@ void controlLoopTask(void* pvParameters) {
                                    ? heaterActuator->getState().power_pct
                                    : 0.0f;
         uint8_t heaterPower = static_cast<uint8_t>(heaterPowerPct);
+        g_liveHeaterPowerPct = heaterPowerPct;
+        g_liveFanPowerPct = fanActuator ? fanActuator->getState().power_pct : 0.0f;
+
+        if (heaterActuator) {
+            safetyEngine.checkActuatorFault(heaterPowerPct, heaterActuator->getState().power_pct, false);
+        }
 
         bool sensorConnected = tempReading.valid;
         if (!safetyEngine.checkSafety(chamberTemp,
                                        stateMachine.getCurrentSession().target_temp_c,
                                        heaterPower, heaterPower > 0, sensorConnected)) {
             stateMachine.stopDrying(DryingStopReason::SENSOR_ERROR);
-            if (heaterActuator) heaterActuator->setPower(0.0f);
-            if (fanActuator) fanActuator->setPower(0.0f);
+            cutActuatorPower();
             continue;
         }
 
@@ -194,8 +247,7 @@ void controlLoopTask(void* pvParameters) {
                     reason == DryingStopReason::COMPLETED) {
                     beginCooldown(reason);
                 } else {
-                    if (heaterActuator) heaterActuator->setPower(0.0f);
-                    if (fanActuator) fanActuator->setPower(0.0f);
+                    cutActuatorPower();
                 }
                 continue;
             }
@@ -219,6 +271,8 @@ void controlLoopTask(void* pvParameters) {
         bool heaterOn = heaterActuator ? heaterActuator->getState().enabled : false;
         float fanPct = fanActuator ? fanActuator->getState().power_pct : 0.0f;
         bool fanOn = fanActuator ? fanActuator->getState().enabled : false;
+        g_liveHeaterPowerPct = heaterPct;
+        g_liveFanPowerPct = fanPct;
 
         stateMachine.updateDryingProgress(chamberTemp, chamberHumidity,
                                           heaterPct, heaterOn, fanPct, fanOn);
@@ -238,23 +292,27 @@ void controlLoopTask(void* pvParameters) {
             }
 
             JsonDocument telemetry;
-            telemetry["status"] = stateMachine.getStateName();
-            telemetry["chamber_temp_c"] = chamberTemp;
-            telemetry["target_temp_c"] = stateMachine.getCurrentSession().target_temp_c;
-            telemetry["humidity_pct"] = chamberHumidity;
-            telemetry["target_humidity_pct"] = stateMachine.getCurrentSession().target_humidity_pct;
-            telemetry["heater_on"] = heaterOn;
-            telemetry["heater_power_pct"] = heaterPct;
-            telemetry["exhaust_fan_on"] = fanOn;
-            telemetry["exhaust_fan_power_pct"] = fanPct;
-            telemetry["elapsed_time_sec"] = stateMachine.getCurrentSession().elapsed_sec;
-            telemetry["remaining_time_sec"] = stateMachine.getCurrentSession().remaining_sec;
-            telemetry["cpu_usage_pct"] = sysMetrics.getCpuUsagePercent();
-            telemetry["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
-            telemetry["uptime_sec"] = millis() / 1000;
-            telemetry["control_algorithm"] = controlEngine.getCurrentAlgorithmType();
+            JsonObject payload = telemetry.to<JsonObject>();
+            wsServer.buildStatusPayload(payload);
+            payload["chamber_temp_c"] = chamberTemp;
+            payload["humidity_pct"] = chamberHumidity;
+            payload["heater_on"] = heaterOn;
+            payload["heater_power_pct"] = heaterPct;
+            payload["exhaust_fan_on"] = fanOn;
+            payload["exhaust_fan_power_pct"] = fanPct;
+            payload["cpu_usage_pct"] = sysMetrics.getCpuUsagePercent();
+            payload["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
+            payload["uptime_sec"] = millis() / 1000;
+            payload["control_algorithm"] = controlEngine.getCurrentAlgorithmType();
 
-            wsServer.broadcastTelemetry(telemetry.as<JsonObject>());
+            StatusPayload pluginTelemetry;
+            pluginTelemetry.status = stateMachine.getStateName();
+            pluginTelemetry.chamber_temp_c = chamberTemp;
+            pluginTelemetry.humidity_pct = chamberHumidity;
+            pluginTelemetry.heater_power_pct = heaterPct;
+            pluginMgr.callOnTelemetryTick(pluginTelemetry);
+
+            wsServer.broadcastTelemetry(payload);
         }
     }
 }
@@ -302,10 +360,12 @@ void displayTask(void* pvParameters) {
         JsonObject statusFields = statusDoc.to<JsonObject>();
         DryingSession session = stateMachine.getCurrentSession();
 
-        statusFields["chamber_temp_c"] = session.target_temp_c;
+        statusFields["chamber_temp_c"] = g_liveChamberTemp;
         statusFields["target_temp_c"] = session.target_temp_c;
-        statusFields["humidity_pct"] = session.target_humidity_pct;
-        statusFields["heater_power_pct"] = heaterActuator ? heaterActuator->getState().power_pct : 0;
+        statusFields["humidity_pct"] = g_liveChamberHumidity;
+        statusFields["target_humidity_pct"] = session.target_humidity_pct;
+        statusFields["heater_power_pct"] = g_liveHeaterPowerPct;
+        statusFields["exhaust_fan_power_pct"] = g_liveFanPowerPct;
         statusFields["status"] = stateMachine.getStateName();
 
         displayManager.update(statusFields);
@@ -331,10 +391,14 @@ void onStateChange(SystemState oldState, SystemState newState) {
     logMgr.logSystem(LogLevel::INFO, LogModule::SYSTEM, 
                      "State transition: %s -> %s", oldStr.c_str(), newStr.c_str());
     
-    // On fault, trigger emergency stop on actuators
-    if (newState == SystemState::FAULT_STOPPED) {
-        if (heaterActuator) heaterActuator->emergencyStop();
-        if (fanActuator) fanActuator->emergencyStop();
+    // On fault or stop, trigger emergency stop on actuators
+    if (newState == SystemState::FAULT_STOPPED || newState == SystemState::STOPPED) {
+        if (!cooldownActive) {
+            cutActuatorPower();
+        }
+    }
+    if (newState == SystemState::DRYING) {
+        pluginMgr.callOnSessionStart(stateMachine.getCurrentSession());
     }
 }
 
@@ -370,6 +434,13 @@ void onPidCalibrateComplete(const PidAutotuneController::Result& result) {
         // Save to NVS
         PidConfig cfg(result.kp, result.ki, result.kd);
         configMgr.setPidConfig(cfg);
+
+        JsonDocument paramsDoc;
+        JsonObject params = paramsDoc.to<JsonObject>();
+        params["kp"] = result.kp;
+        params["ki"] = result.ki;
+        params["kd"] = result.kd;
+        controlEngine.setAlgorithm("pid", params);
         
         logMgr.logSystem(LogLevel::INFO, LogModule::PID, 
                          "PID auto-tune complete: Kp=%.2f, Ki=%.2f, Kd=%.2f",
@@ -382,6 +453,7 @@ void onPidCalibrateComplete(const PidAutotuneController::Result& result) {
     // Notify via WebSocket
     StaticJsonDocument<256> doc;
     doc["status"] = result.success ? "success" : "error";
+    doc["saved_to_nvs"] = result.success;
     if (result.success) {
         doc["kp"] = result.kp;
         doc["ki"] = result.ki;
@@ -447,17 +519,33 @@ void initializeActuators() {
     fanConfig["fan_mode"] = actuatorCfg.fan_mode;
     fanConfig["fan_pwm_freq"] = actuatorCfg.fan_pwm_freq;
     fanConfig["cooldown_duration_sec"] = actuatorCfg.cooldown_duration_sec;
+    fanConfig["heater_pin"] = actuatorCfg.heater_pin;
 
-    heaterActuator = DriverRegistry::instance().createActuator("mosfet_pwm", heaterConfig);
-    fanActuator = DriverRegistry::instance().createActuator("fan_pwm", fanConfig);
+    String heaterType = actuatorCfg.heater_type.length() ? actuatorCfg.heater_type : "mosfet_pwm";
+    String fanType = actuatorCfg.fan_type.length() ? actuatorCfg.fan_type : "fan_pwm";
+    if (fanType == "fan_digital") {
+        fanType = "fan_pwm";
+        fanConfig["fan_mode"] = "independent_digital";
+    }
+
+    heaterActuator = DriverRegistry::instance().createActuator(heaterType, heaterConfig);
+    if (!heaterActuator) {
+        heaterActuator = DriverRegistry::instance().createActuator("mosfet_pwm", heaterConfig);
+        heaterType = "mosfet_pwm";
+    }
+    fanActuator = DriverRegistry::instance().createActuator(fanType, fanConfig);
+    if (!fanActuator) {
+        fanActuator = DriverRegistry::instance().createActuator("fan_pwm", fanConfig);
+        fanType = "fan_pwm";
+    }
 
     if (heaterActuator) {
         logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR,
-                         "Heater actuator on GPIO %d", actuatorCfg.heater_pin);
+                         "Heater %s on GPIO %d", heaterType.c_str(), actuatorCfg.heater_pin);
     }
     if (fanActuator) {
         logMgr.logSystem(LogLevel::INFO, LogModule::ACTUATOR,
-                         "Fan actuator on GPIO %d", actuatorCfg.fan_pin);
+                         "Fan %s on GPIO %d", fanType.c_str(), actuatorCfg.fan_pin);
     }
 }
 
@@ -479,12 +567,23 @@ void initializeDisplays() {
     dispConfig["dc_pin"] = displayCfg.dc_pin;
     dispConfig["rst_pin"] = displayCfg.rst_pin;
     dispConfig["backlight_pin"] = displayCfg.backlight_pin;
+    dispConfig["refresh_rate_hz"] = displayCfg.refresh_rate_hz;
     JsonArray fieldArray = dispConfig["fields"].to<JsonArray>();
     for (const String& field : displayCfg.fields) {
         fieldArray.add(field);
     }
 
     if (displayManager.begin(dispConfig)) {
+        // Apply layout (fields + refresh) after driver init
+        JsonDocument layoutDoc;
+        JsonObject layout = layoutDoc.to<JsonObject>();
+        JsonArray layoutFields = layout["fields"].to<JsonArray>();
+        for (const String& field : displayCfg.fields) {
+            layoutFields.add(field);
+        }
+        layout["refresh_rate_hz"] = displayCfg.refresh_rate_hz;
+        displayManager.setLayout(layout);
+
         activeDisplay = nullptr;
         logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY_MODULE,
                          "Display %s initialized", displayManager.getActiveType().c_str());
@@ -519,6 +618,7 @@ void initializeControlAlgorithm() {
 }
 
 void reloadHardwareFromConfig() {
+    teardownDrivers();
     initializeSensors();
     initializeActuators();
     initializeDisplays();
@@ -539,6 +639,7 @@ void initializeNetwork() {
     });
 
     if (webServer.begin(&configMgr, &logMgr, &hwParser, &DriverRegistry::instance(), &wifiMgr)) {
+        webServer.setHardwareReloadCallback(reloadHardwareFromConfig);
         logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                          "HTTP server started on port 80");
     }
@@ -547,6 +648,8 @@ void initializeNetwork() {
                        &hwParser, &DriverRegistry::instance(), &profileMgr, &controlEngine)) {
         webServer.attachWebSocket(wsServer.getWebSocket());
         wsServer.setHardwareReloadCallback(reloadHardwareFromConfig);
+        wsServer.setActuatorCutoffCallback(cutActuatorPower);
+        wsServer.setPidCalibrateCallbacks(onPidCalibrateProgress, onPidCalibrateComplete);
         logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                          "WebSocket server started on ws://<ip>/ws");
     }
@@ -571,6 +674,11 @@ void setup() {
     SafetyConfig safetyCfg;
     safetyCfg.hard_temp_limit_c = 80.0f;
     safetyCfg.watchdog_enabled = true;
+    {
+        SensorConfig sc = configMgr.getSensorConfig();
+        safetyCfg.i2c_sda_pin = sc.sda_pin;
+        safetyCfg.i2c_scl_pin = sc.scl_pin;
+    }
     if (!safetyEngine.begin(safetyCfg)) {
     }
     
@@ -578,12 +686,8 @@ void setup() {
     stateMachine.setStateChangeCallback(onStateChange);
     stateMachine.setSessionUpdateCallback(onSessionUpdate);
     safetyEngine.setFaultCallback(onSafetyFault);
+    safetyEngine.setEmergencyShutdownCallback(cutActuatorPower);
     pidAutotune.setHeaterCallback([](float power) { 
-        // This will be called by PID autotune during calibration
-    });
-    logMgr.setLogCallback(onLogCallback);
-    
-    pidAutotune.setHeaterCallback([](float power) {
         if (heaterActuator) {
             heaterActuator->setPower(power);
         }

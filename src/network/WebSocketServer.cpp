@@ -185,6 +185,9 @@ void WebSocketServer::handleControlStop(AsyncWebSocketClient* client, const Json
     }
 
     state_machine_->stopDrying(DryingStopReason::USER_STOPPED);
+    if (actuator_cutoff_cb_) {
+        actuator_cutoff_cb_();
+    }
     if (log_mgr_) {
         log_mgr_->logDryingStop(DryingStopReason::USER_STOPPED);
     }
@@ -247,6 +250,19 @@ void WebSocketServer::handleConfigDisplay(AsyncWebSocketClient* client, const Js
     display_cfg.dc_pin = payload["dc_pin"] | display_cfg.dc_pin;
     display_cfg.rst_pin = payload["rst_pin"] | display_cfg.rst_pin;
     display_cfg.backlight_pin = payload["backlight_pin"] | display_cfg.backlight_pin;
+
+    if (payload.containsKey("refresh_rate_hz")) {
+        display_cfg.refresh_rate_hz = payload["refresh_rate_hz"] | display_cfg.refresh_rate_hz;
+        if (display_cfg.refresh_rate_hz < 1) display_cfg.refresh_rate_hz = 1;
+        if (display_cfg.refresh_rate_hz > 5) display_cfg.refresh_rate_hz = 5;
+    }
+
+    if (payload.containsKey("fields") && payload["fields"].is<JsonArray>()) {
+        display_cfg.fields.clear();
+        for (JsonVariant v : payload["fields"].as<JsonArray>()) {
+            display_cfg.fields.push_back(v.as<String>());
+        }
+    }
 
     config_mgr_->setDisplayConfig(display_cfg);
     config_mgr_->save();
@@ -374,16 +390,10 @@ void WebSocketServer::handlePidCalibrate(AsyncWebSocketClient* client, const Jso
 
   const bool started = pid_autotune_->startCalibration(
         cfg,
-        [](int cycle, int total, float temp, float kp, float ki, float kd, bool done) {
-            (void)cycle;
-            (void)total;
-            (void)temp;
-            (void)kp;
-            (void)ki;
-            (void)kd;
-            (void)done;
-        },
-        [](const PidAutotuneController::Result&) {});
+        pid_progress_cb_ ? pid_progress_cb_
+                         : [](int, int, float, float, float, float, bool) {},
+        pid_complete_cb_ ? pid_complete_cb_
+                         : [](const PidAutotuneController::Result&) {});
 
     if (!started) {
         sendError(client, "control/pid_calibrate", "Failed to start calibration");
@@ -447,7 +457,15 @@ void WebSocketServer::broadcastTelemetry(const JsonObject& telemetry) {
 
     String json;
     serializeJson(doc, json);
-    ws_->textAll(json.c_str());
+    for (const auto& info : clients_) {
+        if (!info.subscribed) {
+            continue;
+        }
+        AsyncWebSocketClient* client = ws_->client(info.id);
+        if (client && client->canSend()) {
+            client->text(json.c_str());
+        }
+    }
 }
 
 void WebSocketServer::broadcastFault(FaultCode fault, const String& message) {
@@ -479,7 +497,15 @@ void WebSocketServer::broadcastLog(const String& line, bool is_drying_log) {
 
     String json;
     serializeJson(doc, json);
-    ws_->textAll(json.c_str());
+    for (const auto& info : clients_) {
+        if (!info.log_subscribed) {
+            continue;
+        }
+        AsyncWebSocketClient* client = ws_->client(info.id);
+        if (client && client->canSend()) {
+            client->text(json.c_str());
+        }
+    }
 }
 
 void WebSocketServer::broadcastPidCalibrate(const JsonObject& progress) {
@@ -507,6 +533,20 @@ void WebSocketServer::buildStatusPayload(JsonObject& payload) {
     payload["target_humidity_pct"] = session.target_humidity_pct;
     payload["elapsed_time_sec"] = session.elapsed_sec;
     payload["remaining_time_sec"] = session.remaining_sec;
+    payload["heater_on"] = session.heater_on;
+    payload["heater_power_pct"] = session.heater_power_pct;
+    payload["exhaust_fan_on"] = session.exhaust_fan_on;
+    payload["exhaust_fan_power_pct"] = session.exhaust_fan_power_pct;
+    payload["chamber_temp_c"] = session.current_temp_c;
+    payload["humidity_pct"] = session.current_humidity_pct;
+
+    if (config_mgr_) {
+        const SensorConfig sensor = config_mgr_->getSensorConfig();
+        payload["sensor_type"] = sensor.type;
+        const ActuatorConfig actuator = config_mgr_->getActuatorConfig();
+        payload["heater_type"] = actuator.heater_type;
+        payload["fan_type"] = actuator.fan_type;
+    }
 }
 
 void WebSocketServer::sendResponse(AsyncWebSocketClient* client, const String& topic, const JsonObject& payload) {

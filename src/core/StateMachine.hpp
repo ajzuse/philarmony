@@ -39,6 +39,12 @@ struct DryingSession {
     uint32_t remaining_sec = 0;
     uint32_t start_timestamp = 0;
     DryingStopReason stop_reason = DryingStopReason::RUNNING;
+    float current_temp_c = NAN;
+    float current_humidity_pct = NAN;
+    float heater_power_pct = 0.0f;
+    bool heater_on = false;
+    float exhaust_fan_power_pct = 0.0f;
+    bool exhaust_fan_on = false;
 };
 
 class StateMachine {

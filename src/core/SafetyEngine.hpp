@@ -68,7 +68,10 @@ public:
     const SafetyConfig& getConfig() const { return config_; }
 
     using FaultCallback = void(*)(FaultCode fault, const String& message);
+    using EmergencyShutdownCallback = void(*)();
     void setFaultCallback(FaultCallback cb) { fault_cb_ = cb; }
+    void setEmergencyShutdownCallback(EmergencyShutdownCallback cb) { emergency_cb_ = cb; }
+    void attachCurrentTaskToWatchdog();
 
 private:
     SafetyConfig config_;
@@ -89,7 +92,9 @@ private:
     uint32_t last_validated_temp_ms_ = 0;
 
     bool watchdog_active_ = false;
+    bool watchdog_task_attached_ = false;
     FaultCallback fault_cb_ = nullptr;
+    EmergencyShutdownCallback emergency_cb_ = nullptr;
 
     void triggerFault(FaultCode fault, const String& message);
     void executeEmergencyShutdown();

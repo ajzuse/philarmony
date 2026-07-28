@@ -64,6 +64,15 @@ void WebServer::setupRoutes() {
         });
     server_->on("/log/drying", HTTP_GET, [this](AsyncWebServerRequest* request) { handleLogDownload(request, true); });
     server_->on("/log/system", HTTP_GET, [this](AsyncWebServerRequest* request) { handleLogDownload(request, false); });
+    // Captive portal detection endpoints (Android/iOS/Windows)
+    auto captive = [this](AsyncWebServerRequest* request) { handleCaptivePortal(request); };
+    server_->on("/generate_204", HTTP_GET, captive);
+    server_->on("/gen_204", HTTP_GET, captive);
+    server_->on("/hotspot-detect.html", HTTP_GET, captive);
+    server_->on("/library/test/success.html", HTTP_GET, captive);
+    server_->on("/connecttest.txt", HTTP_GET, captive);
+    server_->on("/ncsi.txt", HTTP_GET, captive);
+    server_->on("/fwlink", HTTP_GET, captive);
     server_->onNotFound([this](AsyncWebServerRequest* request) { handleNotFound(request); });
 }
 
@@ -197,10 +206,18 @@ void WebServer::handleHardwareConfigPostBody(AsyncWebServerRequest* request, con
     }
     config_mgr_->save();
 
+    if (hardware_reload_cb_) {
+        hardware_reload_cb_();
+    }
+
     sendJson(request, 200, "{\"status\":\"saved\"}");
 }
 
 void WebServer::handleNotFound(AsyncWebServerRequest* request) {
+    if (wifi_mgr_ && wifi_mgr_->isAPActive()) {
+        handleCaptivePortal(request);
+        return;
+    }
     sendError(request, 404, "Not found");
 }
 

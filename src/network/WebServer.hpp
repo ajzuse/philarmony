@@ -17,6 +17,8 @@ class WifiManager;
 
 class WebServer {
 public:
+    using HardwareReloadCallback = void(*)();
+
     WebServer(uint16_t port = 80);
     ~WebServer();
     
@@ -26,6 +28,7 @@ public:
                WifiManager* wifi_mgr = nullptr);
 
     void attachWebSocket(AsyncWebSocket* ws);
+    void setHardwareReloadCallback(HardwareReloadCallback cb) { hardware_reload_cb_ = cb; }
     
     // Template for captive portal
     static const char* getCaptivePortalHTML();
@@ -39,6 +42,7 @@ private:
     HardwareConfigParser* hw_parser_ = nullptr;
     DriverRegistry* driver_registry_ = nullptr;
     WifiManager* wifi_mgr_ = nullptr;
+    HardwareReloadCallback hardware_reload_cb_ = nullptr;
     
     // Route handlers
     void setupRoutes();
