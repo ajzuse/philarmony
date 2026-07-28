@@ -23,7 +23,7 @@ jobs:
           pip install platformio
 
       - name: Build firmware
-        run: pio run -e esp32devkitc
+        run: make build ENV=esp32devkitc
 
       - name: Run unit tests
-        run: pio test -e native
+        run: make test

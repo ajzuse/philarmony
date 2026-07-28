@@ -1,5 +1,7 @@
 # Data Model & State Machine Specification (Generic Architecture)
 
+> **Tooling note (2026-07-28):** The root `Makefile` add-on introduces **no** runtime entities, NVS keys, or state-machine transitions. Developer-facing target contract lives in `contracts/makefile-targets.md`. Sections below remain the firmware data model of record.
+
 ## 1. System State Machine
 
 ```text

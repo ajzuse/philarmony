@@ -60,7 +60,7 @@
 
 | # | Spec | Nome | Status | Última Atualização |
 |---|------|------|--------|-------------------|
-| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | 🚧 Implementação (Phase 19) | 2026-07-28   |
+| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | 📝 Especificado | 2026-07-23   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | 📝 Especificado | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
@@ -78,14 +78,13 @@
 | Área | Detalhes |
 |------|----------|
 | **WiFi & Conectividade** | Conexão WiFi com fallback automático para Hotspot "philarmony"/"philarmony" (IP fixo 192.168.4.1) com servidor HTTP para configuração |
-| **WebSocket API** | Servidor WebSocket na porta **80** path `/ws` com tópicos: `config/hardware`, `config/display`, `config/control`, `control/start`, `control/stop`, `control/pid_calibrate`, `status/subscribe`, `status/update`, `status/fault`, `config/profiles/*`, `logs/stream` |
-| **HTTP API** | `GET /api/info`, captive portal `/`, WiFi config `POST /api/wifi/config`, logs `GET /log/system` + `/log/drying` |
-| **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital/shared MOSFET, PID/bang-bang/feedforward, limite segurança configurável (default 80°C) |
-| **Sensores** | sht3x/sht31, DHT22, DS18B20, BME280, AHT20 (+ multi-sensor humidity) via JSON hardware config |
-| **Display** | SSD1306, SH1106, ST7789, ILI9341, ST7735, GC9A01, ILI9488, HD44780, Nextion, auto-detect — layout/font_scaling/compact_mode |
+| **WebSocket API** | Servidor WebSocket na porta **80** path  com tópicos: `config/hardware`, `config/display`, `config/control`, `control/start`, `control/stop`, `control/pid_calibrate`, `status/subscribe`, `status/update`, `config/profiles/*`, `logs/stream` |
+| **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital, PID opcional, limite segurança 80°C hardcoded |
+| **Sensores** | DHT22, DS18B20, BME280 configuráveis via GPIO |
+| **Display** | SSD1306, SH1106 (I2C), ST7789, ILI9341 (SPI) - resolução configurável, campos selecionáveis |
 | **Perfis de Filamento** | 5 built-in (PLA, PETG, ABS, TPU, Nylon) + até 20 customizados em NVS |
-| **Status Streaming** | 1Hz via WebSocket: temp, humidity, heater%, fan%, CPU%, RAM, uptime, elapsed/remaining, fault_code |
-| **Segurança** | Watchdog HW, corte térmico, fan cooldown pós-ciclo (`COOLDOWN`), sensor timeout configurável, NVS atômico |
+| **Status Streaming** | 1Hz via WebSocket: temp, humidity, heater%, fan%, CPU%, RAM, uptime, elapsed/remaining |
+| **Segurança** | Watchdog HW, corte térmico 80°C, fan 30s pós-aquecimento, NVS atômico |
 
 #### Entidades Principais
 - `DryingCycle` - Ciclo de secagem com stop_reason
@@ -213,7 +212,7 @@
 ├────────────────────────────┼────────────┼────────────────────────┼──────┤
 │ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 4 Specs completas    │ 100% │
 │ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 1/4  │
-│ 3. Firmware Core           │ 🔄 EM ANDAMENTO │ ESP32 Base + WS + NVS   │ ~90% │
+│ 3. Firmware Core           │ ⏳ AGUARDANDO │ ESP32 Base + WS + NVS   │ 0%   │
 │ 4. Touch UI                │ ⏳ AGUARDANDO │ LVGL + Touch Driver     │ 0%   │
 │ 5. Desktop Installer       │ ⏳ AGUARDANDO │ Tauri/Flutter + esptool │ 0%   │
 │ 6. Control App (Multi)     │ ⏳ AGUARDANDO │ Flutter + SQLite + WS   │ 0%   │
@@ -233,44 +232,52 @@
 | **NVS/Storage** | NVS (config) + SPIFFS (fonts/assets) | Wear-leveling, atômico, padrão ESP32 |
 | **Desktop Installer** | Tauri (Rust + Web) ou Flutter Desktop | Binário nativo pequeno, esptool.py integrado |
 | **Control App** | Flutter 3.x (Dart) | Single codebase Desktop+Mobile, SQLite, WS |
-| **Build/CI** | GitHub Actions + PlatformIO | Matrix build ESP32 variants, artifact upload |
+| **Build/CI** | GitHub Actions + PlatformIO + GNU Make | `make build` / `make test` / `make flash` (Phase 20 tasks) |
 | **Docs** | Markdown PT-BR/EN-US em `/docs` | GitHub Pages ready, versionado com código |
 
 ---
 
-## 📁 Estrutura do Repositório
+## 🛠️ Makefile
+
+```bash
+make help
+make build                 # ENV=esp32devkitc (lilygo_tdisplay_v1 | esp32_2432s028)
+make test                  # pio test -e native
+make flash PORT=/dev/cu.usbserial-*   # precisa ESP32; aliases: upload, install
+```
+
+Contrato: `specs/001-filament-dryer-esp32/contracts/makefile-targets.md`.
+
+---
+
+## 📁 Estrutura do Repositório (Planejada)
 
 ```
 philarmony/
-├── .specify/                    # Spec Kit + constitution + hooks
+├── .specify/                    # Spec Kit configuração
+│   ├── memory/constitution.md   # Constituição do projeto
+│   ├── templates/               # Templates spec/plan/tasks
+│   ├── scripts/                 # Scripts de automação (sync-readme, etc.)
+│   └── extensions.yml           # Hooks para sincronização automática
 ├── .vscode/
 │   └── workspace.json
 ├── docs/
-│   ├── PT-BR/                   # API, arquitetura, configuração
-│   └── EN-US/
-├── include/
-│   └── firmware_version.h
+│   ├── PT-BR/
+│   ├── EN-US/
 ├── src/
-│   ├── main.cpp
-│   ├── control/                 # PID, bang-bang, feedforward, ControlEngine
-│   ├── core/                    # Config, StateMachine, Safety, Log, Drivers registry
-│   ├── drivers/
-│   │   ├── actuators/
-│   │   ├── display/
-│   │   ├── interfaces/
-│   │   └── sensors/
-│   ├── network/                 # WiFi, HTTP, WebSocket
-│   ├── plugins/
-│   └── utils/
-├── test/                        # PlatformIO Unity (native + flow)
-├── specs/
+│   ├── hardware/
+│   ├── software/
+│   └── lib/
+├── tests/
+│   ├── flow/
+│   └── integration/
+├── examples/
+├── specs/                       # Especificações (4 atuais)
 │   ├── 001-filament-dryer-esp32/
 │   ├── 002-esp32-desktop-installer/
 │   ├── 003-filament-dryer-control-app/
 │   └── 004-esp32-touchscreen-ui/
-├── platformio.ini
-├── partitions.csv
-├── README.md
+├── README.md                    # Este arquivo (auto-sincronizado)
 └── LICENSE
 ```
 
@@ -350,4 +357,4 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 ---
 
 *README auto-gerado e sincronizado pela Constituição Philarmony v0.6.0*
-*Última atualização: 2026-07-28 | Trigger: implement*
+*Última atualização: 2026-07-28 | Trigger: tasks*

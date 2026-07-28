@@ -35,3 +35,14 @@ Stored in NVS via captive portal or `POST /api/wifi/config`. Missing/invalid cre
 ## Profiles
 
 Built-ins: pla, petg, abs, tpu, nylon. Up to 20 customs. Ranges: temp 30–80 °C, duration 1–1440 min, humidity 5–50%.
+
+## Build / flash (Makefile)
+
+Preferred host commands (see `specs/001-filament-dryer-esp32/contracts/makefile-targets.md`):
+
+```bash
+make build                 # ENV=esp32devkitc by default
+make test                  # native Unity suite
+make flash PORT=/dev/ttyUSB0   # requires attached ESP32; aliases: upload, install
+make help
+```

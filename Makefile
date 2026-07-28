@@ -20,12 +20,12 @@ endif
 
 .PHONY: help all build compile test flash upload install uploadfs monitor clean
 
-.DEFAULT_GOAL := all
+.DEFAULT_GOAL := help
 
 help:
 	@echo "Philarmony Make targets (wraps PlatformIO)"
 	@echo ""
-	@echo "  make / make all / make build|compile     Build firmware for ENV (default: $(ENV))"
+	@echo "  make build|compile     Build firmware for ENV (default: $(ENV))"
 	@echo "  make test              Host Unity tests (pio test -e native)"
 	@echo "  make flash|upload|install  Flash app to ESP32 (needs device)"
 	@echo "  make uploadfs          Upload LittleFS image"

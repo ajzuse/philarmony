@@ -6,6 +6,30 @@ This guide describes end-to-end scenarios to validate the Filament Dryer ESP32 f
 
 ## 1. Prerequisites & Compilation
 
+Preferred entrypoint is the root **Makefile** (see `contracts/makefile-targets.md`). PlatformIO remains underneath.
+
+```bash
+# Compile firmware (default ENV=esp32devkitc)
+make build
+make build ENV=lilygo_tdisplay_v1
+make build ENV=esp32_2432s028
+
+# Host Unity tests (must exit non-zero on failure)
+make test
+
+# Flash / install on connected ESP32
+make flash                 # aliases: make upload, make install
+make flash ENV=esp32devkitc PORT=/dev/ttyUSB0
+
+# Optional: LittleFS + serial
+make uploadfs
+make monitor
+make clean
+make help
+```
+
+Equivalent raw PlatformIO (still valid):
+
 ```bash
 # Build firmware with PlatformIO for target ESP32 board
 pio run -e esp32devkitc          # ESP32 DevKitC V4
@@ -191,4 +215,6 @@ curl http://<esp32_ip>/log/system
 | Log download HTTP | `/log/drying` and `/log/system` return correct files |
 | PID auto-tune | Cycles complete, Kp/Ki/Kd calculated, saved to NVS |
 | Profile management | CRUD via WebSocket, persistence across reboot |
-| Multi-board build | `pio run -e <env>` succeeds for all environments |
+| Multi-board build | `make build ENV=<env>` (or `pio run -e <env>`) succeeds for all environments |
+| Makefile façade | `make help`, `make test`, and `make build` succeed; `make test` fails if any Unity case fails |
+| Flash via Make | `make flash` / `upload` / `install` require an attached ESP32; without a device the command fails non-zero (expected) |
