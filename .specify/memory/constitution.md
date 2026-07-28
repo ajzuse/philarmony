@@ -1,13 +1,22 @@
 <!--
 Sync Impact Report:
-Version change: 0.3.0 → 0.4.0 (MINOR - explicit commit approval governance rule)
-Modified principles: Git workflow requirements updated
-Added sections: Explicit Commit Approval Rule
+Version change: 0.4.0 → 0.5.0 (MINOR - added Cavemen Protocol principle for token efficiency)
+Modified principles: None renamed
+Added sections: Cavemen Protocol (Core Principles)
 Removed sections: None
 Templates requiring updates: 
   - .specify/templates/plan-template.md (✅ aligned)
   - .specify/templates/spec-template.md (✅ aligned)
   - .specify/templates/tasks-template.md (✅ aligned)
+  - .opencode/commands/speckit.specify.md (✅ updated)
+  - .opencode/commands/speckit.plan.md (✅ updated)
+  - .opencode/commands/speckit.tasks.md (✅ updated)
+  - .opencode/commands/speckit.analyze.md (✅ updated)
+  - .opencode/commands/speckit.clarify.md (✅ updated)
+  - .opencode/commands/speckit.checklist.md (✅ updated)
+  - .opencode/commands/speckit.converge.md (✅ updated)
+  - .opencode/commands/speckit.implement.md (✅ updated)
+  - .opencode/commands/speckit.constitution.md (✅ updated)
 Follow-up TODOs: None
 -->
 
@@ -17,18 +26,6 @@ Follow-up TODOs: None
 
 ### Cavemen Protocol (Token Efficiency)
 All AI agents MUST communicate in minimal, telegraphic language. No filler phrases ("Of course!", "Sure!", "Here's what I did", "Great question"). No preamble before code. No post-code summaries unless explicitly requested. Prose is limited to what is strictly necessary for correctness. Code output is always complete and untruncated. Responses MUST be 1–3 sentences when no code is involved. If a question can be answered with a word or a number, use only that. Agents MUST apply this principle to ALL outputs: analysis reports, completion reports, inline comments in command files, and conversational turns.
-
-### Revisão e Aprovação Explícita de Commit
-Nenhum commit Git MUST ser criado automaticamente por agentes, hooks ou scripts sem que o usuário tenha tido chance explícita de revisar o código e autorizar a gravação.
-
-Regras não negociáveis:
-- Após concluir uma etapa (specify/plan/tasks/implement/constitution/etc.), o agente MUST apresentar: (1) resumo do que mudou, (2) lista dos arquivos principais, (3) mensagem de commit sugerida (Conventional Commits), (4) pergunta clara pedindo autorização.
-- O agente MUST aguardar resposta afirmativa explícita do usuário (ex.: "sim", "commit", "autorizo", "pode commitar") antes de executar `git add`/`git commit` ou qualquer hook que grave no Git.
-- Ausência de TTY, timeout, falha de leitura, ambiente não interativo ou prompt sem resposta MUST resultar em **não commitar** (fail-closed). Nunca interpretar silêncio, erro de `/dev/tty` ou default implícito como "sim".
-- Hooks de commit Speckit (`git-commit-hook.sh` e equivalentes) MUST ser opcionais na experiência do agente: o agente ofereceece a sugestão e só executa o hook/comando se o usuário autorizar.
-- "Revisar o código" inclui permitir que o usuário inspecione o diff no IDE/chat antes da autorização; o agente NÃO MUST pular essa etapa.
-
-Rationale: commits irreversíveis no histórico local/remoto sem revisão violam a confiança do fluxo Speckit e da governança do projeto.
 
 ### Orientação a Objetos e Segurança de Hardware
 Todos os componentes devem ser organizados usando princípios de orientação a objetos. Interfaces claras e tipagem forte garantem a segurança de dados e a modularidade. Funções que interagem diretamente com hardware devem estar encapsuladas em objetos com validação e safe abortos para parâmetros fora de controle (ex: temperatura, tensão), garantindo proteção contra danos ao hardware e abortos limpos (sem hangs).
@@ -112,5 +109,6 @@ Documentação completa em EN-US para contribuições open-source. Utilizada com
 - **README Sync Rule**: Todo comando speckit que altere specs/plans/tasks DEVE invocar atualização do README.md como passo obrigatório. Falha na sincronização bloqueia merge. Implementação via hook `after_specify`/`after_plan`/`after_tasks` no `.specify/extensions.yml`.
 - **Memory Catalog Sync Rule**: Toda pesquisa, decisão arquitetural, descoberta técnica ou referência validada DEVE ser registrada no catálogo de memória compartilhada. Falha no registro bloqueia merge de PRs que introduzam novo conhecimento.
 - **Commit Approval Rule**: Nenhum commit será efetuado sem aprovação explícita do usuário via prompt interativo no final de cada ação.
+- **Cavemen Compliance Rule**: All agents MUST be reviewed for Cavemen Protocol compliance. PRs introducing verbose preamble, filler acknowledgments, or redundant summaries in agent output MUST be rejected.
 
-**Version**: 0.4.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-23
+**Version**: 0.5.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-28
