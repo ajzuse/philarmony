@@ -105,7 +105,6 @@ void ILI9488Display::showBootScreen(const String& firmware_version) {
     display_->setCursor(20, 220);
     display_->print("v");
     display_->print(firmware_version);
-    delay(2000);
 }
 
 DisplayMetrics ILI9488Display::getMetrics() const {
@@ -194,8 +193,10 @@ void ILI9488Display::renderStatus(const JsonObject& fields) {
                   String(r / 3600) + "h " + String((r % 3600) / 60) + "m", TFT_WHITE);
         y += row_h;
     }
-    if (fields.containsKey("free_heap_bytes")) {
-        uint32_t heap = fields["free_heap_bytes"];
+    if (fields.containsKey("memory_free_bytes") || fields.containsKey("free_heap_bytes")) {
+        uint32_t heap = fields.containsKey("memory_free_bytes")
+                            ? fields["memory_free_bytes"].as<uint32_t>()
+                            : fields["free_heap_bytes"].as<uint32_t>();
         drawField(10, y, "Free RAM:", String(heap / 1024) + " KB", TFT_DARKGREY);
     }
 }

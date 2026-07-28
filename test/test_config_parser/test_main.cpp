@@ -11,6 +11,7 @@ void tearDown() {}
 void test_valid_sensor_type() {
     HardwareConfigParser parser;
     TEST_ASSERT_TRUE(parser.isValidSensorType("sht3x"));
+    TEST_ASSERT_TRUE(parser.isValidSensorType("sht31"));
     TEST_ASSERT_TRUE(parser.isValidSensorType("dht22"));
     TEST_ASSERT_FALSE(parser.isValidSensorType("invalid_sensor"));
 }
@@ -104,6 +105,37 @@ void test_invalid_gpio_pin_rejected() {
     HardwareConfigParser parser;
     TEST_ASSERT_FALSE(parser.isValidGPIOPin(99));
     TEST_ASSERT_TRUE(parser.isValidGPIOPin(25));
+    TEST_ASSERT_TRUE(parser.isValidGPIOPin(34));  // input-only OK for sensors/ADC
+    TEST_ASSERT_TRUE(parser.isValidOutputGPIOPin(25));
+    TEST_ASSERT_FALSE(parser.isValidOutputGPIOPin(34));  // input-only rejected for outputs
+}
+
+void test_reject_custom_algorithm() {
+    HardwareConfigParser parser;
+    JsonDocument doc;
+    doc["algorithm"] = "custom";
+    auto result = parser.validateControl(doc.as<JsonObject>());
+    TEST_ASSERT_FALSE(result.valid);
+    TEST_ASSERT_TRUE(result.errors.size() > 0);
+}
+
+void test_reject_triac_and_parallel_8bit() {
+    HardwareConfigParser parser;
+    JsonDocument act;
+    act["id"] = "h";
+    act["type"] = "triac";
+    act["role"] = "heater";
+    act["pins"]["pwm"] = 25;
+    act["control"]["algorithm"] = "pid";
+    auto act_result = parser.validateActuator(act.as<JsonObject>());
+    TEST_ASSERT_FALSE(act_result.valid);
+
+    JsonDocument disp;
+    disp["enabled"] = true;
+    disp["driver"] = "hd44780";
+    disp["bus_type"] = "parallel_8bit";
+    auto disp_result = parser.validateDisplay(disp.as<JsonObject>());
+    TEST_ASSERT_FALSE(disp_result.valid);
 }
 
 int main(int, char**) {
@@ -112,5 +144,7 @@ int main(int, char**) {
     RUN_TEST(test_parse_minimal_hardware_config);
     RUN_TEST(test_parse_nested_spi_display_bus);
     RUN_TEST(test_invalid_gpio_pin_rejected);
+    RUN_TEST(test_reject_custom_algorithm);
+    RUN_TEST(test_reject_triac_and_parallel_8bit);
     return UNITY_END();
 }

@@ -50,7 +50,6 @@ bool NextionDisplay::begin(const JsonObject& config) {
     // Use UART2 (Serial2) for the Nextion; avoids conflicts with debug Serial
     serial_ = &Serial2;
     serial_->begin(baudrate_, SERIAL_8N1, rx_pin_, tx_pin_);
-    delay(100); // Allow Nextion to power up and be ready
 
     // Send reset + baud-rate negotiation
     sendCmd(""); // Wake up / flush
@@ -140,7 +139,6 @@ void NextionDisplay::showBootScreen(const String& firmware_version) {
     if (!initialized_) return;
     sendCmd("page boot");
     setAttr("boot.t_ver", "txt", "v" + firmware_version);
-    delay(2000);
     sendCmd("page " + page_prefix_);
 }
 

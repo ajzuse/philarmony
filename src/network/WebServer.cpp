@@ -21,8 +21,10 @@
 #include "../core/ConfigManager.hpp"
 #include "../core/LogManager.hpp"
 #include "../core/HardwareConfigParser.hpp"
+#include "../core/StateMachine.hpp"
 #include "WifiManager.hpp"
 #include "firmware_version.h"
+#include "../plugins/IPlugin.hpp"
 #include <WiFi.h>
 #include <Esp.h>
 
@@ -40,12 +42,14 @@ WebServer::~WebServer() {
 bool WebServer::begin(ConfigManager* config_mgr, LogManager* log_mgr,
                       HardwareConfigParser* hw_parser,
                       DriverRegistry* driver_registry,
-                      WifiManager* wifi_mgr) {
+                      WifiManager* wifi_mgr,
+                      StateMachine* state_machine) {
     config_mgr_ = config_mgr;
     log_mgr_ = log_mgr;
     hw_parser_ = hw_parser;
     driver_registry_ = driver_registry;
     wifi_mgr_ = wifi_mgr;
+    state_machine_ = state_machine;
 
     if (!server_) {
         server_ = new AsyncWebServer(port_);
@@ -70,7 +74,49 @@ void WebServer::setupRoutes() {
     server_->on("/", HTTP_GET, [this](AsyncWebServerRequest* request) { handleRoot(request); });
     server_->on("/info", HTTP_GET, [this](AsyncWebServerRequest* request) { handleInfo(request); });
     server_->on("/api/info", HTTP_GET, [this](AsyncWebServerRequest* request) { handleInfo(request); });
-    server_->on("/api/wifi/config", HTTP_POST, [this](AsyncWebServerRequest* request) { handleWifiConfigPost(request); });
+    server_->on(
+        "/api/wifi/config", HTTP_POST,
+        [this](AsyncWebServerRequest* request) {
+            auto* stored = static_cast<String*>(request->_tempObject);
+            if (stored) {
+                String body = *stored;
+                delete stored;
+                request->_tempObject = nullptr;
+
+                // Prefer form fields when present; otherwise treat body as JSON
+                if (request->hasParam("ssid", true) || request->hasParam("password", true)) {
+                    handleWifiConfigPost(request);
+                } else if (!body.isEmpty()) {
+                    JsonDocument doc;
+                    if (deserializeJson(doc, body) != DeserializationError::Ok) {
+                        sendError(request, 400, "Invalid JSON body");
+                        return;
+                    }
+                    const String ssid = doc["ssid"] | "";
+                    const String password = doc["password"] | "";
+                    handleWifiConfigApply(request, ssid, password);
+                } else {
+                    handleWifiConfigPost(request);
+                }
+                return;
+            }
+            handleWifiConfigPost(request);
+        },
+        nullptr,
+        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            if (index == 0) {
+                auto* body = new String();
+                body->reserve(total);
+                request->_tempObject = body;
+            }
+            auto* body = static_cast<String*>(request->_tempObject);
+            if (!body) {
+                return;
+            }
+            for (size_t i = 0; i < len; ++i) {
+                *body += static_cast<char>(data[i]);
+            }
+        });
     server_->on("/api/hardware/config", HTTP_GET, [this](AsyncWebServerRequest* request) { handleHardwareConfigGet(request); });
     server_->on(
         "/api/hardware/config", HTTP_POST,
@@ -99,7 +145,7 @@ void WebServer::setupRoutes() {
 }
 
 void WebServer::handleCaptivePortal(AsyncWebServerRequest* request) {
-    handleRoot(request);
+    request->redirect("/");
 }
 
 void WebServer::handleRoot(AsyncWebServerRequest* request) {
@@ -127,24 +173,34 @@ void WebServer::handleInfo(AsyncWebServerRequest* request) {
     } else {
         doc["system_status"] = "unknown";
     }
+    doc["active_feature"] = "001-filament-dryer-esp32";
     String json;
     serializeJson(doc, json);
     sendJson(request, 200, json);
 }
 
 void WebServer::handleWifiConfigPost(AsyncWebServerRequest* request) {
+    String ssid;
+    String password;
+    if (request->hasParam("ssid", true)) {
+        ssid = request->getParam("ssid", true)->value();
+    }
+    if (request->hasParam("password", true)) {
+        password = request->getParam("password", true)->value();
+    }
+    handleWifiConfigApply(request, ssid, password);
+}
+
+void WebServer::handleWifiConfigApply(AsyncWebServerRequest* request, const String& ssid,
+                                      const String& password) {
     if (!config_mgr_) {
         sendError(request, 500, "Config manager unavailable");
         return;
     }
 
     WifiConfig config = config_mgr_->getWifiConfig();
-    if (request->hasParam("ssid", true)) {
-        config.ssid = request->getParam("ssid", true)->value();
-    }
-    if (request->hasParam("password", true)) {
-        config.password = request->getParam("password", true)->value();
-    }
+    config.ssid = ssid;
+    config.password = password;
     config.valid = !config.ssid.isEmpty();
 
     if (!config_mgr_->setWifiConfig(config)) {
@@ -152,20 +208,12 @@ void WebServer::handleWifiConfigPost(AsyncWebServerRequest* request) {
         return;
     }
 
-    bool connected = false;
-    bool connecting = false;
     if (wifi_mgr_) {
-        connected = wifi_mgr_->setConfig(config) && wifi_mgr_->isConnected();
-        connecting = wifi_mgr_->isConnecting();
+        wifi_mgr_->setConfig(config);
     }
 
-    if (connected) {
-        sendJson(request, 200, "{\"status\":\"connected\"}");
-    } else if (connecting) {
-        sendJson(request, 200, "{\"status\":\"connecting\"}");
-    } else {
-        sendJson(request, 200, "{\"status\":\"saved\",\"ap_active\":true}");
-    }
+    sendJson(request, 200,
+             "{\"status\":\"success\",\"message\":\"Credenciais salvas. Reiniciando conexao...\"}");
 }
 
 void WebServer::handleLogDownload(AsyncWebServerRequest* request, bool drying_log) {
@@ -181,7 +229,171 @@ void WebServer::handleLogDownload(AsyncWebServerRequest* request, bool drying_lo
         return;
     }
 
-    request->send(200, "text/plain", body);
+    const char* filename = drying_log ? "drying.log" : "system.log";
+    AsyncWebServerResponse* response =
+        request->beginResponse(200, "text/plain; charset=utf-8", body);
+    response->addHeader("Content-Disposition",
+                        String("attachment; filename=\"") + filename + "\"");
+    request->send(response);
+}
+
+void WebServer::buildKlipperHardwareConfig(JsonObject& root) {
+    const SensorConfig sensor = config_mgr_->getSensorConfig();
+    const ActuatorConfig actuator = config_mgr_->getActuatorConfig();
+    const DisplayConfig display = config_mgr_->getDisplayConfig();
+
+    JsonArray sensors = root["sensors"].to<JsonArray>();
+
+    if (sensor.is_integrated) {
+        JsonObject primary = sensors.add<JsonObject>();
+        primary["id"] = "chamber_temp";
+        primary["type"] = sensor.type;
+        JsonArray caps = primary["capabilities"].to<JsonArray>();
+        caps.add("temperature");
+        caps.add("humidity");
+        JsonObject bus = primary["bus"].to<JsonObject>();
+        if (sensor.gpio_pin >= 0 &&
+            (sensor.type.indexOf("dht") >= 0 || sensor.type.indexOf("ds18") >= 0 ||
+             sensor.type == "ntc" || sensor.type == "thermistor" || sensor.type == "am2302")) {
+            bus["type"] = "onewire";
+            bus["pin"] = sensor.gpio_pin;
+        } else {
+            bus["type"] = "i2c";
+            bus["bus"] = sensor.i2c_bus;
+            bus["address"] = sensor.i2c_address;
+            bus["sda_pin"] = sensor.sda_pin;
+            bus["scl_pin"] = sensor.scl_pin;
+        }
+        JsonObject cal = primary["calibration"].to<JsonObject>();
+        cal["temperature_offset"] = sensor.temperature_offset;
+        cal["temperature_scale"] = sensor.temperature_scale;
+        cal["humidity_offset"] = sensor.humidity_offset;
+        cal["humidity_scale"] = sensor.humidity_scale;
+    } else {
+        JsonObject temp = sensors.add<JsonObject>();
+        temp["id"] = "chamber_temp";
+        temp["type"] = sensor.type;
+        JsonArray temp_caps = temp["capabilities"].to<JsonArray>();
+        temp_caps.add("temperature");
+        JsonObject temp_bus = temp["bus"].to<JsonObject>();
+        if (sensor.gpio_pin >= 0) {
+            temp_bus["type"] = "onewire";
+            temp_bus["pin"] = sensor.gpio_pin;
+        } else {
+            temp_bus["type"] = "i2c";
+            temp_bus["bus"] = sensor.i2c_bus;
+            temp_bus["address"] = sensor.i2c_address;
+            temp_bus["sda_pin"] = sensor.sda_pin;
+            temp_bus["scl_pin"] = sensor.scl_pin;
+        }
+        JsonObject temp_cal = temp["calibration"].to<JsonObject>();
+        temp_cal["temperature_offset"] = sensor.temperature_offset;
+        temp_cal["temperature_scale"] = sensor.temperature_scale;
+
+        if (!sensor.humidity_type.isEmpty()) {
+            JsonObject hum = sensors.add<JsonObject>();
+            hum["id"] = "chamber_humidity";
+            hum["type"] = sensor.humidity_type;
+            JsonArray hum_caps = hum["capabilities"].to<JsonArray>();
+            hum_caps.add("humidity");
+            JsonObject hum_bus = hum["bus"].to<JsonObject>();
+            if (sensor.humidity_gpio_pin >= 0) {
+                hum_bus["type"] = "onewire";
+                hum_bus["pin"] = sensor.humidity_gpio_pin;
+            } else {
+                hum_bus["type"] = "i2c";
+                hum_bus["bus"] = sensor.i2c_bus;
+                hum_bus["address"] = sensor.humidity_i2c_address;
+                hum_bus["sda_pin"] = sensor.humidity_sda_pin;
+                hum_bus["scl_pin"] = sensor.humidity_scl_pin;
+            }
+            JsonObject hum_cal = hum["calibration"].to<JsonObject>();
+            hum_cal["humidity_offset"] = sensor.humidity_offset;
+            hum_cal["humidity_scale"] = sensor.humidity_scale;
+        }
+    }
+
+    if (!sensor.extra_temp_type.isEmpty()) {
+        JsonObject extra = sensors.add<JsonObject>();
+        extra["id"] = "external_temp";
+        extra["type"] = sensor.extra_temp_type;
+        JsonArray caps = extra["capabilities"].to<JsonArray>();
+        caps.add("temperature");
+        JsonObject bus = extra["bus"].to<JsonObject>();
+        if (sensor.extra_temp_gpio_pin >= 0) {
+            bus["type"] = "onewire";
+            bus["pin"] = sensor.extra_temp_gpio_pin;
+        } else {
+            bus["type"] = "i2c";
+            bus["bus"] = sensor.i2c_bus;
+            bus["address"] = sensor.extra_temp_i2c_address;
+            bus["sda_pin"] = sensor.sda_pin;
+            bus["scl_pin"] = sensor.scl_pin;
+        }
+    }
+
+    JsonArray actuators = root["actuators"].to<JsonArray>();
+    {
+        JsonObject heater = actuators.add<JsonObject>();
+        heater["id"] = "heater";
+        heater["type"] = actuator.heater_type;
+        heater["role"] = "heater";
+        JsonObject pins = heater["pins"].to<JsonObject>();
+        pins["pwm"] = actuator.heater_pin;
+        JsonObject control = heater["control"].to<JsonObject>();
+        control["pwm_freq_hz"] = actuator.heater_pwm_freq;
+        control["max_power_pct"] = actuator.heater_max_power_pct;
+        JsonObject safety = heater["safety_limits"].to<JsonObject>();
+        safety["max_power_pct"] = actuator.heater_max_power_pct;
+    }
+    {
+        JsonObject fan = actuators.add<JsonObject>();
+        fan["id"] = "exhaust_fan";
+        fan["type"] = actuator.fan_type;
+        fan["role"] = "fan";
+        JsonObject pins = fan["pins"].to<JsonObject>();
+        pins["pwm"] = actuator.fan_pin;
+        JsonObject control = fan["control"].to<JsonObject>();
+        control["pwm_freq_hz"] = actuator.fan_pwm_freq;
+        control["cooldown_sec"] = actuator.cooldown_duration_sec;
+        JsonObject safety = fan["safety_limits"].to<JsonObject>();
+        safety["max_power_pct"] = 100;
+    }
+    if (actuator.has_custom) {
+        JsonObject custom = actuators.add<JsonObject>();
+        custom["id"] = "custom";
+        custom["type"] = actuator.custom_type;
+        custom["role"] = "custom";
+        JsonObject pins = custom["pins"].to<JsonObject>();
+        pins["gpio"] = actuator.custom_pin;
+    }
+
+    JsonObject display_obj = root["display"].to<JsonObject>();
+    display_obj["enabled"] = display.enabled;
+    display_obj["driver"] = display.driver;
+    JsonObject bus = display_obj["bus"].to<JsonObject>();
+    bus["type"] = display.bus_type;
+    if (display.bus_type == "spi" || display.spi_mosi >= 0) {
+        bus["mosi"] = display.spi_mosi;
+        bus["sclk"] = display.spi_sclk;
+        bus["cs"] = display.spi_cs;
+        bus["dc"] = display.dc_pin;
+        bus["rst"] = display.rst_pin;
+        bus["bl"] = display.backlight_pin;
+    }
+    JsonObject geometry = display_obj["geometry"].to<JsonObject>();
+    geometry["width"] = display.width;
+    geometry["height"] = display.height;
+    geometry["rotation"] = display.rotation;
+    JsonObject layout = display_obj["layout"].to<JsonObject>();
+    JsonArray fields = layout["fields"].to<JsonArray>();
+    for (const auto& field : display.fields) {
+        fields.add(field);
+    }
+    layout["font_scaling"] = "auto";
+    layout["refresh_rate_hz"] = display.refresh_rate_hz;
+
+    root["control"] = config_mgr_->getObjectConfig("control");
 }
 
 void WebServer::handleHardwareConfigGet(AsyncWebServerRequest* request) {
@@ -192,31 +404,7 @@ void WebServer::handleHardwareConfigGet(AsyncWebServerRequest* request) {
 
     JsonDocument doc;
     JsonObject root = doc.to<JsonObject>();
-
-    const SensorConfig sensor = config_mgr_->getSensorConfig();
-    JsonObject sensor_obj = root["sensor"].to<JsonObject>();
-    sensor_obj["type"] = sensor.type;
-    sensor_obj["i2c_address"] = sensor.i2c_address;
-    sensor_obj["gpio_pin"] = sensor.gpio_pin;
-    sensor_obj["temperature_offset"] = sensor.temperature_offset;
-    sensor_obj["temperature_scale"] = sensor.temperature_scale;
-    sensor_obj["humidity_offset"] = sensor.humidity_offset;
-    sensor_obj["humidity_scale"] = sensor.humidity_scale;
-
-    const ActuatorConfig actuator = config_mgr_->getActuatorConfig();
-    JsonObject actuator_obj = root["actuator"].to<JsonObject>();
-    actuator_obj["heater_pin"] = actuator.heater_pin;
-    actuator_obj["fan_pin"] = actuator.fan_pin;
-    actuator_obj["fan_mode"] = actuator.fan_mode;
-
-    const DisplayConfig display = config_mgr_->getDisplayConfig();
-    JsonObject display_obj = root["display"].to<JsonObject>();
-    display_obj["enabled"] = display.enabled;
-    display_obj["driver"] = display.driver;
-    display_obj["width"] = display.width;
-    display_obj["height"] = display.height;
-
-    root["control"] = config_mgr_->getObjectConfig("control");
+    buildKlipperHardwareConfig(root);
 
     String json;
     serializeJson(doc, json);
@@ -226,6 +414,11 @@ void WebServer::handleHardwareConfigGet(AsyncWebServerRequest* request) {
 void WebServer::handleHardwareConfigPostBody(AsyncWebServerRequest* request, const String& body) {
     if (!config_mgr_ || !hw_parser_) {
         sendError(request, 500, "Hardware parser unavailable");
+        return;
+    }
+
+    if (state_machine_ && (state_machine_->isDrying() || state_machine_->isCoolingDown())) {
+        sendError(request, 409, "Cannot reload hardware while drying or cooling down");
         return;
     }
 
@@ -264,6 +457,15 @@ void WebServer::handleNotFound(AsyncWebServerRequest* request) {
     if (wifi_mgr_ && wifi_mgr_->isAPActive()) {
         handleCaptivePortal(request);
         return;
+    }
+    if (plugin_mgr_) {
+        JsonDocument paramsDoc;
+        JsonObject params = paramsDoc.to<JsonObject>();
+        String response;
+        if (plugin_mgr_->callHttpRequest(request->url(), params, response)) {
+            request->send(200, "application/json", response);
+            return;
+        }
     }
     sendError(request, 404, "Not found");
 }

@@ -33,11 +33,17 @@ MosfetActuator::~MosfetActuator() {
 }
 
 bool MosfetActuator::begin(const JsonObject& config) {
-    gpio_pin_ = config["heater_pin"] | 25;
+    gpio_pin_ = config["heater_pin"] | config["pwm"] | config["gpio_pin"] | 25;
     pwm_freq_ = config["heater_pwm_freq"] | 1000;
     max_power_pct_ = config["heater_max_power_pct"] | 100;
     pwm_channel_ = config["pwm_channel"] | 0;
     pwm_resolution_ = config["pwm_resolution"] | 10;
+    current_sense_pin_ = config["current_sense_pin"] | config["sense_pin"] | -1;
+    overcurrent_adc_threshold_ = config["overcurrent_adc_threshold"] | 3000;
+    open_loop_detect_ = config["open_loop_detect"] | false;
+    overcurrent_latched_ = false;
+    emergency_stopped_ = false;
+    measured_power_pct_ = 0.0f;
     
     // Configure LEDC PWM
     ledcSetup(pwm_channel_, pwm_freq_, pwm_resolution_);
@@ -45,6 +51,10 @@ bool MosfetActuator::begin(const JsonObject& config) {
     
     // Ensure off at start
     ledcWrite(pwm_channel_, 0);
+
+    if (current_sense_pin_ >= 0) {
+        pinMode(current_sense_pin_, INPUT);
+    }
     
     state_ = ActuatorState{};
     initialized_ = true;
@@ -57,16 +67,53 @@ bool MosfetActuator::setPower(float power_pct) {
     // Clamp to safety limits
     power_pct = constrain(power_pct, 0.0f, (float)max_power_pct_);
     
-    if (state_.fault) {
+    if (state_.fault && !emergency_stopped_) {
         return false;
+    }
+    if (overcurrent_latched_) {
+        return false;
+    }
+    // Allow recovery from emergency stop when commanding again
+    if (emergency_stopped_ && power_pct >= 0.0f) {
+        emergency_stopped_ = false;
+        state_.fault = false;
+        state_.fault_message = "";
     }
     
     state_.power_pct = power_pct;
     state_.enabled = (power_pct > 0.0f);
     
     applyDuty(power_to_duty(power_pct));
+
+    // Open-loop heuristic: when enabled without sense pin, treat commanded echo as measured
+    // only if open_loop_detect_ — otherwise measured stays unset (no false PWM mismatch).
+    if (hasCurrentSense()) {
+        checkOvercurrent();
+    } else if (open_loop_detect_) {
+        // Stub open-loop: without ADC, cannot trip on current; leave measured unset.
+        measured_power_pct_ = state_.power_pct;
+    }
     
     return true;
+}
+
+bool MosfetActuator::checkOvercurrent() {
+    if (!initialized_ || current_sense_pin_ < 0) {
+        return false;
+    }
+    const int adc = analogRead(current_sense_pin_);
+    // Map ADC roughly to "measured" power for feedback comparison when sensing shunt
+    measured_power_pct_ = constrain((adc / 4095.0f) * 100.0f, 0.0f, 100.0f);
+    if (adc >= static_cast<int>(overcurrent_adc_threshold_) && state_.power_pct > 5.0f) {
+        overcurrent_latched_ = true;
+        ledcWrite(pwm_channel_, 0);
+        state_.enabled = false;
+        state_.power_pct = 0.0f;
+        state_.fault = true;
+        state_.fault_message = "Overcurrent sense";
+        return true;
+    }
+    return false;
 }
 
 void MosfetActuator::emergencyStop() {
@@ -77,7 +124,8 @@ void MosfetActuator::emergencyStop() {
     
     state_.enabled = false;
     state_.power_pct = 0.0f;
-    state_.fault = true;
+    emergency_stopped_ = true;
+    // Do NOT set state_.fault for e-stop — that must not count as overcurrent (T118)
     state_.fault_message = "Emergency stop";
     
 }

@@ -49,6 +49,34 @@ String StateMachine::getStateName() const {
     return "UNKNOWN";
 }
 
+String StateMachine::getStatusStreamName() const {
+    switch (current_state_) {
+        case SystemState::BOOT: return "boot";
+        case SystemState::WIFI_CONNECT: return "wifi_connect";
+        case SystemState::HOTSPOT: return "hotspot";
+        case SystemState::READY: return "ready";
+        case SystemState::DRYING: return "drying";
+        case SystemState::COOLDOWN: return "cooldown";
+        case SystemState::STOPPED: return "stopped";
+        case SystemState::FAULT_STOPPED: return "fault_stopped";
+    }
+    return "unknown";
+}
+
+String StateMachine::stopReasonToString(DryingStopReason reason) {
+    switch (reason) {
+        case DryingStopReason::RUNNING: return "running";
+        case DryingStopReason::COMPLETED: return "completed";
+        case DryingStopReason::USER_STOPPED: return "user_stopped";
+        case DryingStopReason::HUMIDITY_REACHED: return "humidity_reached";
+        case DryingStopReason::MAX_TIME: return "max_time";
+        case DryingStopReason::SAFETY_CUTOFF: return "safety_cutoff";
+        case DryingStopReason::SENSOR_ERROR: return "sensor_error";
+        case DryingStopReason::THERMAL_RUNAWAY: return "thermal_runaway";
+    }
+    return "unknown";
+}
+
 bool StateMachine::canTransition(SystemState from, SystemState to) const {
     uint8_t f = static_cast<uint8_t>(from);
     uint8_t t = static_cast<uint8_t>(to);
@@ -77,7 +105,10 @@ bool StateMachine::startDrying(const DryingSession& session) {
         return false;
     }
     
+    static uint32_t next_session_id = 1;
+
     current_session_ = session;
+    current_session_.session_id = next_session_id++;
     current_session_.status = SystemState::DRYING;
     current_session_.start_timestamp = millis();
     current_session_.stop_reason = DryingStopReason::RUNNING;

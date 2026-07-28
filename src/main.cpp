@@ -43,6 +43,7 @@
 #include "network/WebSocketServer.hpp"
 #include "utils/SystemMetrics.hpp"
 #include "drivers/interfaces/IDriverInterfaces.hpp"
+#include "drivers/actuators/MosfetActuator.hpp"
 #include "drivers/display/DisplayManager.hpp"
 #include "plugins/IPlugin.hpp"
 
@@ -99,6 +100,7 @@ static void cutActuatorPower() {
 
 static void teardownDrivers() {
     cutActuatorPower();
+    displayManager.end();
     if (activeTempSensor != nullptr && activeTempSensor == activeHumiditySensor) {
         delete activeTempSensor;
         activeTempSensor = nullptr;
@@ -144,6 +146,42 @@ static SensorReading applySensorCalibration(const SensorReading& reading) {
     return calibrated;
 }
 
+static float resolveFanDutyPct(float chamber_temp_c) {
+    ActuatorConfig ac = configMgr.getActuatorConfig();
+    if (!ac.fan_speed_curve.empty()) {
+        const auto& curve = ac.fan_speed_curve;
+        bool has_temps = false;
+        for (const auto& pt : curve) {
+            if (pt.temp_c > 0.0f) {
+                has_temps = true;
+                break;
+            }
+        }
+        if (!has_temps || isnan(chamber_temp_c)) {
+            return constrain(curve.front().power_pct, 0.0f, 100.0f);
+        }
+        if (chamber_temp_c <= curve.front().temp_c) {
+            return constrain(curve.front().power_pct, 0.0f, 100.0f);
+        }
+        if (chamber_temp_c >= curve.back().temp_c) {
+            return constrain(curve.back().power_pct, 0.0f, 100.0f);
+        }
+        for (size_t i = 1; i < curve.size(); ++i) {
+            if (chamber_temp_c <= curve[i].temp_c) {
+                const float t0 = curve[i - 1].temp_c;
+                const float t1 = curve[i].temp_c;
+                const float p0 = curve[i - 1].power_pct;
+                const float p1 = curve[i].power_pct;
+                if (t1 <= t0) return constrain(p1, 0.0f, 100.0f);
+                const float frac = (chamber_temp_c - t0) / (t1 - t0);
+                return constrain(p0 + frac * (p1 - p0), 0.0f, 100.0f);
+            }
+        }
+        return constrain(curve.back().power_pct, 0.0f, 100.0f);
+    }
+    return constrain(ac.fan_duty_pct, 0.0f, 100.0f);
+}
+
 static void beginCooldown(DryingStopReason reason) {
     if (!stateMachine.beginCooldown(reason)) {
         stateMachine.stopDrying(reason);
@@ -158,7 +196,7 @@ static void beginCooldown(DryingStopReason reason) {
         heaterActuator->setPower(0.0f);
     }
     if (fanActuator) {
-        fanActuator->setPower(80.0f);
+        fanActuator->setPower(resolveFanDutyPct(g_liveChamberTemp));
     }
 }
 
@@ -223,12 +261,39 @@ void controlLoopTask(void* pvParameters) {
 
         if (cooldownActive) {
             if (heaterActuator) heaterActuator->setPower(0.0f);
-            if (fanActuator) fanActuator->setPower(80.0f);
-            if (millis() >= cooldownEndMs) {
+            if (fanActuator) fanActuator->setPower(resolveFanDutyPct(chamberTemp));
+            const bool cooldownDone = millis() >= cooldownEndMs;
+            if (cooldownDone) {
                 cooldownActive = false;
                 if (fanActuator) fanActuator->setPower(0.0f);
                 stateMachine.completeCooldown();
                 pluginMgr.callOnSessionStop(stateMachine.getCurrentSession(), pendingCooldownReason);
+            }
+
+            // T121: 1Hz status/update during COOLDOWN (heater 0%, fan on)
+            static int cooldownLogCounter = 0;
+            if (++cooldownLogCounter >= 50) {
+                cooldownLogCounter = 0;
+                const float heaterPct = 0.0f;
+                const float fanPct = fanActuator ? fanActuator->getState().power_pct : 0.0f;
+                const bool fanOn = fanPct > 0.5f;
+                g_liveHeaterPowerPct = heaterPct;
+                g_liveFanPowerPct = fanPct;
+                stateMachine.updateDryingProgress(chamberTemp, chamberHumidity,
+                                                  heaterPct, false, fanPct, fanOn);
+                JsonDocument telemetry;
+                JsonObject payload = telemetry.to<JsonObject>();
+                wsServer.buildStatusPayload(payload);
+                payload["chamber_temp_c"] = chamberTemp;
+                payload["humidity_pct"] = chamberHumidity;
+                payload["heater_on"] = false;
+                payload["heater_power_pct"] = 0.0f;
+                payload["exhaust_fan_on"] = fanOn;
+                payload["exhaust_fan_power_pct"] = fanPct;
+                payload["cpu_usage_pct"] = sysMetrics.getCpuUsagePercent();
+                payload["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
+                payload["uptime_sec"] = millis() / 1000;
+                wsServer.broadcastTelemetry(payload);
             }
             continue;
         }
@@ -241,16 +306,29 @@ void controlLoopTask(void* pvParameters) {
         g_liveFanPowerPct = fanActuator ? fanActuator->getState().power_pct : 0.0f;
 
         if (heaterActuator) {
-            const bool overcurrent = !heaterActuator->isHealthy();
-            safetyEngine.checkActuatorFault(lastCommandedHeaterPct,
-                                            heaterActuator->getState().power_pct,
-                                            overcurrent);
+            bool overcurrent = false;
+            bool measured_from_feedback = false;
+            float measured = heaterActuator->getState().power_pct;
+            MosfetActuator* heaterMosfet = nullptr;
+            if (heaterActuator->getType() == "mosfet_aod4184" ||
+                heaterActuator->getType() == "mosfet_pwm") {
+                heaterMosfet = static_cast<MosfetActuator*>(heaterActuator);
+            }
+            if (heaterMosfet && heaterMosfet->hasCurrentSense()) {
+                overcurrent = heaterMosfet->checkOvercurrent();
+                measured = heaterMosfet->getMeasuredPowerPct();
+                measured_from_feedback = true;
+            }
+            // Never pass !isHealthy() as overcurrent — e-stop must not count (T118)
+            safetyEngine.checkActuatorFault(lastCommandedHeaterPct, measured,
+                                            overcurrent, measured_from_feedback);
         }
 
         bool sensorConnected = tempReading.valid;
         if (!safetyEngine.checkSafety(chamberTemp,
                                        stateMachine.getCurrentSession().target_temp_c,
                                        heaterPower, heaterPower > 0, sensorConnected)) {
+            // SafetyEngine already waited sensor_timeout_ms before faulting disconnect
             stateMachine.stopDrying(DryingStopReason::SENSOR_ERROR);
             cutActuatorPower();
             continue;
@@ -286,9 +364,10 @@ void controlLoopTask(void* pvParameters) {
                 reason = DryingStopReason::SAFETY_CUTOFF;
             }
 
+            // T115: do NOT abort on first invalid sample — SafetyEngine honors sensor_timeout_ms
             if (!sensorConnected) {
-                stop = true;
-                reason = DryingStopReason::SENSOR_ERROR;
+                // Surface error in status while session continues until timeout/fault
+                session.stop_reason = DryingStopReason::SENSOR_ERROR;
             }
 
             if (stop) {
@@ -309,14 +388,24 @@ void controlLoopTask(void* pvParameters) {
                 if (isnan(controlOutput)) {
                     controlOutput = 0.0f;
                 }
+                // Limit heater while sensor invalid (fail-safe soft limit)
+                if (!sensorConnected) {
+                    controlOutput = 0.0f;
+                }
                 controlOutput = constrain(controlOutput, 0.0f, 100.0f);
+                const uint8_t maxPwr = safetyEngine.getConfig().max_heater_power_pct;
+                if (controlOutput > maxPwr) {
+                    controlOutput = static_cast<float>(maxPwr);
+                }
 
                 if (heaterActuator) {
                     heaterActuator->setPower(controlOutput);
                     lastCommandedHeaterPct = controlOutput;
                 }
                 if (fanActuator && fanActuator != heaterActuator) {
-                    fanActuator->setPower((controlOutput > 0 || chamberTemp > 40.0f) ? 80.0f : 0.0f);
+                    const float fanDuty = resolveFanDutyPct(chamberTemp);
+                    fanActuator->setPower(
+                        (controlOutput > 0 || chamberTemp > 40.0f) ? fanDuty : 0.0f);
                 }
             }
         }
@@ -371,7 +460,7 @@ void controlLoopTask(void* pvParameters) {
             }
 
             StatusPayload pluginTelemetry;
-            pluginTelemetry.status = stateMachine.getStateName();
+            pluginTelemetry.status = stateMachine.getStatusStreamName();
             pluginTelemetry.chamber_temp_c = chamberTemp;
             pluginTelemetry.humidity_pct = chamberHumidity;
             pluginTelemetry.heater_power_pct = heaterPct;
@@ -397,6 +486,9 @@ void networkTask(void* pvParameters) {
         
         // WebSocket cleanup
         wsServer.loop();
+
+        // CPU/heap metrics (throttled internally to sample_interval)
+        sysMetrics.update();
         
         // Log streaming to WebSocket
         static uint32_t lastLogStream = 0;
@@ -438,7 +530,7 @@ void displayTask(void* pvParameters) {
         statusFields["cpu_usage_pct"] = sysMetrics.getCpuUsagePercent();
         statusFields["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
         statusFields["uptime_sec"] = millis() / 1000;
-        statusFields["status"] = stateMachine.getStateName();
+        statusFields["status"] = stateMachine.getStatusStreamName();
         statusFields["font_scaling"] = static_cast<int>(displayManager.getLayout().font_scaling);
         statusFields["compact_mode"] = displayManager.getLayout().compact_mode;
 
@@ -466,11 +558,10 @@ void onStateChange(SystemState oldState, SystemState newState) {
     logMgr.logSystem(LogLevel::INFO, LogModule::SYSTEM, 
                      "State transition: %s -> %s", oldStr.c_str(), newStr.c_str());
     
-    // On fault or stop, trigger emergency stop on actuators
+    // On fault or stop, clear cooldown gate and always cut actuators
     if (newState == SystemState::FAULT_STOPPED || newState == SystemState::STOPPED) {
-        if (!cooldownActive) {
-            cutActuatorPower();
-        }
+        cooldownActive = false;
+        cutActuatorPower();
     }
     if (newState == SystemState::DRYING) {
         pluginMgr.callOnSessionStart(stateMachine.getCurrentSession());
@@ -499,23 +590,33 @@ void onPidCalibrateProgress(int cycle, int total, float temp, float kp, float ki
     doc["kp"] = kp;
     doc["ki"] = ki;
     doc["kd"] = kd;
-    doc["saved_to_nvs"] = done;
+    // saved_to_nvs only after successful NVS write in onPidCalibrateComplete
+    doc["saved_to_nvs"] = false;
     
     wsServer.broadcastPidCalibrate(doc.as<JsonObject>());
 }
 
 void onPidCalibrateComplete(const PidAutotuneController::Result& result) {
+    bool saved = false;
     if (result.success) {
-        // Save to NVS
         PidConfig cfg(result.kp, result.ki, result.kd);
         configMgr.setPidConfig(cfg);
+        saved = true;
 
         JsonDocument paramsDoc;
         JsonObject params = paramsDoc.to<JsonObject>();
         params["kp"] = result.kp;
         params["ki"] = result.ki;
         params["kd"] = result.kd;
-        controlEngine.setAlgorithm("pid", params);
+
+        // T127: apply PID-like params to current algorithm when it accepts them
+        IControlAlgorithm* current = controlEngine.getCurrentAlgorithm();
+        const String currentType = controlEngine.getCurrentAlgorithmType();
+        if (current && (currentType == "pid" || current->needsTuning())) {
+            current->setParameters(params);
+        } else if (currentType.isEmpty() || currentType == "pid") {
+            controlEngine.setAlgorithm("pid", params);
+        }
         
         logMgr.logSystem(LogLevel::INFO, LogModule::PID, 
                          "PID auto-tune complete: Kp=%.2f, Ki=%.2f, Kd=%.2f",
@@ -525,10 +626,9 @@ void onPidCalibrateComplete(const PidAutotuneController::Result& result) {
                          "PID auto-tune failed: %s", result.error.c_str());
     }
     
-    // Notify via WebSocket
     StaticJsonDocument<256> doc;
-    doc["status"] = result.success ? "success" : "error";
-    doc["saved_to_nvs"] = result.success;
+    doc["status"] = result.success ? "complete" : "error";
+    doc["saved_to_nvs"] = saved;
     if (result.success) {
         doc["kp"] = result.kp;
         doc["ki"] = result.ki;
@@ -565,6 +665,9 @@ void applySafetyConfigFromManager() {
     ActuatorConfig ac = configMgr.getActuatorConfig();
     cfg.max_heater_power_pct = ac.heater_max_power_pct;
     cfg.cooldown_fan_duration_sec = ac.cooldown_duration_sec;
+    if (ac.heater_max_temp_c > 0.0f) {
+        cfg.hard_temp_limit_c = min(cfg.hard_temp_limit_c, ac.heater_max_temp_c);
+    }
     safetyEngine.setConfig(cfg);
 }
 
@@ -701,7 +804,10 @@ void initializeActuators() {
 
 void initializeDisplays() {
     DisplayConfig displayCfg = configMgr.getDisplayConfig();
-    if (!displayCfg.enabled) return;
+    if (!displayCfg.enabled) {
+        displayManager.end();
+        return;
+    }
 
     JsonDocument displayDoc;
     JsonObject dispConfig = displayDoc.to<JsonObject>();
@@ -717,6 +823,12 @@ void initializeDisplays() {
     dispConfig["dc_pin"] = displayCfg.dc_pin;
     dispConfig["rst_pin"] = displayCfg.rst_pin;
     dispConfig["backlight_pin"] = displayCfg.backlight_pin;
+    dispConfig["sda_pin"] = displayCfg.i2c_sda;
+    dispConfig["scl_pin"] = displayCfg.i2c_scl;
+    dispConfig["i2c_sda"] = displayCfg.i2c_sda;
+    dispConfig["i2c_scl"] = displayCfg.i2c_scl;
+    dispConfig["i2c_address"] = displayCfg.i2c_address;
+    dispConfig["address"] = displayCfg.i2c_address;
     dispConfig["refresh_rate_hz"] = displayCfg.refresh_rate_hz;
     JsonArray fieldArray = dispConfig["fields"].to<JsonArray>();
     for (const String& field : displayCfg.fields) {
@@ -732,6 +844,8 @@ void initializeDisplays() {
             layoutFields.add(field);
         }
         layout["refresh_rate_hz"] = displayCfg.refresh_rate_hz;
+        layout["font_scaling"] = displayCfg.font_scaling;
+        layout["compact_mode"] = displayCfg.compact_mode;
         displayManager.setLayout(layout);
 
         activeDisplay = nullptr;
@@ -759,7 +873,16 @@ void initializeControlAlgorithm() {
         params["kd"] = pidCfg.kd;
     }
 
+    if (algorithm == "custom") {
+        logMgr.logSystem(LogLevel::ERROR, LogModule::PID,
+                         "custom algorithm requires registered factory; not falling back");
+        return;
+    }
+
     if (!controlEngine.setAlgorithm(algorithm, params)) {
+        logMgr.logSystem(LogLevel::WARNING, LogModule::PID,
+                         "Failed to set algorithm '%s'; falling back to bang_bang",
+                         algorithm.c_str());
         JsonDocument bang;
         JsonObject bangParams = bang.to<JsonObject>();
         bangParams["hysteresis_c"] = 1.0f;
@@ -768,6 +891,12 @@ void initializeControlAlgorithm() {
 }
 
 void reloadHardwareFromConfig() {
+    // Belt-and-suspenders: API should reject reload during drying/cooldown;
+    // if called anyway, e-stop before tearing down live drivers.
+    if (stateMachine.isDrying() || stateMachine.isCoolingDown()) {
+        cutActuatorPower();
+        stateMachine.stopDrying(DryingStopReason::SAFETY_CUTOFF);
+    }
     teardownDrivers();
     initializeSensors();
     initializeActuators();
@@ -790,7 +919,8 @@ void initializeNetwork() {
         }
     });
 
-    if (webServer.begin(&configMgr, &logMgr, &hwParser, &DriverRegistry::instance(), &wifiMgr)) {
+    if (webServer.begin(&configMgr, &logMgr, &hwParser, &DriverRegistry::instance(), &wifiMgr,
+                        &stateMachine)) {
         webServer.setHardwareReloadCallback(reloadHardwareFromConfig);
         logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                          "HTTP server started on port 80");
@@ -801,7 +931,10 @@ void initializeNetwork() {
         webServer.attachWebSocket(wsServer.getWebSocket());
         wsServer.setHardwareReloadCallback(reloadHardwareFromConfig);
         wsServer.setActuatorCutoffCallback(cutActuatorPower);
+        wsServer.setSafetyRefreshCallback(applySafetyConfigFromManager);
         wsServer.setPidCalibrateCallbacks(onPidCalibrateProgress, onPidCalibrateComplete);
+        wsServer.setPluginManager(&pluginMgr);
+        webServer.setPluginManager(&pluginMgr);
         logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                          "WebSocket server started on ws://<ip>/ws");
     }
@@ -840,6 +973,15 @@ void setup() {
     stateMachine.setSessionUpdateCallback(onSessionUpdate);
     safetyEngine.setFaultCallback(onSafetyFault);
     safetyEngine.setEmergencyShutdownCallback(cutActuatorPower);
+    safetyEngine.setSpiRecoveryCallback([]() -> bool {
+        DisplayConfig dc = configMgr.getDisplayConfig();
+        if (!dc.enabled) {
+            return true;
+        }
+        displayManager.end();
+        initializeDisplays();
+        return displayManager.isAnyConnected() || dc.bus_type != "spi";
+    });
     pidAutotune.setHeaterCallback([](float power) { 
         if (heaterActuator) {
             heaterActuator->setPower(power);

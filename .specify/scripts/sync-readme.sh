@@ -275,7 +275,7 @@ ${specs_table}
 | Área | Detalhes |
 |------|----------|
 | **WiFi & Conectividade** | Conexão WiFi com fallback automático para Hotspot "philarmony"/"philarmony" (IP fixo 192.168.4.1) com servidor HTTP para configuração |
-| **WebSocket API** | Servidor WebSocket na porta 8080 com tópicos: \`config/sensors\`, \`config/pins\`, \`config/display\`, \`control/start\`, \`control/stop\`, \`status/subscribe\`, \`config/profiles/*\` |
+| **WebSocket API** | Servidor WebSocket na porta **80** path `/ws` com tópicos: \`config/hardware\`, \`config/display\`, \`config/control\`, \`control/start\`, \`control/stop\`, \`control/pid_calibrate\`, \`status/subscribe\`, \`status/update\`, \`config/profiles/*\`, \`logs/stream\` |
 | **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital, PID opcional, limite segurança 80°C hardcoded |
 | **Sensores** | DHT22, DS18B20, BME280 configuráveis via GPIO |
 | **Display** | SSD1306, SH1106 (I2C), ST7789, ILI9341 (SPI) - resolução configurável, campos selecionáveis |

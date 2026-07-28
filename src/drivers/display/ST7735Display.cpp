@@ -103,7 +103,6 @@ void ST7735Display::showBootScreen(const String& firmware_version) {
     display_->setCursor(4, 90);
     display_->print("v");
     display_->print(firmware_version);
-    delay(2000);
 }
 
 DisplayMetrics ST7735Display::getMetrics() const {

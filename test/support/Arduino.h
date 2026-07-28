@@ -60,6 +60,13 @@ public:
 
     char operator[](size_t index) const { return data_[index]; }
 
+    int indexOf(const char* substr) const {
+        if (!substr) return -1;
+        const auto pos = data_.find(substr);
+        return pos == std::string::npos ? -1 : static_cast<int>(pos);
+    }
+    int indexOf(const String& substr) const { return indexOf(substr.c_str()); }
+
 private:
     std::string data_;
 };

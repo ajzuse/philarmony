@@ -75,6 +75,9 @@ public:
     
     SystemState getState() const { return current_state_; }
     String getStateName() const;
+    /** Lowercase status for status/update and display (boot, drying, cooldown, …). */
+    String getStatusStreamName() const;
+    static String stopReasonToString(DryingStopReason reason);
     
     bool transitionTo(SystemState new_state);
     bool canTransition(SystemState from, SystemState to) const;

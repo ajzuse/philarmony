@@ -36,8 +36,14 @@ public:
     ActuatorState getState() const override;
     String getType() const override { return "mosfet_aod4184"; }
     String getName() const override { return "AOD4184 Heater MOSFET"; }
-    bool isHealthy() const override { return initialized_ && !state_.fault; }
-    
+    bool isHealthy() const override { return initialized_ && !state_.fault && !overcurrent_latched_; }
+
+    /** True when current-sense pin is configured and last sample exceeded threshold. */
+    bool hasCurrentSense() const { return current_sense_pin_ >= 0; }
+    bool checkOvercurrent();
+    float getMeasuredPowerPct() const { return measured_power_pct_; }
+    bool hasOpenLoopFeedback() const { return hasCurrentSense() || open_loop_detect_; }
+
     // PID integration
     void setPidConfig(float kp, float ki, float kd);
     float computePid(float target_temp, float current_temp, float dt);
@@ -48,6 +54,12 @@ private:
     uint8_t pwm_channel_ = 0;
     uint8_t pwm_resolution_ = 10;
     uint8_t max_power_pct_ = 100;
+    int8_t current_sense_pin_ = -1;
+    uint16_t overcurrent_adc_threshold_ = 3000;
+    bool open_loop_detect_ = false;
+    bool overcurrent_latched_ = false;
+    float measured_power_pct_ = 0.0f;
+    bool emergency_stopped_ = false;
     bool initialized_ = false;
     ActuatorState state_;
     

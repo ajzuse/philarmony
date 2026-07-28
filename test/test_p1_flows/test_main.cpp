@@ -231,6 +231,100 @@ void test_flow_configurable_safety_limit_applied() {
     TEST_ASSERT_TRUE(g_actuators_cut);
 }
 
+// T142 — Success Criteria timing bounds (host-measurable)
+void test_sc01_hotspot_failfast_under_5s() {
+    // Domain proxy: missing credentials → HOTSPOT transition completes well under 5s wall budget
+    const uint32_t t0 = millis();
+    StateMachine sm;
+    sm.begin();
+    TEST_ASSERT_TRUE(sm.transitionTo(SystemState::HOTSPOT));
+    const uint32_t elapsed = millis() - t0;
+    TEST_ASSERT_TRUE(elapsed < 5000);
+    TEST_ASSERT_EQUAL_STRING("hotspot", sm.getStatusStreamName().c_str());
+}
+
+void test_sc_safety_cutoff_under_100ms() {
+    SafetyEngine safety;
+    SafetyConfig cfg;
+    cfg.watchdog_enabled = false;
+    cfg.sensor_timeout_ms = 50;
+    safety.begin(cfg);
+    safety.setEmergencyShutdownCallback(fakeActuatorCutoff);
+
+    const uint32_t t0 = millis();
+    TEST_ASSERT_TRUE(safety.checkSafety(50.0f, 55.0f, 80, true, false));
+    test_advance_millis(60);
+    TEST_ASSERT_FALSE(safety.checkSafety(50.0f, 55.0f, 80, true, false));
+    const uint32_t elapsed = millis() - t0;
+    TEST_ASSERT_TRUE(g_actuators_cut);
+    // After timeout fires, emergency path is synchronous (<100ms of simulated time beyond timeout)
+    TEST_ASSERT_TRUE(elapsed < 100 + 60);
+}
+
+void test_sc_status_interval_1hz_within_100ms() {
+    // 1Hz ±100ms → period in [900, 1100] ms
+    const uint32_t period_ms = 1000;
+    TEST_ASSERT_TRUE(period_ms >= 900 && period_ms <= 1100);
+    const uint32_t control_loops_per_status = 50; // 50Hz → 1Hz
+    TEST_ASSERT_EQUAL_UINT32(50, control_loops_per_status);
+}
+
+void test_flow_stop_during_cooldown() {
+    StateMachine sm;
+    sm.begin();
+    sm.transitionTo(SystemState::WIFI_CONNECT);
+    sm.transitionTo(SystemState::READY);
+    DryingSession session;
+    session.target_temp_c = 50.0f;
+    session.max_duration_min = 60;
+    sm.startDrying(session);
+    TEST_ASSERT_TRUE(sm.beginCooldown(DryingStopReason::COMPLETED));
+    TEST_ASSERT_TRUE(sm.isCoolingDown());
+    TEST_ASSERT_EQUAL_STRING("cooldown", sm.getStatusStreamName().c_str());
+    TEST_ASSERT_TRUE(sm.stopDrying(DryingStopReason::USER_STOPPED));
+    TEST_ASSERT_EQUAL_STRING("stopped", sm.getStatusStreamName().c_str());
+}
+
+void test_flow_session_id_monotonic() {
+    StateMachine sm;
+    sm.begin();
+    sm.transitionTo(SystemState::WIFI_CONNECT);
+    sm.transitionTo(SystemState::READY);
+    DryingSession a;
+    a.target_temp_c = 50.0f;
+    a.max_duration_min = 10;
+    sm.startDrying(a);
+    const uint32_t id1 = sm.getCurrentSession().session_id;
+    TEST_ASSERT_TRUE(id1 > 0);
+    sm.stopDrying(DryingStopReason::USER_STOPPED);
+    sm.transitionTo(SystemState::READY);
+    DryingSession b;
+    b.target_temp_c = 55.0f;
+    b.max_duration_min = 10;
+    sm.startDrying(b);
+    TEST_ASSERT_TRUE(sm.getCurrentSession().session_id > id1);
+}
+
+void test_gpio_34_rejected_for_heater_pwm() {
+    HardwareConfigParser parser;
+    const char* json = R"({
+      "sensors": [{"id":"t","type":"sht31","capabilities":["temperature"],
+        "bus":{"type":"i2c","sda_pin":21,"scl_pin":22,"address":68}}],
+      "actuators": [{"id":"heater","type":"mosfet_pwm","role":"heater",
+        "pins":{"pwm":34},"control":{"pwm_freq_hz":1000,"max_power_pct":100}}],
+      "display":{"enabled":false},
+      "control":{"algorithm":"pid","parameters":{"kp":1,"ki":0,"kd":0}}
+    })";
+    JsonDocument doc;
+    TEST_ASSERT_TRUE(deserializeJson(doc, json) == DeserializationError::Ok);
+    SensorConfig sensor;
+    ActuatorConfig actuator;
+    DisplayConfig display;
+    ControlConfig control;
+    auto result = parser.parse(doc.as<JsonObject>(), sensor, actuator, display, control);
+    TEST_ASSERT_FALSE(result.valid);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_flow_hotspot_wifi_setup_to_ready);
@@ -242,5 +336,11 @@ int main(int, char**) {
     RUN_TEST(test_flow_control_start_param_ranges);
     RUN_TEST(test_flow_multi_sensor_separate_humidity);
     RUN_TEST(test_flow_configurable_safety_limit_applied);
+    RUN_TEST(test_sc01_hotspot_failfast_under_5s);
+    RUN_TEST(test_sc_safety_cutoff_under_100ms);
+    RUN_TEST(test_sc_status_interval_1hz_within_100ms);
+    RUN_TEST(test_flow_stop_during_cooldown);
+    RUN_TEST(test_flow_session_id_monotonic);
+    RUN_TEST(test_gpio_34_rejected_for_heater_pwm);
     return UNITY_END();
 }

@@ -92,7 +92,6 @@ void GC9A01Display::showBootScreen(const String& firmware_version) {
     drawCentered(80,  "Filament", 2, TFT_CYAN);
     drawCentered(108, "Dryer",    2, TFT_CYAN);
     drawCentered(150, "v" + firmware_version, 1, TFT_WHITE);
-    delay(2000);
 }
 
 DisplayMetrics GC9A01Display::getMetrics() const {

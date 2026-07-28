@@ -60,7 +60,7 @@
 
 | # | Spec | Nome | Status | Última Atualização |
 |---|------|------|--------|-------------------|
-| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | 🚧 Implementação (Phase 17) | 2026-07-28   |
+| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | 🚧 Implementação (Phase 19) | 2026-07-28   |
 | 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | 📝 Especificado | 2026-07-23   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | 📝 Especificado | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
@@ -78,7 +78,7 @@
 | Área | Detalhes |
 |------|----------|
 | **WiFi & Conectividade** | Conexão WiFi com fallback automático para Hotspot "philarmony"/"philarmony" (IP fixo 192.168.4.1) com servidor HTTP para configuração |
-| **WebSocket API** | Servidor WebSocket na porta **80** path `/ws` com tópicos: `config/hardware`, `config/sensors`, `config/display`, `control/start`, `control/stop`, `control/pid_calibrate`, `status/subscribe`, `config/profiles/*`, `logs/stream` |
+| **WebSocket API** | Servidor WebSocket na porta **80** path `/ws` com tópicos: `config/hardware`, `config/display`, `config/control`, `control/start`, `control/stop`, `control/pid_calibrate`, `status/subscribe`, `status/update`, `status/fault`, `config/profiles/*`, `logs/stream` |
 | **HTTP API** | `GET /api/info`, captive portal `/`, WiFi config `POST /api/wifi/config`, logs `GET /log/system` + `/log/drying` |
 | **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital/shared MOSFET, PID/bang-bang/feedforward, limite segurança configurável (default 80°C) |
 | **Sensores** | sht3x/sht31, DHT22, DS18B20, BME280, AHT20 (+ multi-sensor humidity) via JSON hardware config |
@@ -213,7 +213,7 @@
 ├────────────────────────────┼────────────┼────────────────────────┼──────┤
 │ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 4 Specs completas    │ 100% │
 │ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 1/4  │
-│ 3. Firmware Core           │ ⏳ AGUARDANDO │ ESP32 Base + WS + NVS   │ 0%   │
+│ 3. Firmware Core           │ 🔄 EM ANDAMENTO │ ESP32 Base + WS + NVS   │ ~90% │
 │ 4. Touch UI                │ ⏳ AGUARDANDO │ LVGL + Touch Driver     │ 0%   │
 │ 5. Desktop Installer       │ ⏳ AGUARDANDO │ Tauri/Flutter + esptool │ 0%   │
 │ 6. Control App (Multi)     │ ⏳ AGUARDANDO │ Flutter + SQLite + WS   │ 0%   │
@@ -238,34 +238,39 @@
 
 ---
 
-## 📁 Estrutura do Repositório (Planejada)
+## 📁 Estrutura do Repositório
 
 ```
 philarmony/
-├── .specify/                    # Spec Kit configuração
-│   ├── memory/constitution.md   # Constituição do projeto
-│   ├── templates/               # Templates spec/plan/tasks
-│   ├── scripts/                 # Scripts de automação (sync-readme, etc.)
-│   └── extensions.yml           # Hooks para sincronização automática
+├── .specify/                    # Spec Kit + constitution + hooks
 ├── .vscode/
 │   └── workspace.json
 ├── docs/
-│   ├── PT-BR/
-│   ├── EN-US/
+│   ├── PT-BR/                   # API, arquitetura, configuração
+│   └── EN-US/
+├── include/
+│   └── firmware_version.h
 ├── src/
-│   ├── hardware/
-│   ├── software/
-│   └── lib/
-├── tests/
-│   ├── flow/
-│   └── integration/
-├── examples/
-├── specs/                       # Especificações (4 atuais)
+│   ├── main.cpp
+│   ├── control/                 # PID, bang-bang, feedforward, ControlEngine
+│   ├── core/                    # Config, StateMachine, Safety, Log, Drivers registry
+│   ├── drivers/
+│   │   ├── actuators/
+│   │   ├── display/
+│   │   ├── interfaces/
+│   │   └── sensors/
+│   ├── network/                 # WiFi, HTTP, WebSocket
+│   ├── plugins/
+│   └── utils/
+├── test/                        # PlatformIO Unity (native + flow)
+├── specs/
 │   ├── 001-filament-dryer-esp32/
 │   ├── 002-esp32-desktop-installer/
 │   ├── 003-filament-dryer-control-app/
 │   └── 004-esp32-touchscreen-ui/
-├── README.md                    # Este arquivo (auto-sincronizado)
+├── platformio.ini
+├── partitions.csv
+├── README.md
 └── LICENSE
 ```
 
