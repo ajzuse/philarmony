@@ -16,5 +16,6 @@ Source seed: `specs/001-filament-dryer-esp32/research.md` (T100).
 | DEC-007 | Single-app partitions (OTA out of scope) | flash, partitions | 2026-07-28 |
 | DEC-008 | WiFi ConfigManager sole NVS owner + STA fail-fast | wifi, nvs, sc-01 | 2026-07-28 |
 | DEC-009 | Root Makefile wraps PlatformIO (build/test/flash) | tooling, makefile, pio | 2026-07-28 |
+| DEC-010 | Desktop installer Flutter + esptool (shared w/ 003) | desktop, installer, flutter | 2026-07-28 |
 
 See individual entry files under `entries/`.
