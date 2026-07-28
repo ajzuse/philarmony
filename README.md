@@ -4,7 +4,7 @@
 [![Platform: ESP32](https://img.shields.io/badge/Platform-ESP32-red.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![Language: C/C++](https://img.shields.io/badge/Language-C%2FC%2B%2B-orange.svg)]()
 [![Spec Kit](https://img.shields.io/badge/Spec%20Kit-v0.13.2-green.svg)]()
-[![Constitution](https://img.shields.io/badge/Constitution-v0.4.0-purple.svg)](.specify/memory/constitution.md)
+[![Constitution](https://img.shields.io/badge/Constitution-v0.6.0-purple.svg)](.specify/memory/constitution.md)
 
 ## 📋 Sobre o Projeto
 
@@ -60,7 +60,7 @@
 
 | # | Spec | Nome | Status | Última Atualização |
 |---|------|------|--------|-------------------|
-| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ⚙️ Tasks Geradas | 2026-07-23   |
+| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | 🚧 Implementação (Phase 17) | 2026-07-28   |
 | 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | 📝 Especificado | 2026-07-23   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | 📝 Especificado | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
@@ -78,29 +78,14 @@
 | Área | Detalhes |
 |------|----------|
 | **WiFi & Conectividade** | Conexão WiFi com fallback automático para Hotspot "philarmony"/"philarmony" (IP fixo 192.168.4.1) com servidor HTTP para configuração |
-| **WebSocket API** | Servidor WebSocket na porta 8080 com tópicos: `config/sensors`, `config/pins`, `config/display`, `control/start`, `control/stop`, `status/subscribe`, `config/profiles/*` |
-| **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital, PID opcional, limite segurança 80°C hardcoded |
-| **Sensores** | DHT22, DS18B20, BME280 configuráveis via GPIO |
-| **Display** | SSD1306, SH1106 (I2C), ST7789, ILI9341 (SPI) - resolução configurável, campos selecionáveis |
+| **WebSocket API** | Servidor WebSocket na porta **80** path `/ws` com tópicos: `config/hardware`, `config/sensors`, `config/display`, `control/start`, `control/stop`, `control/pid_calibrate`, `status/subscribe`, `config/profiles/*`, `logs/stream` |
+| **HTTP API** | `GET /api/info`, captive portal `/`, WiFi config `POST /api/wifi/config`, logs `GET /log/system` + `/log/drying` |
+| **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital/shared MOSFET, PID/bang-bang/feedforward, limite segurança configurável (default 80°C) |
+| **Sensores** | sht3x/sht31, DHT22, DS18B20, BME280, AHT20 (+ multi-sensor humidity) via JSON hardware config |
+| **Display** | SSD1306, SH1106, ST7789, ILI9341, ST7735, GC9A01, ILI9488, HD44780, Nextion, auto-detect — layout/font_scaling/compact_mode |
 | **Perfis de Filamento** | 5 built-in (PLA, PETG, ABS, TPU, Nylon) + até 20 customizados em NVS |
-| **Status Streaming** | 1Hz via WebSocket: temp, humidity, heater%, fan%, CPU%, RAM, uptime, elapsed/remaining, session_id |
-| **Segurança** | Watchdog HW, runaway térmico, validação de sensor, feedback de atuador, fan 30s pós-ciclo (COOLDOWN), NVS atômico |
-| **Tooling** | Root `Makefile` (`make build|test|flash`), CI GitHub Actions, Unity `pio test -e native`, docs PT-BR/EN-US |
-
-#### Entidades Principais
-- `DryingCycle` - Ciclo de secagem com stop_reason
-- `SensorConfig` - Tipo e pinagem de sensores
-- `PinConfig` - Mapeamento GPIOs (heater, fan, sensors, I2C, SPI)
-- `DisplayConfig` - Driver, resolução, campos visíveis
-- `FilamentProfile` - id, name_pt/en, target_temp, duration, target_humidity, is_builtin
-
-#### Fora do Escopo (Fase Atual)
-- Touch screen (spec 004)
-- Multi-zona
-- OTA updates
-- Autenticação/usuários
-- MQTT/Cloud
-- Scheduler/agendamento
+| **Status Streaming** | 1Hz via WebSocket: temp, humidity, heater%, fan%, CPU%, RAM, uptime, elapsed/remaining, fault_code |
+| **Segurança** | Watchdog HW, corte térmico, fan cooldown pós-ciclo (`COOLDOWN`), sensor timeout configurável, NVS atômico |
 
 #### Entidades Principais
 - `DryingCycle` - Ciclo de secagem com stop_reason
@@ -359,5 +344,5 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 
 ---
 
-*README auto-gerado e sincronizado pela Constituição Philarmony v0.4.0*
-*Última atualização: 2026-07-24 | Trigger: tasks*
+*README auto-gerado e sincronizado pela Constituição Philarmony v0.6.0*
+*Última atualização: 2026-07-28 | Trigger: implement*

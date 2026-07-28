@@ -26,10 +26,13 @@ void test_sensor_disconnect_after_retries_triggers_fault() {
     SafetyEngine safety;
     SafetyConfig cfg;
     cfg.watchdog_enabled = false;
+    cfg.sensor_timeout_ms = 600;
     TEST_ASSERT_TRUE(safety.begin(cfg));
 
     TEST_ASSERT_TRUE(safety.checkSafety(40.0f, 50.0f, 0, false, false));
+    test_advance_millis(300);
     TEST_ASSERT_TRUE(safety.checkSafety(40.0f, 50.0f, 0, false, false));
+    test_advance_millis(400); // total disconnect duration >= 600ms
     TEST_ASSERT_FALSE(safety.checkSafety(40.0f, 50.0f, 0, false, false));
     TEST_ASSERT_TRUE(safety.isFaulted());
     TEST_ASSERT_EQUAL((int)FaultCode::SENSOR_DISCONNECT, (int)safety.getLastFault());

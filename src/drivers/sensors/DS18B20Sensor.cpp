@@ -1,3 +1,21 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 /**
  * DS18B20Sensor - Implementation
  */
@@ -55,35 +73,42 @@ bool DS18B20Sensor::findDevice() {
 }
 
 SensorReading DS18B20Sensor::read() {
-    SensorReading reading;
+    SensorReading reading = last_reading_;
     reading.timestamp = millis();
-    
+
     if (!initialized_) {
         reading.valid = false;
         reading.error_message = "Not initialized";
         return reading;
     }
-    
-    // Start conversion
-    onewire_->reset();
-    onewire_->select(device_addr_);
-    onewire_->write(0x44, 1); // Start conversion, parasite power
-    
-    // Wait for conversion (max 750ms for 12-bit)
-    uint32_t wait_time = 94 << (resolution_ - 9);
-    delay(wait_time);
-    
+
+    if (read_phase_ == ReadPhase::IDLE) {
+        onewire_->reset();
+        onewire_->select(device_addr_);
+        onewire_->write(0x44, 1); // Start conversion
+        const uint32_t wait_time = 94u << (resolution_ - 9);
+        convert_ready_ms_ = millis() + wait_time;
+        read_phase_ = ReadPhase::CONVERTING;
+        return reading;
+    }
+
+    if (millis() < convert_ready_ms_) {
+        return reading;
+    }
+
     int16_t raw_temp;
+    read_phase_ = ReadPhase::IDLE;
     if (readScratchpad(raw_temp)) {
         reading.temperature = raw_temp / 16.0f;
-        reading.humidity = NAN; // DS18B20 doesn't measure humidity
+        reading.humidity = NAN;
         reading.valid = true;
+        reading.error_message = "";
         last_reading_ = reading;
     } else {
         reading.valid = false;
         reading.error_message = "Failed to read scratchpad";
     }
-    
+
     return reading;
 }
 

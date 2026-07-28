@@ -70,6 +70,7 @@ void test_flow_sensor_fault_safe_abort() {
     SafetyEngine safety;
     SafetyConfig cfg;
     cfg.watchdog_enabled = false;
+    cfg.sensor_timeout_ms = 600;
     safety.begin(cfg);
     safety.setEmergencyShutdownCallback(fakeActuatorCutoff);
 
@@ -83,7 +84,7 @@ void test_flow_sensor_fault_safe_abort() {
     sm.startDrying(session);
 
     TEST_ASSERT_TRUE(safety.checkSafety(50.0f, 55.0f, 80, true, false));
-    TEST_ASSERT_TRUE(safety.checkSafety(50.0f, 55.0f, 80, true, false));
+    test_advance_millis(700);
     TEST_ASSERT_FALSE(safety.checkSafety(50.0f, 55.0f, 80, true, false));
     TEST_ASSERT_TRUE(safety.isFaulted());
     TEST_ASSERT_EQUAL((int)FaultCode::SENSOR_DISCONNECT, (int)safety.getLastFault());

@@ -1,3 +1,21 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 /**
  * Filament Dryer ESP32 - Main Firmware Entry Point
  * 
@@ -127,6 +145,11 @@ static SensorReading applySensorCalibration(const SensorReading& reading) {
 }
 
 static void beginCooldown(DryingStopReason reason) {
+    if (!stateMachine.beginCooldown(reason)) {
+        stateMachine.stopDrying(reason);
+        cutActuatorPower();
+        return;
+    }
     pendingCooldownReason = reason;
     cooldownActive = true;
     ActuatorConfig actuatorCfg = configMgr.getActuatorConfig();
@@ -204,6 +227,7 @@ void controlLoopTask(void* pvParameters) {
             if (millis() >= cooldownEndMs) {
                 cooldownActive = false;
                 if (fanActuator) fanActuator->setPower(0.0f);
+                stateMachine.completeCooldown();
                 pluginMgr.callOnSessionStop(stateMachine.getCurrentSession(), pendingCooldownReason);
             }
             continue;
@@ -268,32 +292,32 @@ void controlLoopTask(void* pvParameters) {
             }
 
             if (stop) {
-                stateMachine.stopDrying(reason);
                 if (reason == DryingStopReason::HUMIDITY_REACHED ||
                     reason == DryingStopReason::MAX_TIME ||
                     reason == DryingStopReason::COMPLETED) {
                     beginCooldown(reason);
                 } else {
+                    stateMachine.stopDrying(reason);
                     cutActuatorPower();
                 }
                 continue;
             }
 
-            float targetTemp = session.target_temp_c;
-            float controlOutput = controlEngine.compute(targetTemp, chamberTemp, dt);
-            if (isnan(controlOutput)) {
-                controlOutput = 0.0f;
-            }
-            controlOutput = constrain(controlOutput, 0.0f, 100.0f);
+            if (!pidAutotune.isRunning()) {
+                float targetTemp = session.target_temp_c;
+                float controlOutput = controlEngine.compute(targetTemp, chamberTemp, dt);
+                if (isnan(controlOutput)) {
+                    controlOutput = 0.0f;
+                }
+                controlOutput = constrain(controlOutput, 0.0f, 100.0f);
 
-            if (heaterActuator) {
-                heaterActuator->setPower(controlOutput);
-                lastCommandedHeaterPct = controlOutput;
-            }
-            if (fanActuator && fanActuator != heaterActuator) {
-                fanActuator->setPower((controlOutput > 0 || chamberTemp > 40.0f) ? 80.0f : 0.0f);
-            } else if (fanActuator && fanActuator == heaterActuator) {
-                // Shared MOSFET: heater power already set; fan role shares same output
+                if (heaterActuator) {
+                    heaterActuator->setPower(controlOutput);
+                    lastCommandedHeaterPct = controlOutput;
+                }
+                if (fanActuator && fanActuator != heaterActuator) {
+                    fanActuator->setPower((controlOutput > 0 || chamberTemp > 40.0f) ? 80.0f : 0.0f);
+                }
             }
         }
 
@@ -407,7 +431,16 @@ void displayTask(void* pvParameters) {
         statusFields["target_humidity_pct"] = session.target_humidity_pct;
         statusFields["heater_power_pct"] = g_liveHeaterPowerPct;
         statusFields["exhaust_fan_power_pct"] = g_liveFanPowerPct;
+        statusFields["heater_on"] = g_liveHeaterPowerPct > 0.5f;
+        statusFields["exhaust_fan_on"] = g_liveFanPowerPct > 0.5f;
+        statusFields["elapsed_time_sec"] = session.elapsed_sec;
+        statusFields["remaining_time_sec"] = session.remaining_sec;
+        statusFields["cpu_usage_pct"] = sysMetrics.getCpuUsagePercent();
+        statusFields["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
+        statusFields["uptime_sec"] = millis() / 1000;
         statusFields["status"] = stateMachine.getStateName();
+        statusFields["font_scaling"] = static_cast<int>(displayManager.getLayout().font_scaling);
+        statusFields["compact_mode"] = displayManager.getLayout().compact_mode;
 
         displayManager.update(statusFields);
         displayManager.markRefreshed();
@@ -426,6 +459,7 @@ void onStateChange(SystemState oldState, SystemState newState) {
         case SystemState::HOTSPOT: newStr = "HOTSPOT"; break;
         case SystemState::READY: newStr = "READY"; break;
         case SystemState::DRYING: newStr = "DRYING"; break;
+        case SystemState::COOLDOWN: newStr = "COOLDOWN"; break;
         case SystemState::STOPPED: newStr = "STOPPED"; break;
         case SystemState::FAULT_STOPPED: newStr = "FAULT_STOPPED"; break;
     }
@@ -743,6 +777,7 @@ void reloadHardwareFromConfig() {
 }
 
 void initializeNetwork() {
+    wifiMgr.setConfigManager(&configMgr);
     wifiMgr.begin();
 
     wifiMgr.setStatusCallback([](WifiManager::Status s) {

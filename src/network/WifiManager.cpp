@@ -1,3 +1,21 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 /**
  * WifiManager - Non-blocking STA + AP fallback + DNS captive sinkhole
  */
@@ -19,18 +37,14 @@ WifiManager::~WifiManager() {
 }
 
 bool WifiManager::begin() {
-    if (!prefs_.begin("filament_dryer", true)) {
-        return false;
-    }
-    
     loadConfig();
-    
+
     if (current_config_.valid && !current_config_.ssid.isEmpty()) {
         beginConnectAsync(current_config_.ssid, current_config_.password);
     } else {
         startAP();
     }
-    
+
     return true;
 }
 
@@ -40,6 +54,10 @@ bool WifiManager::connect() {
     }
     beginConnectAsync(current_config_.ssid, current_config_.password);
     return true;
+}
+
+uint32_t WifiManager::connectTimeoutMs() const {
+    return ever_connected_ ? RECONNECT_TIMEOUT_MS : CONNECT_TIMEOUT_MS;
 }
 
 void WifiManager::beginConnectAsync(const String& ssid, const String& password) {
@@ -57,7 +75,7 @@ void WifiManager::startAP() {
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET);
     bool result = WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL);
-    
+
     if (result) {
         ap_active_ = true;
         startDnsSinkhole();
@@ -69,8 +87,8 @@ void WifiManager::stopAP() {
     stopDnsSinkhole();
     if (ap_active_) {
         WiFi.softAPdisconnect(true);
-        ap_active_ = false;
     }
+    ap_active_ = false;
 }
 
 void WifiManager::startDnsSinkhole() {
@@ -94,8 +112,10 @@ void WifiManager::loop() {
     }
 
     if (status_ == Status::CONNECTING) {
-        if (WiFi.status() == WL_CONNECTED) {
+        const wl_status_t st = WiFi.status();
+        if (st == WL_CONNECTED) {
             wifi_connected_ = true;
+            ever_connected_ = true;
             retry_count_ = 0;
             retry_delay_ms_ = 5000;
             stopAP();
@@ -103,7 +123,19 @@ void WifiManager::loop() {
             return;
         }
 
-        if (millis() - connect_start_ms_ >= CONNECT_TIMEOUT_MS) {
+        // Fail fast on hard auth errors so AP meets SC-01 (<5s)
+        if (st == WL_NO_SSID_AVAIL || st == WL_CONNECT_FAILED || st == WL_CONNECTION_LOST) {
+            WiFi.disconnect(true);
+            wifi_connected_ = false;
+            if (!ap_active_) {
+                startAP();
+            } else {
+                updateStatus(Status::AP_ACTIVE);
+            }
+            return;
+        }
+
+        if (millis() - connect_start_ms_ >= connectTimeoutMs()) {
             WiFi.disconnect(true);
             wifi_connected_ = false;
             if (!ap_active_) {
@@ -118,12 +150,13 @@ void WifiManager::loop() {
     if (status_ == Status::CONNECTED) {
         if (WiFi.status() != WL_CONNECTED) {
             wifi_connected_ = false;
-            
+
             if (retry_count_ < 5) {
                 retry_count_++;
                 retry_delay_ms_ = min(retry_delay_ms_ * 2, 60000);
                 last_retry_ = millis();
                 updateStatus(Status::CONNECTING);
+                beginConnectAsync(current_config_.ssid, current_config_.password);
             } else {
                 startAP();
             }
@@ -134,9 +167,12 @@ void WifiManager::loop() {
         return;
     }
 
-    if (status_ == Status::CONNECTING || status_ == Status::DISCONNECTED) {
-        if (millis() - last_retry_ >= retry_delay_ms_ && current_config_.valid) {
-            connect();
+    if (status_ == Status::AP_ACTIVE || status_ == Status::DISCONNECTED) {
+        if (millis() - last_retry_ >= retry_delay_ms_ && current_config_.valid &&
+            !current_config_.ssid.isEmpty() && !wifi_connected_) {
+            // Background STA retry while AP stays up
+            beginConnectAsync(current_config_.ssid, current_config_.password);
+            last_retry_ = millis();
         }
     }
 }
@@ -144,12 +180,13 @@ void WifiManager::loop() {
 bool WifiManager::setConfig(const WifiConfig& config) {
     current_config_ = config;
     current_config_.valid = !config.ssid.isEmpty();
-    
+
     if (!saveConfig()) {
         return false;
     }
 
     retry_count_ = 0;
+    ever_connected_ = false; // new creds: use fail-fast timeout
     beginConnectAsync(current_config_.ssid, current_config_.password);
     return true;
 }
@@ -167,31 +204,19 @@ void WifiManager::clearConfig() {
 }
 
 void WifiManager::loadConfig() {
-    String json = prefs_.getString("wifi", "{}");
-    JsonDocument doc;
-    deserializeJson(doc, json);
-    
-    current_config_.ssid = doc["ssid"] | "";
-    current_config_.password = doc["password"] | "";
-    current_config_.valid = doc["valid"] | false;
+    if (config_mgr_) {
+        current_config_ = config_mgr_->getWifiConfig();
+        return;
+    }
+    // Fallback only if ConfigManager was not wired (should not happen in production)
+    current_config_ = WifiConfig{};
 }
 
 bool WifiManager::saveConfig() {
-    JsonDocument doc;
-    doc["ssid"] = current_config_.ssid;
-    doc["password"] = current_config_.password;
-    doc["valid"] = current_config_.valid;
-    
-    String json;
-    serializeJson(doc, json);
-    
-    prefs_.end();
-    if (!prefs_.begin("filament_dryer", false)) return false;
-    bool ok = prefs_.putString("wifi", json);
-    prefs_.end();
-    prefs_.begin("filament_dryer", true);
-    
-    return ok;
+    if (config_mgr_) {
+        return config_mgr_->setWifiConfig(current_config_);
+    }
+    return false;
 }
 
 void WifiManager::updateStatus(Status new_status) {

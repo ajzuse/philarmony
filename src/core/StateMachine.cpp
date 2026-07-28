@@ -1,11 +1,29 @@
 /**
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
  * StateMachine - Implementation
  */
 #include "StateMachine.hpp"
 
 namespace filament_dryer {
 
-constexpr bool StateMachine::valid_transitions[7][7];
+constexpr bool StateMachine::valid_transitions[8][8];
 
 StateMachine::StateMachine() {}
 
@@ -24,6 +42,7 @@ String StateMachine::getStateName() const {
         case SystemState::HOTSPOT: return "HOTSPOT";
         case SystemState::READY: return "READY";
         case SystemState::DRYING: return "DRYING";
+        case SystemState::COOLDOWN: return "COOLDOWN";
         case SystemState::STOPPED: return "STOPPED";
         case SystemState::FAULT_STOPPED: return "FAULT_STOPPED";
     }
@@ -33,7 +52,7 @@ String StateMachine::getStateName() const {
 bool StateMachine::canTransition(SystemState from, SystemState to) const {
     uint8_t f = static_cast<uint8_t>(from);
     uint8_t t = static_cast<uint8_t>(to);
-    if (f >= 7 || t >= 7) return false;
+    if (f >= 8 || t >= 8) return false;
     return valid_transitions[f][t];
 }
 
@@ -47,7 +66,7 @@ bool StateMachine::transitionTo(SystemState new_state) {
     state_enter_time_ = millis();
     
     if (state_change_cb_) {
-        state_change_cb_(previous_state_, current_state_);
+        state_change_cb_(previous_state_, new_state);
     }
     
     return true;
@@ -66,8 +85,27 @@ bool StateMachine::startDrying(const DryingSession& session) {
     return transitionTo(SystemState::DRYING);
 }
 
-bool StateMachine::stopDrying(DryingStopReason reason) {
+bool StateMachine::beginCooldown(DryingStopReason reason) {
     if (current_state_ != SystemState::DRYING) {
+        return false;
+    }
+    pending_cooldown_reason_ = reason;
+    current_session_.status = SystemState::COOLDOWN;
+    return transitionTo(SystemState::COOLDOWN);
+}
+
+bool StateMachine::completeCooldown() {
+    if (current_state_ != SystemState::COOLDOWN) {
+        return false;
+    }
+    current_session_.stop_reason = pending_cooldown_reason_;
+    current_session_.status = SystemState::STOPPED;
+    current_session_.elapsed_sec = (millis() - current_session_.start_timestamp) / 1000;
+    return transitionTo(SystemState::STOPPED);
+}
+
+bool StateMachine::stopDrying(DryingStopReason reason) {
+    if (current_state_ != SystemState::DRYING && current_state_ != SystemState::COOLDOWN) {
         return false;
     }
     
@@ -75,14 +113,13 @@ bool StateMachine::stopDrying(DryingStopReason reason) {
     current_session_.status = SystemState::STOPPED;
     current_session_.elapsed_sec = (millis() - current_session_.start_timestamp) / 1000;
     
-    transitionTo(SystemState::STOPPED);
-    return true;
+    return transitionTo(SystemState::STOPPED);
 }
 
 bool StateMachine::updateDryingProgress(float current_temp, float current_humidity,
                                          float heater_power_pct, bool heater_on,
                                          float fan_power_pct, bool fan_on) {
-    if (current_state_ != SystemState::DRYING) {
+    if (current_state_ != SystemState::DRYING && current_state_ != SystemState::COOLDOWN) {
         return false;
     }
     
@@ -103,7 +140,8 @@ bool StateMachine::updateDryingProgress(float current_temp, float current_humidi
 }
 
 uint32_t StateMachine::getSessionUptime() const {
-    if (current_state_ == SystemState::DRYING && current_session_.start_timestamp > 0) {
+    if ((current_state_ == SystemState::DRYING || current_state_ == SystemState::COOLDOWN) &&
+        current_session_.start_timestamp > 0) {
         return (millis() - current_session_.start_timestamp) / 1000;
     }
     return 0;

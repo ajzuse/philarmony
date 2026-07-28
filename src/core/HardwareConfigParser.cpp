@@ -1,3 +1,21 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 /**
  * HardwareConfigParser - Implementation
  * Generic hardware configuration parser and validator
@@ -696,9 +714,55 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::checkPinConflicts(c
     ValidationResult result;
     std::map<int, String> pin_usage;
 
-    // Check sensor pins
-    // Note: This is a simplified version - full implementation would check all pins
-    // from sensor.bus, actuator.pins, display pins
+    auto claim = [&](int pin, const String& owner) {
+        if (pin < 0) return;
+        auto it = pin_usage.find(pin);
+        if (it != pin_usage.end() && it->second != owner) {
+            addError(result, "GPIO " + String(pin) + " conflict: " + it->second + " vs " + owner);
+        } else {
+            pin_usage[pin] = owner;
+        }
+    };
+
+    auto isI2cSensor = [](const String& t) {
+        return t == "sht3x" || t == "sht30" || t == "sht31" || t == "aht20" ||
+               t == "bme280" || t == "bmp280";
+    };
+
+    if (isI2cSensor(sensor.type)) {
+        claim(sensor.sda_pin, "sensor.sda");
+        claim(sensor.scl_pin, "sensor.scl");
+    } else {
+        claim(sensor.gpio_pin, "sensor.gpio");
+    }
+    if (!sensor.is_integrated && !sensor.humidity_type.isEmpty()) {
+        if (isI2cSensor(sensor.humidity_type)) {
+            claim(sensor.humidity_sda_pin, "humidity.sda");
+            claim(sensor.humidity_scl_pin, "humidity.scl");
+        } else {
+            claim(sensor.humidity_gpio_pin, "humidity.gpio");
+        }
+    }
+    claim(sensor.extra_temp_gpio_pin, "extra_temp.gpio");
+
+    claim(actuator.heater_pin, "heater");
+    if (actuator.fan_mode != "shared_mosfet" && actuator.fan_type != "shared_mosfet") {
+        claim(actuator.fan_pin, "fan");
+    }
+    if (actuator.has_custom) {
+        claim(actuator.custom_pin, "custom");
+    }
+
+    if (display.enabled) {
+        if (display.bus_type == "spi") {
+            claim(display.spi_mosi, "display.mosi");
+            claim(display.spi_sclk, "display.sclk");
+            claim(display.spi_cs, "display.cs");
+            claim(display.dc_pin, "display.dc");
+            claim(display.rst_pin, "display.rst");
+            claim(display.backlight_pin, "display.bl");
+        }
+    }
 
     return result;
 }

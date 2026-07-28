@@ -1,3 +1,21 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 /**
  * DisplayManager - Implementation
  *
@@ -23,6 +41,7 @@ DisplayManager::~DisplayManager() {}
 // ---------------------------------------------------------------------------
 
 bool DisplayManager::begin(const JsonObject& config) {
+    end();
     String driver = config["driver"] | "auto";
 
     if (driver == "auto") {
@@ -51,6 +70,15 @@ bool DisplayManager::begin(const JsonObject& config) {
     }
 
     return active_display_ != nullptr;
+}
+
+void DisplayManager::end() {
+    if (active_display_) {
+        active_display_->clear();
+        active_display_ = nullptr;
+        active_type_ = "none";
+    }
+    last_refresh_ms_ = 0;
 }
 
 bool DisplayManager::setDisplayType(const String& type, const JsonObject& config) {
@@ -275,6 +303,8 @@ void DisplayManager::buildRenderPayload(const JsonObject& src,
         for (JsonPair kv : src) {
             dst[kv.key()] = kv.value();
         }
+        dst["font_scaling"] = static_cast<int>(layout_.font_scaling);
+        dst["compact_mode"] = layout_.compact_mode;
         return;
     }
 
@@ -284,6 +314,10 @@ void DisplayManager::buildRenderPayload(const JsonObject& src,
             dst[field] = src[field];
         }
     }
+
+    // Always pass layout hints so drivers can size text
+    dst["font_scaling"] = static_cast<int>(layout_.font_scaling);
+    dst["compact_mode"] = layout_.compact_mode;
 
     // Always pass "status" — drivers need it for color coding even in compact mode
     if (src.containsKey("status") && !dst.containsKey("status")) {

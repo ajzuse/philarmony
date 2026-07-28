@@ -1,9 +1,30 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "WebServer.hpp"
 
 #include "../core/ConfigManager.hpp"
 #include "../core/LogManager.hpp"
 #include "../core/HardwareConfigParser.hpp"
 #include "WifiManager.hpp"
+#include "firmware_version.h"
+#include <WiFi.h>
+#include <Esp.h>
 
 namespace filament_dryer {
 
@@ -48,6 +69,7 @@ void WebServer::setupRoutes() {
 
     server_->on("/", HTTP_GET, [this](AsyncWebServerRequest* request) { handleRoot(request); });
     server_->on("/info", HTTP_GET, [this](AsyncWebServerRequest* request) { handleInfo(request); });
+    server_->on("/api/info", HTTP_GET, [this](AsyncWebServerRequest* request) { handleInfo(request); });
     server_->on("/api/wifi/config", HTTP_POST, [this](AsyncWebServerRequest* request) { handleWifiConfigPost(request); });
     server_->on("/api/hardware/config", HTTP_GET, [this](AsyncWebServerRequest* request) { handleHardwareConfigGet(request); });
     server_->on(
@@ -85,7 +107,28 @@ void WebServer::handleRoot(AsyncWebServerRequest* request) {
 }
 
 void WebServer::handleInfo(AsyncWebServerRequest* request) {
-    String json = "{\"status\":\"ok\"}";
+    JsonDocument doc;
+    doc["firmware_version"] = FIRMWARE_VERSION;
+    doc["firmware_name"] = FIRMWARE_NAME;
+#if defined(ESP_IDF_VERSION)
+    doc["chip_model"] = ESP.getChipModel();
+    doc["mac_address"] = WiFi.macAddress();
+    doc["free_heap_bytes"] = ESP.getFreeHeap();
+#else
+    doc["chip_model"] = "native";
+    doc["mac_address"] = "00:00:00:00:00:00";
+    doc["free_heap_bytes"] = 0;
+#endif
+    if (wifi_mgr_) {
+        if (wifi_mgr_->isConnected()) doc["system_status"] = "ready";
+        else if (wifi_mgr_->isAPActive()) doc["system_status"] = "hotspot";
+        else if (wifi_mgr_->isConnecting()) doc["system_status"] = "connecting";
+        else doc["system_status"] = "boot";
+    } else {
+        doc["system_status"] = "unknown";
+    }
+    String json;
+    serializeJson(doc, json);
     sendJson(request, 200, json);
 }
 
