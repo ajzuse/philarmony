@@ -110,12 +110,16 @@ void WebServer::handleWifiConfigPost(AsyncWebServerRequest* request) {
     }
 
     bool connected = false;
+    bool connecting = false;
     if (wifi_mgr_) {
-        connected = wifi_mgr_->setConfig(config);
+        connected = wifi_mgr_->setConfig(config) && wifi_mgr_->isConnected();
+        connecting = wifi_mgr_->isConnecting();
     }
 
     if (connected) {
         sendJson(request, 200, "{\"status\":\"connected\"}");
+    } else if (connecting) {
+        sendJson(request, 200, "{\"status\":\"connecting\"}");
     } else {
         sendJson(request, 200, "{\"status\":\"saved\",\"ap_active\":true}");
     }

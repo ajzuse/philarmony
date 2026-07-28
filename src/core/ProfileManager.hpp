@@ -15,7 +15,7 @@ public:
 
     std::vector<FilamentProfile> listProfiles() const;
     FilamentProfile getProfile(const String& profile_id) const;
-    bool createProfile(const FilamentProfile& profile);
+    bool createProfile(FilamentProfile& profile);
     bool updateProfile(const FilamentProfile& profile);
     bool deleteProfile(const String& profile_id);
     void resetToDefaults();

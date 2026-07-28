@@ -24,29 +24,42 @@ struct PidConfig {
 };
 
 struct SensorConfig {
-    String type = "sht31";          // sht31, dht22, ds18b20, ntc_thermistor, bme280
+    String type = "sht31";          // primary / temperature sensor type
     bool is_integrated = true;      // true if temp+humidity in same IC
-    uint8_t i2c_bus = 0;            // I2C bus number (0 or 1)
-    uint8_t i2c_address = 0x44;     // I2C address
-    int8_t gpio_pin = -1;           // GPIO pin for 1-Wire/DHT/ADC (-1 if I2C)
-    int8_t sda_pin = 21;            // I2C SDA GPIO
-    int8_t scl_pin = 22;            // I2C SCL GPIO
+    uint8_t i2c_bus = 0;
+    uint8_t i2c_address = 0x44;
+    int8_t gpio_pin = -1;
+    int8_t sda_pin = 21;
+    int8_t scl_pin = 22;
     float temperature_offset = 0.0f;
     float temperature_scale = 1.0f;
     float humidity_offset = 0.0f;
     float humidity_scale = 1.0f;
+    // Separate humidity sensor (when is_integrated == false)
+    String humidity_type;
+    uint8_t humidity_i2c_address = 0;
+    int8_t humidity_gpio_pin = -1;
+    int8_t humidity_sda_pin = 21;
+    int8_t humidity_scl_pin = 22;
+    // Optional extra temperature sensor id/type for status reflection
+    String extra_temp_type;
+    int8_t extra_temp_gpio_pin = -1;
+    uint8_t extra_temp_i2c_address = 0;
 };
 
 struct ActuatorConfig {
-    String heater_type = "mosfet_pwm";  // DriverRegistry actuator type for heater
-    int8_t heater_pin = 25;             // Heater MOSFET PWM GPIO
-    uint32_t heater_pwm_freq = 1000;    // PWM frequency in Hz
-    uint8_t heater_max_power_pct = 100; // Soft safety power limit %
-    String fan_type = "fan_pwm";        // DriverRegistry actuator type for fan
-    String fan_mode = "independent_pwm"; // shared_mosfet, independent_pwm, independent_digital
-    int8_t fan_pin = 26;                // Fan MOSFET/PWM GPIO
-    uint32_t fan_pwm_freq = 5000;       // Fan PWM frequency in Hz
-    uint16_t cooldown_duration_sec = 30; // Post-heating fan run time in seconds
+    String heater_type = "mosfet_pwm";
+    int8_t heater_pin = 25;
+    uint32_t heater_pwm_freq = 1000;
+    uint8_t heater_max_power_pct = 100;
+    String fan_type = "fan_pwm";
+    String fan_mode = "independent_pwm";
+    int8_t fan_pin = 26;
+    uint32_t fan_pwm_freq = 5000;
+    uint16_t cooldown_duration_sec = 30;
+    bool has_custom = false;
+    String custom_type;
+    int8_t custom_pin = -1;
 };
 
 struct DisplayConfig {
@@ -137,6 +150,13 @@ public:
         if (temp_c < 30.0f || temp_c > 80.0f) return false;
         if (duration_min < 1 || duration_min > 1440) return false;
         if (humidity_pct < 5.0f || humidity_pct > 50.0f) return false;
+        return true;
+    }
+    static bool validateStartParams(float temp_c, uint16_t duration_min, float humidity_pct,
+                                    bool has_humidity) {
+        if (temp_c < 30.0f || temp_c > 80.0f) return false;
+        if (duration_min < 1 || duration_min > 1440) return false;
+        if (has_humidity && (humidity_pct < 5.0f || humidity_pct > 50.0f)) return false;
         return true;
     }
     static constexpr size_t kMaxCustomProfiles = 20;

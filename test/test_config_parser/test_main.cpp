@@ -54,6 +54,50 @@ void test_parse_minimal_hardware_config() {
     auto result = parser.parse(doc.as<JsonObject>(), sensor, actuator, display, control);
     TEST_ASSERT_TRUE(result.valid);
     TEST_ASSERT_EQUAL_STRING("pid", control.algorithm.c_str());
+    TEST_ASSERT_EQUAL_UINT16(128, display.width);
+    TEST_ASSERT_EQUAL_UINT16(64, display.height);
+    TEST_ASSERT_EQUAL_STRING("i2c", display.bus_type.c_str());
+}
+
+void test_parse_nested_spi_display_bus() {
+    const char* json = R"({
+      "sensors": [{
+        "id": "chamber",
+        "type": "sht3x",
+        "capabilities": ["temperature", "humidity"],
+        "bus": { "type": "i2c", "bus": 0, "address": 68, "sda_pin": 21, "scl_pin": 22 }
+      }],
+      "actuators": [{
+        "id": "heater",
+        "type": "mosfet_pwm",
+        "role": "heater",
+        "pins": { "pwm": 25 },
+        "control": { "algorithm": "pid", "pwm_freq_hz": 1000, "max_power_pct": 100 }
+      }],
+      "display": {
+        "enabled": true,
+        "driver": "st7789",
+        "bus": { "type": "spi", "mosi": 19, "sclk": 18, "cs": 5, "dc": 16, "rst": 23, "bl": 4 },
+        "geometry": { "width": 135, "height": 240, "rotation": 90 }
+      },
+      "control": { "algorithm": "pid", "parameters": { "kp": 1, "ki": 0, "kd": 0 } }
+    })";
+
+    JsonDocument doc;
+    TEST_ASSERT(deserializeJson(doc, json) == DeserializationError::Ok);
+    HardwareConfigParser parser;
+    SensorConfig sensor;
+    ActuatorConfig actuator;
+    DisplayConfig display;
+    ControlConfig control;
+    auto result = parser.parse(doc.as<JsonObject>(), sensor, actuator, display, control);
+    TEST_ASSERT_TRUE(result.valid);
+    TEST_ASSERT_EQUAL_STRING("spi", display.bus_type.c_str());
+    TEST_ASSERT_EQUAL(19, display.spi_mosi);
+    TEST_ASSERT_EQUAL(18, display.spi_sclk);
+    TEST_ASSERT_EQUAL(5, display.spi_cs);
+    TEST_ASSERT_EQUAL_UINT16(135, display.width);
+    TEST_ASSERT_EQUAL_UINT16(240, display.height);
 }
 
 void test_invalid_gpio_pin_rejected() {
@@ -66,6 +110,7 @@ int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_valid_sensor_type);
     RUN_TEST(test_parse_minimal_hardware_config);
+    RUN_TEST(test_parse_nested_spi_display_bus);
     RUN_TEST(test_invalid_gpio_pin_rejected);
     return UNITY_END();
 }

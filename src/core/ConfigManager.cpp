@@ -94,6 +94,15 @@ SensorConfig ConfigManager::getSensorConfig() const {
             config.temperature_scale = doc["temperature_scale"] | 1.0f;
             config.humidity_offset = doc["humidity_offset"] | 0.0f;
             config.humidity_scale = doc["humidity_scale"] | 1.0f;
+            config.is_integrated = doc["is_integrated"] | true;
+            config.humidity_type = doc["humidity_type"] | "";
+            config.humidity_i2c_address = doc["humidity_i2c_address"] | 0;
+            config.humidity_gpio_pin = doc["humidity_gpio_pin"] | -1;
+            config.humidity_sda_pin = doc["humidity_sda_pin"] | 21;
+            config.humidity_scl_pin = doc["humidity_scl_pin"] | 22;
+            config.extra_temp_type = doc["extra_temp_type"] | "";
+            config.extra_temp_gpio_pin = doc["extra_temp_gpio_pin"] | -1;
+            config.extra_temp_i2c_address = doc["extra_temp_i2c_address"] | 0;
         }
     }
     return config;
@@ -114,6 +123,14 @@ void ConfigManager::setSensorConfig(const SensorConfig& config) {
     doc["temperature_scale"] = config.temperature_scale;
     doc["humidity_offset"] = config.humidity_offset;
     doc["humidity_scale"] = config.humidity_scale;
+    doc["humidity_type"] = config.humidity_type;
+    doc["humidity_i2c_address"] = config.humidity_i2c_address;
+    doc["humidity_gpio_pin"] = config.humidity_gpio_pin;
+    doc["humidity_sda_pin"] = config.humidity_sda_pin;
+    doc["humidity_scl_pin"] = config.humidity_scl_pin;
+    doc["extra_temp_type"] = config.extra_temp_type;
+    doc["extra_temp_gpio_pin"] = config.extra_temp_gpio_pin;
+    doc["extra_temp_i2c_address"] = config.extra_temp_i2c_address;
     
     String json;
     serializeJson(doc, json);
@@ -138,6 +155,9 @@ ActuatorConfig ConfigManager::getActuatorConfig() const {
             config.fan_pin = doc["fan_pin"] | 26;
             config.fan_pwm_freq = doc["fan_pwm_freq"] | 5000;
             config.cooldown_duration_sec = doc["cooldown_duration_sec"] | 30;
+            config.has_custom = doc["has_custom"] | false;
+            config.custom_type = doc["custom_type"] | "";
+            config.custom_pin = doc["custom_pin"] | -1;
         }
     }
     return config;
@@ -156,6 +176,9 @@ void ConfigManager::setActuatorConfig(const ActuatorConfig& config) {
     doc["fan_pin"] = config.fan_pin;
     doc["fan_pwm_freq"] = config.fan_pwm_freq;
     doc["cooldown_duration_sec"] = config.cooldown_duration_sec;
+    doc["has_custom"] = config.has_custom;
+    doc["custom_type"] = config.custom_type;
+    doc["custom_pin"] = config.custom_pin;
     
     String json;
     serializeJson(doc, json);
@@ -294,24 +317,42 @@ std::vector<FilamentProfile> ConfigManager::getProfiles() const {
 
 FilamentProfile ConfigManager::getProfile(const String& profile_id) const {
     FilamentProfile empty;
+    FilamentProfile builtin_match;
     auto profiles = getProfiles();
     for (const auto& p : profiles) {
-        if (p.id == profile_id) return p;
+        if (p.id != profile_id) continue;
+        if (!p.is_builtin) {
+            return p;  // custom override wins
+        }
+        builtin_match = p;
     }
-    return empty;
+    return builtin_match.id.isEmpty() ? empty : builtin_match;
 }
 
 bool ConfigManager::addProfile(const FilamentProfile& profile) {
     auto profiles = getProfiles();
-    
-    // Check for duplicate ID
-    for (const auto& p : profiles) {
-        if (p.id == profile.id) return false;
-    }
 
     if (!validateProfileParams(profile.target_temp_c, profile.default_duration_min,
                                profile.target_humidity_pct)) {
         return false;
+    }
+
+    bool has_builtin = false;
+    for (const auto& p : profiles) {
+        if (p.id == profile.id) {
+            if (p.is_builtin) {
+                has_builtin = true;
+            } else {
+                return false;  // custom already exists — use update
+            }
+        }
+    }
+
+    // Shadowing a builtin is allowed (custom override with same ID)
+    if (!has_builtin) {
+        for (const auto& p : profiles) {
+            if (p.id == profile.id) return false;
+        }
     }
 
     size_t custom_count = 0;
@@ -321,30 +362,49 @@ bool ConfigManager::addProfile(const FilamentProfile& profile) {
     if (custom_count >= kMaxCustomProfiles) {
         return false;
     }
-    
-    profiles.push_back(profile);
+
+    FilamentProfile to_save = profile;
+    to_save.is_builtin = false;
+    to_save.created_at = millis();
+    to_save.updated_at = to_save.created_at;
+    profiles.push_back(to_save);
     return saveProfiles(profiles);
 }
 
 bool ConfigManager::updateProfile(const FilamentProfile& profile) {
     auto profiles = getProfiles();
-    
-    for (auto& p : profiles) {
-        if (p.id == profile.id) {
-            // Don't allow modifying builtin profiles
-            if (p.is_builtin) return false;
 
-            if (!validateProfileParams(profile.target_temp_c, profile.default_duration_min,
-                                       profile.target_humidity_pct)) {
-                return false;
-            }
-            
+    if (!validateProfileParams(profile.target_temp_c, profile.default_duration_min,
+                               profile.target_humidity_pct)) {
+        return false;
+    }
+
+    // Update existing custom entry
+    for (auto& p : profiles) {
+        if (p.id == profile.id && !p.is_builtin) {
             p.name_pt = profile.name_pt;
             p.name_en = profile.name_en;
             p.target_temp_c = profile.target_temp_c;
             p.default_duration_min = profile.default_duration_min;
             p.target_humidity_pct = profile.target_humidity_pct;
             p.updated_at = millis();
+            return saveProfiles(profiles);
+        }
+    }
+
+    // Builtin ID with no custom yet → create override
+    for (const auto& p : profiles) {
+        if (p.id == profile.id && p.is_builtin) {
+            FilamentProfile override_profile = profile;
+            override_profile.is_builtin = false;
+            override_profile.created_at = millis();
+            override_profile.updated_at = override_profile.created_at;
+            size_t custom_count = 0;
+            for (const auto& existing : profiles) {
+                if (!existing.is_builtin) ++custom_count;
+            }
+            if (custom_count >= kMaxCustomProfiles) return false;
+            profiles.push_back(override_profile);
             return saveProfiles(profiles);
         }
     }

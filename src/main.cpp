@@ -50,9 +50,13 @@ SystemMetrics sysMetrics;
 
 ISensorDriver* activeTempSensor = nullptr;
 ISensorDriver* activeHumiditySensor = nullptr;
+ISensorDriver* extraTempSensor = nullptr;
 IActuatorDriver* heaterActuator = nullptr;
 IActuatorDriver* fanActuator = nullptr;
+IActuatorDriver* customActuator = nullptr;
 IDisplayDriver* activeDisplay = nullptr;
+static bool actuatorsShareInstance = false;
+static float lastCommandedHeaterPct = 0.0f;
 
 static bool cooldownActive = false;
 static uint32_t cooldownEndMs = 0;
@@ -87,10 +91,22 @@ static void teardownDrivers() {
         delete activeHumiditySensor;
         activeHumiditySensor = nullptr;
     }
-    delete heaterActuator;
-    heaterActuator = nullptr;
-    delete fanActuator;
-    fanActuator = nullptr;
+    delete extraTempSensor;
+    extraTempSensor = nullptr;
+
+    if (actuatorsShareInstance) {
+        delete heaterActuator;
+        heaterActuator = nullptr;
+        fanActuator = nullptr;
+        actuatorsShareInstance = false;
+    } else {
+        delete heaterActuator;
+        heaterActuator = nullptr;
+        delete fanActuator;
+        fanActuator = nullptr;
+    }
+    delete customActuator;
+    customActuator = nullptr;
 }
 
 static SensorReading applySensorCalibration(const SensorReading& reading) {
@@ -173,6 +189,13 @@ void controlLoopTask(void* pvParameters) {
             if (!tempReading.valid && activeTempSensor) {
                 safetyEngine.detectAndRecoverI2CBusLockup();
             }
+            static bool displayWasOk = false;
+            const bool displayOk = !configMgr.getDisplayConfig().enabled ||
+                                   displayManager.isAnyConnected();
+            if (displayWasOk && !displayOk) {
+                safetyEngine.detectAndRecoverSpiBusError(true);
+            }
+            displayWasOk = displayOk;
         }
 
         if (cooldownActive) {
@@ -194,7 +217,10 @@ void controlLoopTask(void* pvParameters) {
         g_liveFanPowerPct = fanActuator ? fanActuator->getState().power_pct : 0.0f;
 
         if (heaterActuator) {
-            safetyEngine.checkActuatorFault(heaterPowerPct, heaterActuator->getState().power_pct, false);
+            const bool overcurrent = !heaterActuator->isHealthy();
+            safetyEngine.checkActuatorFault(lastCommandedHeaterPct,
+                                            heaterActuator->getState().power_pct,
+                                            overcurrent);
         }
 
         bool sensorConnected = tempReading.valid;
@@ -230,7 +256,8 @@ void controlLoopTask(void* pvParameters) {
                 reason = DryingStopReason::HUMIDITY_REACHED;
             }
 
-            if (!isnan(chamberTemp) && chamberTemp >= 80.0f) {
+            if (!isnan(chamberTemp) &&
+                chamberTemp >= safetyEngine.getConfig().hard_temp_limit_c) {
                 stop = true;
                 reason = DryingStopReason::SAFETY_CUTOFF;
             }
@@ -261,9 +288,12 @@ void controlLoopTask(void* pvParameters) {
 
             if (heaterActuator) {
                 heaterActuator->setPower(controlOutput);
+                lastCommandedHeaterPct = controlOutput;
             }
-            if (fanActuator) {
+            if (fanActuator && fanActuator != heaterActuator) {
                 fanActuator->setPower((controlOutput > 0 || chamberTemp > 40.0f) ? 80.0f : 0.0f);
+            } else if (fanActuator && fanActuator == heaterActuator) {
+                // Shared MOSFET: heater power already set; fan role shares same output
             }
         }
 
@@ -304,6 +334,17 @@ void controlLoopTask(void* pvParameters) {
             payload["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
             payload["uptime_sec"] = millis() / 1000;
             payload["control_algorithm"] = controlEngine.getCurrentAlgorithmType();
+            payload["sensor_type"] = configMgr.getSensorConfig().type;
+            if (!configMgr.getSensorConfig().humidity_type.isEmpty()) {
+                payload["humidity_sensor_type"] = configMgr.getSensorConfig().humidity_type;
+            }
+            if (extraTempSensor) {
+                SensorReading extra = applySensorCalibration(extraTempSensor->read());
+                if (extra.valid) {
+                    payload["external_temp_c"] = extra.temperature;
+                }
+                payload["extra_temp_type"] = configMgr.getSensorConfig().extra_temp_type;
+            }
 
             StatusPayload pluginTelemetry;
             pluginTelemetry.status = stateMachine.getStateName();
@@ -471,6 +512,28 @@ void onLogCallback(const String& line, bool isDryingLog) {
 // ============================================================
 // Setup & Initialization
 // ============================================================
+void applySafetyConfigFromManager() {
+    SafetyConfig cfg = safetyEngine.getConfig();
+    JsonObject control = configMgr.getObjectConfig("control");
+    if (!control.isNull() && control["safety_limits"].is<JsonObject>()) {
+        JsonObject safety = control["safety_limits"].as<JsonObject>();
+        cfg.hard_temp_limit_c = safety["hard_temp_limit_c"] | cfg.hard_temp_limit_c;
+        cfg.max_heater_power_pct = safety["max_heater_power_pct"] | cfg.max_heater_power_pct;
+        cfg.sensor_timeout_ms = safety["sensor_timeout_ms"] | cfg.sensor_timeout_ms;
+        cfg.thermal_runaway_time_sec =
+            safety["thermal_runaway_time_sec"] | cfg.thermal_runaway_time_sec;
+        cfg.thermal_runaway_temp_rise =
+            safety["thermal_runaway_temp_rise_c"] | cfg.thermal_runaway_temp_rise;
+    }
+    SensorConfig sc = configMgr.getSensorConfig();
+    cfg.i2c_sda_pin = sc.sda_pin;
+    cfg.i2c_scl_pin = sc.scl_pin;
+    ActuatorConfig ac = configMgr.getActuatorConfig();
+    cfg.max_heater_power_pct = ac.heater_max_power_pct;
+    cfg.cooldown_fan_duration_sec = ac.cooldown_duration_sec;
+    safetyEngine.setConfig(cfg);
+}
+
 void initializeSensors() {
     SensorConfig sensorCfg = configMgr.getSensorConfig();
     JsonDocument sensorDoc;
@@ -490,7 +553,35 @@ void initializeSensors() {
     }
 
     activeTempSensor = sensor;
-    activeHumiditySensor = sensor;
+    if (sensorCfg.is_integrated || sensorCfg.humidity_type.isEmpty()) {
+        activeHumiditySensor = sensor;
+    } else {
+        JsonDocument humDoc;
+        JsonObject humConfig = humDoc.to<JsonObject>();
+        humConfig["type"] = sensorCfg.humidity_type;
+        humConfig["i2c_address"] = sensorCfg.humidity_i2c_address;
+        humConfig["gpio_pin"] = sensorCfg.humidity_gpio_pin;
+        humConfig["sda_pin"] = sensorCfg.humidity_sda_pin;
+        humConfig["scl_pin"] = sensorCfg.humidity_scl_pin;
+        activeHumiditySensor =
+            DriverRegistry::instance().createSensor(sensorCfg.humidity_type, humConfig);
+        if (!activeHumiditySensor) {
+            activeHumiditySensor = sensor;
+        }
+    }
+
+    extraTempSensor = nullptr;
+    if (!sensorCfg.extra_temp_type.isEmpty()) {
+        JsonDocument extraDoc;
+        JsonObject extraConfig = extraDoc.to<JsonObject>();
+        extraConfig["type"] = sensorCfg.extra_temp_type;
+        extraConfig["gpio_pin"] = sensorCfg.extra_temp_gpio_pin;
+        extraConfig["i2c_address"] = sensorCfg.extra_temp_i2c_address;
+        extraConfig["sda_pin"] = sensorCfg.sda_pin;
+        extraConfig["scl_pin"] = sensorCfg.scl_pin;
+        extraTempSensor =
+            DriverRegistry::instance().createSensor(sensorCfg.extra_temp_type, extraConfig);
+    }
 
     if (!activeTempSensor) {
         logMgr.logSystem(LogLevel::WARNING, LogModule::SENSOR,
@@ -528,15 +619,40 @@ void initializeActuators() {
         fanConfig["fan_mode"] = "independent_digital";
     }
 
-    heaterActuator = DriverRegistry::instance().createActuator(heaterType, heaterConfig);
-    if (!heaterActuator) {
-        heaterActuator = DriverRegistry::instance().createActuator("mosfet_pwm", heaterConfig);
-        heaterType = "mosfet_pwm";
+    actuatorsShareInstance = false;
+    const bool useShared =
+        heaterType == "shared_mosfet" || fanType == "shared_mosfet" ||
+        actuatorCfg.fan_mode == "shared_mosfet";
+
+    if (useShared) {
+        IActuatorDriver* shared =
+            DriverRegistry::instance().createActuator("shared_mosfet", heaterConfig);
+        heaterActuator = shared;
+        fanActuator = shared;
+        actuatorsShareInstance = (shared != nullptr);
+        heaterType = "shared_mosfet";
+        fanType = "shared_mosfet";
+    } else {
+        heaterActuator = DriverRegistry::instance().createActuator(heaterType, heaterConfig);
+        if (!heaterActuator) {
+            heaterActuator = DriverRegistry::instance().createActuator("mosfet_pwm", heaterConfig);
+            heaterType = "mosfet_pwm";
+        }
+        fanActuator = DriverRegistry::instance().createActuator(fanType, fanConfig);
+        if (!fanActuator) {
+            fanActuator = DriverRegistry::instance().createActuator("fan_pwm", fanConfig);
+            fanType = "fan_pwm";
+        }
     }
-    fanActuator = DriverRegistry::instance().createActuator(fanType, fanConfig);
-    if (!fanActuator) {
-        fanActuator = DriverRegistry::instance().createActuator("fan_pwm", fanConfig);
-        fanType = "fan_pwm";
+
+    customActuator = nullptr;
+    if (actuatorCfg.has_custom && !actuatorCfg.custom_type.isEmpty()) {
+        JsonDocument customDoc;
+        JsonObject customConfig = customDoc.to<JsonObject>();
+        customConfig["gpio_pin"] = actuatorCfg.custom_pin;
+        customConfig["pwm"] = actuatorCfg.custom_pin;
+        customActuator =
+            DriverRegistry::instance().createActuator(actuatorCfg.custom_type, customConfig);
     }
 
     if (heaterActuator) {
@@ -623,6 +739,7 @@ void reloadHardwareFromConfig() {
     initializeActuators();
     initializeDisplays();
     initializeControlAlgorithm();
+    applySafetyConfigFromManager();
 }
 
 void initializeNetwork() {
@@ -681,6 +798,7 @@ void setup() {
     }
     if (!safetyEngine.begin(safetyCfg)) {
     }
+    applySafetyConfigFromManager();
     
     // Setup callbacks
     stateMachine.setStateChangeCallback(onStateChange);

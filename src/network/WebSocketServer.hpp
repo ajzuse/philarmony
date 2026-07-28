@@ -96,7 +96,8 @@ private:
     void handleControlStop(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleConfigHardware(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleConfigDisplay(AsyncWebSocketClient* client, const JsonObject& payload);
-    void handleConfigProfiles(AsyncWebSocketClient* client, const JsonObject& payload);
+    void handleConfigProfiles(AsyncWebSocketClient* client, const JsonObject& payload,
+                              const String& topic = "config/profiles");
     void handleConfigControl(AsyncWebSocketClient* client, const JsonObject& payload);
     void handlePidCalibrate(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleStatusSubscribe(AsyncWebSocketClient* client, const JsonObject& payload);
