@@ -393,3 +393,59 @@ Add US2 (Control & Telemetry) -> Add US3 (Safety Engine & Logs) -> Add US4 (Disp
 - [x] T146 Resolve research/DEC-003 `triac` and display `parallel_8bit`: either register factories + parser support, or reject unknown types at parse and update shared-memory catalog/DEC-003 to match shipped matrix — Done-When: no accepted-but-unloadable type remains — per FR-003 and Constitution: Memória Compartilhada (partial)
 - [x] T147 Assign monotonic `DryingSession.session_id` (&gt;0) on `startDrying` and include `session_id` + `stop_reason` on `status/update` when a session is active/recent — Done-When: data-model fields appear in telemetry; session_id increments per start — per plan: data-model and FR-006 (missing)
 - [x] T148 Make captive-portal detection endpoints (`/generate_204`, `/fwlink`, `/hotspot-detect.html`, `/ncsi.txt`, `/connecttest.txt`) **redirect** to `/` per http-api §3 instead of returning 200 HTML inline — Done-When: those routes respond with redirect to captive root — per FR-001 and plan: http-api contract (partial)
+
+---
+
+## Phase 20: Developer Tooling — Root Makefile (plan add-on 2026-07-28)
+
+**Purpose**: Host-side GNU Make façade over PlatformIO for compile, native tests, and ESP32 flash/install (DEC-009 / `contracts/makefile-targets.md`). No firmware runtime API change.
+
+**Independent Test**: `make help` lists targets; `make test` runs `pio test -e native` and fails non-zero on failure; `make build` compiles default `ENV=esp32devkitc`; `make flash`/`upload`/`install` are aliases wrapping `pio run -e $(ENV) -t upload` (device required for flash success).
+
+**Prerequisites**: `platformio.ini` envs `esp32devkitc`, `lilygo_tdisplay_v1`, `esp32_2432s028`, `native` already exist; `pio` on `PATH`.
+
+- [x] T149 Create root `Makefile` with `.PHONY`, default `ENV=esp32devkitc`, optional `PORT`/`UPLOAD_PORT` passthrough, and `help` target documenting allowed ENVs per `contracts/makefile-targets.md` in Makefile
+- [x] T150 [P] Implement `build` / `compile` / default goal targets as `pio run -e $(ENV)` in Makefile
+- [x] T151 [P] Implement `test` target as `pio test -e native` (must propagate non-zero exit) in Makefile
+- [x] T152 Implement equivalent `flash`, `upload`, and `install` targets as `pio run -e $(ENV) -t upload` with port flags when `PORT`/`UPLOAD_PORT` set in Makefile
+- [x] T153 [P] Implement `uploadfs`, `monitor`, and `clean` targets per `contracts/makefile-targets.md` in Makefile
+- [x] T154 [P] Sync developer docs to prefer Make: `README.md`, `specs/001-filament-dryer-esp32/quickstart.md`, `docs/PT-BR/configuracao.md`, `docs/EN-US/configuration.md`
+- [x] T155 Confirm `.vscode/workspace.json` philarmony `build_command`/`test_command`/`flash_command` match Makefile targets (update if drift) in `.vscode/workspace.json`
+- [x] T156 Wire CI to `make test` (and optionally `make build`) so PR checks fail when Make/pio tests fail in `.github/workflows/` per Constitution: Teste Automatizado e Qualidade
+- [x] T157 Validate Done-When: `make help`, `make test`, and `make build` succeed locally; document flash requires attached ESP32 in `specs/001-filament-dryer-esp32/quickstart.md`
+
+**Checkpoint**: Contributors can build, test, and flash via Make without memorizing `pio -e` flags.
+
+### Phase 20 Done-When
+
+- **T149–T153**: Root `Makefile` exists; targets match `contracts/makefile-targets.md`; `flash`≡`upload`≡`install`.
+- **T154–T155**: Docs and workspace point at `make build|test|flash`.
+- **T156**: CI invokes `make test` (or equivalent) and fails on non-zero.
+- **T157**: Manual/host validation recorded in quickstart checklist.
+
+---
+
+## Dependencies & Execution Order (Phase 20)
+
+1. **T149** → blocks T150–T153 (skeleton first)
+2. **T150**, **T151**, **T153** can run in parallel after T149
+3. **T152** after T149 (may share upload-port helper with T153)
+4. **T154**, **T155** [P] after Makefile targets exist
+5. **T156** after `make test` works
+6. **T157** last (validation)
+
+### Parallel example
+
+```text
+# After T149:
+T150 + T151 + T153 in parallel
+Then T152, then T154 + T155, then T156, then T157
+```
+
+### MVP (tooling)
+
+`T149` + `T150` + `T151` + `T152` + `T157` — enough to compile, test, and flash.
+
+### Implementation strategy
+
+Do **not** re-open Phase 1–19 completed IDs. Implement Phase 20 only; keep wrapping `pio` (no alternate toolchain).

@@ -212,3 +212,27 @@ Inspired by Klipper's `PID_CALIBRATE` command, the firmware implements the **Zie
   - $K_i = \frac{2 \cdot K_p}{T_u}$
   - $K_d = \frac{K_p \cdot T_u}{8}$
 - Automatically stores $K_p, K_i, K_d$ into NVS memory under `heater.pid` namespace for seamless boot persistence.
+
+---
+
+## 8. Developer Tooling — Root Makefile (DEC-009)
+
+### Decision
+Add a **GNU Make** façade at repository root that wraps PlatformIO CLI for the primary workflows: **compile**, **native tests**, and **ESP32 flash/install**. PlatformIO remains the source of truth for environments, libraries, and partitions.
+
+### Rationale
+- Short, memorable targets (`make build`, `make test`, `make flash`) lower contributor friction vs. repeating `pio run -e …`.
+- Exit codes propagate from `pio` so CI and constitution “tests must fail the build” stay intact.
+- `ENV=` selects among existing `platformio.ini` envs without duplicating board config.
+- Aligns with Constitution **Workspace de Dependências** (document Make + PlatformIO in `.vscode/workspace.json`) and **Documentação Sincronizada** (quickstart/README prefer `make`).
+
+### Alternatives considered
+| Option | Why rejected |
+|--------|----------------|
+| Shell scripts only (`scripts/build.sh`) | Fragmented; no standard `make help` discovery |
+| CMake as primary build | Conflicts with PlatformIO’s managed toolchain; high migration cost |
+| Taskfile / just | Extra runtime dependency; Make is ubiquitous on macOS/Linux CI |
+| Document `pio` only | User explicitly requested Makefile for principal tasks |
+
+### Target contract
+See `contracts/makefile-targets.md`. No firmware runtime or data-model impact.
