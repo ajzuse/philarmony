@@ -1,22 +1,19 @@
-<!-- 
+<!--
 Sync Impact Report:
-Version change: 0.4.0 → 0.5.0 (MINOR - added Cavemen Protocol principle for token efficiency)
-Modified principles: None renamed
-Added sections: Cavemen Protocol (Core Principles)
+Version change: 0.5.0 → 0.6.0 (MINOR — elevated explicit commit review/approval into a Core Principle and closed auto-commit loopholes)
+Modified principles:
+  - Development Workflow / Git "Confirmação Explícita de Commit" → promoted & expanded as Core Principle "Revisão e Aprovação Explícita de Commit"
+  - Governance "Commit Approval Rule" → strengthened (no default-yes; review before commit)
+Added sections:
+  - Core Principles: Revisão e Aprovação Explícita de Commit
 Removed sections: None
-Templates requiring updates: 
-  - .specify/templates/plan-template.md (✅ aligned)
-  - .specify/templates/spec-template.md (✅ aligned)
-  - .specify/templates/tasks-template.md (✅ aligned)
-  - .opencode/commands/speckit.specify.md (✅ updated)
-  - .opencode/commands/speckit.plan.md (✅ updated)
-  - .opencode/commands/speckit.tasks.md (✅ updated)
-  - .opencode/commands/speckit.analyze.md (✅ updated)
-  - .opencode/commands/speckit.clarify.md (✅ updated)
-  - .opencode/commands/speckit.checklist.md (✅ updated)
-  - .opencode/commands/speckit.converge.md (✅ updated)
-  - .opencode/commands/speckit.implement.md (✅ updated)
-  - .opencode/commands/speckit.constitution.md (✅ updated)
+Templates requiring updates:
+  - .specify/templates/plan-template.md (✅ no structural change required; Constitution Check still points to constitution.md)
+  - .specify/templates/spec-template.md (✅ no change)
+  - .specify/templates/tasks-template.md (✅ no change)
+  - .specify/extensions.yml (✅ git commit hooks set optional)
+  - .specify/extensions/git-workflow/scripts/git-commit-hook.sh (✅ fail-closed: no TTY ⇒ no commit)
+  - .claude/skills/speckit-* (⚠ agents must follow new principle; hook optionality updated via extensions.yml)
 Follow-up TODOs: None
 -->
 
@@ -26,6 +23,18 @@ Follow-up TODOs: None
 
 ### Cavemen Protocol (Token Efficiency)
 All AI agents MUST communicate in minimal, telegraphic language. No filler phrases ("Of course!", "Sure!", "Here's what I did", "Great question"). No preamble before code. No post-code summaries unless explicitly requested. Prose is limited to what is strictly necessary for correctness. Code output is always complete and untruncated. Responses MUST be 1–3 sentences when no code is involved. If a question can be answered with a word or a number, use only that. Agents MUST apply this principle to ALL outputs: analysis reports, completion reports, inline comments in command files, and conversational turns.
+
+### Revisão e Aprovação Explícita de Commit
+Nenhum commit Git MUST ser criado automaticamente por agentes, hooks ou scripts sem que o usuário tenha tido chance explícita de revisar o código e autorizar a gravação.
+
+Regras não negociáveis:
+- Após concluir uma etapa (specify/plan/tasks/implement/constitution/etc.), o agente MUST apresentar: (1) resumo do que mudou, (2) lista dos arquivos principais, (3) mensagem de commit sugerida (Conventional Commits), (4) pergunta clara pedindo autorização.
+- O agente MUST aguardar resposta afirmativa explícita do usuário (ex.: "sim", "commit", "autorizo", "pode commitar") antes de executar `git add`/`git commit` ou qualquer hook que grave no Git.
+- Ausência de TTY, timeout, falha de leitura, ambiente não interativo ou prompt sem resposta MUST resultar em **não commitar** (fail-closed). Nunca interpretar silêncio, erro de `/dev/tty` ou default implícito como "sim".
+- Hooks de commit Speckit (`git-commit-hook.sh` e equivalentes) MUST ser opcionais na experiência do agente: o agente ofereceece a sugestão e só executa o hook/comando se o usuário autorizar.
+- "Revisar o código" inclui permitir que o usuário inspecione o diff no IDE/chat antes da autorização; o agente NÃO MUST pular essa etapa.
+
+Rationale: commits irreversíveis no histórico local/remoto sem revisão violam a confiança do fluxo Speckit e da governança do projeto.
 
 ### Orientação a Objetos e Segurança de Hardware
 Todos os componentes devem ser organizados usando princípios de orientação a objetos. Interfaces claras e tipagem forte garantem a segurança de dados e a modularidade. Funções que interagem diretamente com hardware devem estar encapsuladas em objetos com validação e safe abortos para parâmetros fora de controle (ex: temperatura, tensão), garantindo proteção contra danos ao hardware e abortos limpos (sem hangs).
@@ -76,10 +85,10 @@ O catálogo deve ser versionado, consultável via query semântica, e sincroniza
 
 **Git workflow requirements:**
 - Conventional Commits: All commit messages MUST follow Conventional Commits format with feature scope: `tipo(<feature>): descrição` (ex: `docs(filament-dryer-esp32): Add implementation plan`).
-- Confirmação Explícita de Commit: É PROIBIDO realizar commits automáticos sem a confirmação prévia e explícita do usuário. Após cada ação/etapa, o sistema ou agente DEVE apresentar o resumo das alterações e a mensagem sugerida de commit e aguardar autorização do usuário antes de executar a gravação no Git.
+- Revisão antes do commit: aplica-se o princípio Core "Revisão e Aprovação Explícita de Commit" em todas as etapas Speckit e em qualquer automação Git.
 - Branch strategy: Create new branch (`feature/<nome-do-projeto>`) for each task block before implementation
-- Incremental commits: Make commits between tasks after validation of tests and user explicit authorization
-- Pull Requests: Open PR at end of each task block execution
+- Incremental commits: Make commits between tasks only after validation of tests **and** explicit user authorization following code review opportunity
+- Pull Requests: Open PR at end of each task block execution only when the user requests it
 
 ## Language Support
 
@@ -108,7 +117,7 @@ Documentação completa em EN-US para contribuições open-source. Utilizada com
 - Use README.md in docs/ for runtime development guidance
 - **README Sync Rule**: Todo comando speckit que altere specs/plans/tasks DEVE invocar atualização do README.md como passo obrigatório. Falha na sincronização bloqueia merge. Implementação via hook `after_specify`/`after_plan`/`after_tasks` no `.specify/extensions.yml`.
 - **Memory Catalog Sync Rule**: Toda pesquisa, decisão arquitetural, descoberta técnica ou referência validada DEVE ser registrada no catálogo de memória compartilhada. Falha no registro bloqueia merge de PRs que introduzam novo conhecimento.
-- **Commit Approval Rule**: Nenhum commit será efetuado sem aprovação explícita do usuário via prompt interativo no final de cada ação.
+- **Commit Approval Rule**: Nenhum commit MUST ser efetuado sem (1) oportunidade de o usuário revisar o código/diff e (2) aprovação explícita do usuário. Hooks e agentes MUST falhar fechado (não commitar) se a confirmação interativa não for obtida. Default implícito "sim" é PROIBIDO.
 - **Cavemen Compliance Rule**: All agents MUST be reviewed for Cavemen Protocol compliance. PRs introducing verbose preamble, filler acknowledgments, or redundant summaries in agent output MUST be rejected.
 
-**Version**: 0.5.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-28
+**Version**: 0.6.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-28

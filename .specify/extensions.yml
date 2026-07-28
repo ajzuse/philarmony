@@ -57,11 +57,13 @@ hooks:
       timeout: 15000
     - id: git-commit-after-specify
       name: "Commit Convencional após Especificação"
-      description: "Questiona e gera commit convencional após o término da etapa specify"
+      description: "Sugere commit convencional após specify; só executa se o usuário autorizar após revisar o código"
       enabled: true
-      mandatory: true
+      mandatory: false
+      optional: true
       command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=specify"
       timeout: 30000
+      prompt: "Revise o diff e, se autorizar o commit, execute o comando sugerido."
 
   after_plan:
     - id: sync-readme-after-plan
@@ -80,11 +82,13 @@ hooks:
       timeout: 15000
     - id: git-commit-after-plan
       name: "Commit Convencional após Planejamento"
-      description: "Questiona e gera commit convencional após o término da etapa plan"
+      description: "Sugere commit convencional após plan; só executa se o usuário autorizar após revisar o código"
       enabled: true
-      mandatory: true
+      mandatory: false
+      optional: true
       command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=plan"
       timeout: 30000
+      prompt: "Revise o diff e, se autorizar o commit, execute o comando sugerido."
 
   after_tasks:
     - id: sync-readme-after-tasks
@@ -103,17 +107,21 @@ hooks:
       timeout: 15000
     - id: git-commit-after-tasks
       name: "Commit Convencional após Tasks"
-      description: "Questiona e gera commit convencional após o término da etapa tasks"
+      description: "Sugere commit convencional após tasks; só executa se o usuário autorizar após revisar o código"
       enabled: true
-      mandatory: true
+      mandatory: false
+      optional: true
       command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=tasks"
       timeout: 30000
+      prompt: "Revise o diff e, se autorizar o commit, execute o comando sugerido."
 
   after_implement:
     - id: git-commit-after-implement
       name: "Commit Convencional após Implementação"
-      description: "Questiona e gera commit convencional após o término da etapa implement"
+      description: "Sugere commit convencional após implement; só executa se o usuário autorizar após revisar o código"
       enabled: true
-      mandatory: true
+      mandatory: false
+      optional: true
       command: "bash .specify/extensions/git-workflow/scripts/git-commit-hook.sh --stage=implement"
       timeout: 30000
+      prompt: "Revise o diff das mudanças de implementação e, se autorizar o commit, execute o comando sugerido."

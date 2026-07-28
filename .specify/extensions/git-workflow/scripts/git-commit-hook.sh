@@ -151,7 +151,9 @@ if [ "$AUTO_YES" = true ]; then
 elif [ "$AUTO_NO" = true ]; then
     DO_COMMIT=false
 elif [ -n "${SPECIFY_GIT_AUTO_COMMIT:-}" ] && [ "${SPECIFY_GIT_AUTO_COMMIT}" != "0" ] && [ "${SPECIFY_GIT_AUTO_COMMIT}" != "false" ]; then
-    DO_COMMIT=true
+    echo "⚠️ SPECIFY_GIT_AUTO_COMMIT está definido, mas a constituição 0.6.0 exige aprovação humana."
+    echo "Ignore esta variável e use confirmação interativa, ou passe --yes somente com autorização prévia explícita."
+    DO_COMMIT=false
 elif [ -t 0 ] || [ -e /dev/tty ]; then
     # Try reading from terminal if available
     TTY_DEV="/dev/tty"
@@ -161,13 +163,21 @@ elif [ -t 0 ] || [ -e /dev/tty ]; then
     
     printf "Deseja realizar o commit com a mensagem acima? [S/n]: "
     if [ -e /dev/tty ]; then
-        read -r ANSWER < /dev/tty || ANSWER="s"
+        if ! read -r ANSWER < /dev/tty; then
+            echo ""
+            echo "⚠️ Não foi possível ler confirmação do terminal (/dev/tty). Commit NÃO será realizado."
+            ANSWER="n"
+        fi
     else
-        read -r ANSWER || ANSWER="s"
+        if ! read -r ANSWER; then
+            echo ""
+            echo "⚠️ Não foi possível ler confirmação. Commit NÃO será realizado."
+            ANSWER="n"
+        fi
     fi
 
     case "$(echo "$ANSWER" | tr '[:upper:]' '[:lower:]')" in
-        s|sim|y|yes|"")
+        s|sim|y|yes)
             DO_COMMIT=true
             ;;
         *)
@@ -176,23 +186,10 @@ elif [ -t 0 ] || [ -e /dev/tty ]; then
     esac
 else
     # Non-interactive mode (e.g. subagent or script execution without tty)
-    echo "⚠️ Ambientes não-interativo detectado sem TTY direto."
-    echo "Para auto-commit em scripts, utilize '--yes' ou exporte SPECIFY_GIT_AUTO_COMMIT=1."
-    printf "Deseja confirmar o commit '$COMMIT_MSG'? [S/n]: "
-    if read -t 10 -r ANSWER; then
-        case "$(echo "$ANSWER" | tr '[:upper:]' '[:lower:]')" in
-            s|sim|y|yes|"")
-                DO_COMMIT=true
-                ;;
-            *)
-                DO_COMMIT=false
-                ;;
-        esac
-    else
-        echo ""
-        echo "ℹ️ Tempo limite esgotado. Commit não realizado automaticamente."
-        DO_COMMIT=false
-    fi
+    echo "⚠️ Ambiente não interativo detectado sem TTY direto."
+    echo "Commit NÃO será realizado automaticamente (fail-closed / constitution 0.6.0)."
+    echo "Para forçar commit em scripts, use explicitamente '--yes' (somente com autorização humana prévia)."
+    DO_COMMIT=false
 fi
 
 if [ "$DO_COMMIT" = true ]; then
