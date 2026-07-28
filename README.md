@@ -61,7 +61,7 @@
 | # | Spec | Nome | Status | Última Atualização |
 |---|------|------|--------|-------------------|
 | 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ✅ Implementado | 2026-07-28   |
-| 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | ⚙️ Tasks geradas (Flutter + MSIX/DMG/deb/rpm) | 2026-07-28   |
+| 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | 🧭 Plano+Tasks (clarify sync) | 2026-07-28   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | 📝 Especificado | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
 
@@ -117,14 +117,12 @@
 | **Perfis de Filamento** | Visualização/edição dos 5 built-in + criação customizados, sincronizados no flash |
 | **Config Profiles** | Export/import JSON (senha WiFi como placeholder), versionamento |
 | **Flash Process** | Erase → Write Firmware → Write Config NVS → Verify → Reset, com progress bar |
-| **Distribuição Host** | Win **MSIX**; macOS **DMG**; Linux **AppImage** + **`.deb`** + **`.rpm`** via `make package-installer-linux*` |
 | **Multi-linguagem** | PT-BR / EN-US com strings externalizadas |
 
 #### Entidades
 - `DeviceProfile` - Modelo ESP32, flash, sensores, pins, display, WiFi, firmware_version
 - `FilamentProfile` - Mesmo schema do firmware (id, names, temp, duration, humidity, is_builtin)
 - `FirmwarePackage` - version, binary_path, partition_table, bootloader, checksum SHA256
-- `HostReleaseArtifact` - instalador OS (msix/dmg/appimage/deb/rpm), checksum, signed
 
 ---
 
@@ -232,7 +230,7 @@
 | **GUI Firmware** | LVGL v8+ | Leve, touch-ready, double buffer, temas |
 | **WebSocket** | async_web_server / ESPAsyncWebServer | Non-blocking, multi-client, 1Hz nativo |
 | **NVS/Storage** | NVS (config) + SPIFFS (fonts/assets) | Wear-leveling, atômico, padrão ESP32 |
-| **Desktop Installer** | Flutter + esptool + MSIX/DMG/AppImage/deb/rpm | DEC-010/011; Make Linux; 60 tasks |
+| **Desktop Installer** | Flutter + esptool + MSIX/DMG/AppImage/deb/rpm | DEC-010/011; clarify: soft WS, local reconfig |
 | **Control App** | Flutter 3.x (Dart) | Single codebase Desktop+Mobile, SQLite, WS |
 | **Build/CI** | GitHub Actions + PlatformIO | Matrix build ESP32 variants, artifact upload |
 | **Docs** | Markdown PT-BR/EN-US em `/docs` | GitHub Pages ready, versionado com código |
@@ -346,4 +344,4 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 ---
 
 *README auto-gerado e sincronizado pela Constituição Philarmony v0.6.0*
-*Última atualização: 2026-07-28 | Trigger: tasks*
+*Última atualização: 2026-07-28 | Trigger: plan*

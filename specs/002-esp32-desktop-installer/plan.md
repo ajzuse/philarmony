@@ -4,15 +4,16 @@
 
 **Input**: Feature specification from `/specs/002-esp32-desktop-installer/spec.md`.
 
-**Depends on**: Firmware feature `001-filament-dryer-esp32` (NVS/hardware JSON schema, WebSocket verify after flash, pre-built PlatformIO binaries).
+**Depends on**: Firmware feature `001-filament-dryer-esp32` (NVS/hardware JSON schema, optional post-flash WS/HTTP when reachable, pre-built PlatformIO binaries).
 
 **Stack (2026-07-28):** **Flutter** shared with `003-filament-dryer-control-app` (DEC-010).  
-**Distribution (2026-07-28):** Ship **OS-native installers** for single-download install — **Windows**, **macOS**, and **Linux** (DEC-011).  
-**Amended**: Linux elevated to first-class: **`make` package targets** + AppImage + `.deb` + **`.rpm`** (Fedora / RHEL-family).
+**Distribution (2026-07-28):** Ship **OS-native installers** — Windows, macOS, Linux (DEC-011).  
+**Amended**: Linux first-class (`make` + AppImage/deb/rpm).  
+**Amended (clarify 2026-07-28):** Soft post-flash network verify; local-only reconfigure; password redaction; Retry without restore; macOS notarize required / Win+Linux unsigned MVP OK.
 
 ## Summary
 
-Build a cross-platform **Flutter** desktop app that (1) guides ESP32 first-time setup and USB firmware flash, and (2) is itself delivered as **platform installers** so end users download a single file and install without unzipping Flutter build folders. Domain logic lives in shared Dart packages for the future control app. USB via `flutter_libserialport`; device flash via bundled **esptool**. Host packaging: **MSIX** (Windows), **signed+notarized DMG** (macOS), and on Linux **AppImage + `.deb` + `.rpm`**, driven primarily through **repo `Makefile` targets** (plus CI).
+Build a cross-platform **Flutter** desktop app that (1) guides ESP32 first-time setup and USB firmware flash, and (2) is itself delivered as **platform installers**. Domain logic in `packages/philarmony_core`. USB via `flutter_libserialport`; device flash via bundled **esptool**. **Flash Success** = esptool verify; WS/HTTP check is optional and non-blocking. Reconfigure prefills from **local last-session / JSON only** (no on-device NVS dump). Host packaging: **MSIX** (Windows, unsigned OK MVP), **notarized DMG** (macOS public), **AppImage + deb + rpm** via **Makefile** (unsigned OK MVP with docs warnings).
 
 ## Technical Context
 
@@ -24,38 +25,42 @@ Build a cross-platform **Flutter** desktop app that (1) guides ESP32 first-time 
 - Bundled `esptool` per OS — erase/write/verify via `Process`
 - `packages/philarmony_core` — models, validators, NVS mapping (shared with `003`)
 - **Packaging**: `msix` (Windows); `flutter_distributor` / `create-dmg` (macOS DMG); Linux **AppImage + deb + rpm** via `flutter_distributor` / fpm / rpmbuild, wrapped by **Makefile**
-- Code signing: Windows Authenticode (optional for sideload MVP; required for Store); Apple Developer ID + notarization (required for Gatekeeper); Linux optional GPG on packages
+- Code signing: **macOS Developer ID + notarization REQUIRED for public DMG**; Windows Authenticode optional in MVP (document SmartScreen); Linux GPG optional in MVP
+- Post-flash: optional WS/HTTP when IP/hotspot reachable — MUST NOT fail Flash Success after esptool verify
 
 **Storage**:
-- Local JSON configuration profiles (export/import; password stripped)
+- Local JSON configuration profiles (export/import; password **always** omitted/`***`)
+- Last successful DeviceProfile (sans password) in app support dir for reconfigure
 - Bundled firmware + esptool inside the app bundle / installer payload
-- Device NVS at flash time
+- Device NVS at flash time only (no USB NVS readback in this phase)
 
-**Testing**: `flutter_test` + mocked flasher; CI builds Win/macOS/Linux packages (signing secrets when available); smoke “installer launches” incl. rpm/deb install on VMs
+**Testing**: `flutter_test` + mocked flasher; CI builds Win/macOS/Linux packages; smoke installers; assert soft network-verify warning path
 
 **Target Platform**:
-- **Windows** 10/11 x64 — **MSIX** (optional Inno `.exe`)
-- **macOS** 12+ — **DMG** (signed + notarized for public release)
-- **Linux** x64 — **AppImage** (portable), **`.deb`** (Debian/Ubuntu), **`.rpm`** (Fedora, RHEL, Rocky, Alma, etc.); built via `make package-installer-*`
-- Mobile deferred to `003` (no USB flash requirement there)
+- **Windows** 10/11 x64 — **MSIX** (optional Inno `.exe`); unsigned public MVP allowed with docs warning
+- **macOS** 12+ — **DMG**; **public release MUST be signed + notarized**
+- **Linux** x64 — AppImage + `.deb` + `.rpm`; unsigned MVP OK with docs; builds via `make package-installer-*`
+- Mobile deferred to `003`
 
 **Project Type**: Desktop application + release packaging pipeline
 
 **Performance Goals**:
 - USB detect &lt;2s; device flash ≤4MB &lt;30s; UI &lt;100ms
-- Host installer size: target &lt;150MB compressed download including firmware assets (monitor; document if exceeded)
+- Host installer size: target &lt;150MB compressed download including firmware assets
 
 **Constraints**:
 - End users MUST NOT need Flutter SDK, Visual Studio, or Xcode to install the app
-- One download artifact **per OS/format** (Win x64; macOS universal or dual; Linux AppImage + deb + rpm)
-- Linux packaging entry point for developers/CI: **Makefile** (does not replace end-user `.rpm`/`.deb`/AppImage downloads)
+- One download artifact per OS/format
+- Linux packaging entry point for builders/CI: **Makefile**
 - No firmware compile-from-source; USB flash only
 - Pin safety validation before device erase
+- Flash failure: **Retry** full pipeline — **no** automatic pre-erase image restore
+- Reconfigure: local store / JSON import only — **no** on-device NVS dump over USB
 - GPLv3 source; release binaries may need third-party notices for esptool
-- WiFi passwords never in exported profiles
-- Unsigned macOS builds only for internal CI — public releases require notarization
+- WiFi passwords never in exported profiles (omit/`***` only — no “encrypted in JSON”)
+- Unsigned macOS only for internal CI — **public** macOS MUST be notarized
 
-**Scale/Scope**: Wizard + device flash + **host app installers** for Win/macOS/Linux; shared Dart core with `003`
+**Scale/Scope**: Wizard + device flash + host installers Win/macOS/Linux; shared Dart core with `003`
 
 ## Constitution Check
 
@@ -63,14 +68,14 @@ Build a cross-platform **Flutter** desktop app that (1) guides ESP32 first-time 
 
 - [x] **Orientação a Objetos / Segurança de Hardware**: Domain classes encapsulate serial/flash; invalid pins abort.
 - [x] **Desempenho**: Flash/serial off UI isolate; packaging is build-time only.
-- [x] **Failsafe**: No device flash without validation; host installer must not leave half-installed state (use OS installer semantics — MSIX/DMG/deb/rpm).
-- [x] **Workspace**: Flutter SDK + packaging tools (incl. rpm/deb/AppImage) documented in `.vscode/workspace.json`.
-- [x] **Teste Automatizado**: Flow tests + CI package build job (at least unsigned artifact generation for Win/macOS/Linux formats).
-- [x] **Documentação Sincronizada**: README + `docs/*/installer*` describe download/install steps (incl. `dnf`/`apt`/AppImage).
-- [x] **Memória Compartilhada**: DEC-010 (Flutter) + DEC-011 (host distribution, amended Linux).
+- [x] **Failsafe**: No device flash without pin validation; Flash Success = esptool verify; network check soft; Retry without false “rollback restore”.
+- [x] **Workspace**: Flutter SDK + packaging tools documented in `.vscode/workspace.json`.
+- [x] **Teste Automatizado**: Flow tests + CI package jobs; soft-verify path covered.
+- [x] **Documentação Sincronizada**: README + installer docs (signing warnings, `dnf`/`apt`/AppImage).
+- [x] **Memória Compartilhada**: DEC-010 + DEC-011; clarify session encoded in spec.
 - [x] **Commit approval**: unchanged.
 
-**Post-design**: Gates OK. Linux Make + rpm/deb/AppImage are additive packaging; firmware flash safety unchanged.
+**Post-design (clarify amend)**: Gates OK. Clarifications remove NVS-read and auto-restore scope; tighten signing/MVP and Flash Success definition.
 
 ## Project Structure
 

@@ -10,11 +10,11 @@
 
 Distribute the Flutter **Philarmony Desktop Installer** as **single-file OS installers**:
 
-- **Windows**: `.msix` (primary), optional Inno `.exe` fallback  
-- **macOS**: signed + notarized `.dmg`  
+- **Windows**: `.msix` (primary), optional Inno `.exe` fallback; **unsigned OK in MVP** with docs warning  
+- **macOS**: **signed + notarized `.dmg` REQUIRED for public release**  
 - **Linux** (first-class):
   - **Build**: repo **`make package-installer-linux*`** targets
-  - **Ship**: **AppImage** (portable), **`.deb`** (Debian/Ubuntu), **`.rpm`** (Fedora, RHEL, Rocky, Alma, and other rpm-based)
+  - **Ship**: **AppImage** + **`.deb`** + **`.rpm`**; **unsigned OK in MVP** with docs warning
 
 Published on GitHub Releases with checksums. App bundle embeds firmware + esptool.
 

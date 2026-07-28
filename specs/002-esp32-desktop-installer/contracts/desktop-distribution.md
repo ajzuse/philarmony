@@ -59,16 +59,19 @@ make package-installer-linux-rpm          # Fedora / RHEL-family only
 
 | OS | Requirement for public release |
 |----|--------------------------------|
-| Windows | Prefer Authenticode-signed MSIX; unsigned OK for internal CI only |
-| macOS | **Developer ID Application** signature + **Apple notarization** (Gatekeeper) |
-| Linux | Optional GPG signature on AppImage / deb / rpm (recommended for `dnf`/`apt` trust) |
+| Windows | Authenticode **optional in MVP**; unsigned OK with SmartScreen warning in docs |
+| macOS | **REQUIRED**: Developer ID Application + **Apple notarization** for any **public** GitHub Release DMG |
+| Linux | GPG **optional in MVP**; unsigned AppImage/deb/rpm OK with trust-prompt docs |
+
+Internal/CI may produce unsigned macOS builds for smoke only — not for public download pages.
 
 ## Release checklist
 
 - [ ] Version bump matches `pubspec.yaml` / git tag `installer-vX.Y.Z`
 - [ ] Firmware assets version recorded in release notes (`embeds_firmware_version`)
 - [ ] SHA-256 for each asset published (incl. `.rpm` and `.deb`)
-- [ ] Smoke: Win MSIX, macOS DMG, Linux AppImage + `dnf install` rpm + `apt install` deb
+- [ ] Smoke: Win MSIX, macOS **notarized** DMG, Linux AppImage + `dnf install` rpm + `apt install` deb
+- [ ] Docs warn if Win/Linux artifacts are unsigned (MVP policy)
 - [ ] Docs PT-BR/EN-US “Download & Install” updated (Fedora/`dnf` called out)
 
 ## Non-goals (this phase)
