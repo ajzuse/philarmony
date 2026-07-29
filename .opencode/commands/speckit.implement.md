@@ -2,6 +2,13 @@
 description: Execute the implementation plan by processing and executing all tasks defined in tasks.md
 ---
 
+## Cavemen Protocol
+
+Apply the Cavemen Protocol (constitution §Core Principles) to ALL output:
+- No filler phrases. No preamble. Progress = task ID + ✓ or ✗. Nothing else per task.
+- Completion Report: task count + 1-sentence status. Nothing else.
+- Checklist prompt to user: 1 sentence.
+
 ## User Input
 
 ```text

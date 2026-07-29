@@ -10,10 +10,14 @@ build/
 *.bundle.js
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
+# Keep .vscode/workspace.json tracked for constitution toolchain reproducibility
+.vscode/*
+!.vscode/workspace.json
+!.vscode/extensions.json
+!.vscode/settings.json
 
 # OS
 .DS_Store
@@ -49,3 +53,28 @@ yarn.lock
 # Documentation
 temp/
 *.md~
+
+# PlatformIO
+.pio/
+.pio-core/
+.pioenvs/
+.piolibdeps/
+
+# C++ build artifacts
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.hex
+*.map
+
+# ESP-IDF / Arduino
+sdkconfig
+sdkconfig.old
+build/
+managed_components/
+
+# Backup files created during editing
+*.bak
+*.orig

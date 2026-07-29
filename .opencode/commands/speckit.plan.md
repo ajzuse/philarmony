@@ -10,6 +10,13 @@ handoffs:
     prompt: Create a checklist for the following domain...
 ---
 
+## Cavemen Protocol
+
+Apply the Cavemen Protocol (constitution §Core Principles) to ALL output:
+- No filler phrases. No preamble. No post-code summaries unless requested.
+- Completion Report: artifact paths + 1-sentence status. Nothing else.
+- Questions to user: 1 sentence max per question.
+
 ## User Input
 
 ```text

@@ -1,0 +1,29 @@
+name: Firmware CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master, "feature/**"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Build firmware
+        run: make build ENV=esp32devkitc
+
+      - name: Run unit tests
+        run: make test

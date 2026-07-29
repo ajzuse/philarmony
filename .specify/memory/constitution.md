@@ -1,33 +1,52 @@
-<!-- 
+<!--
 Sync Impact Report:
-Version change: 0.2.0 → 0.3.0 (MINOR - new principle added)
-Modified principles: None renamed
-Added sections: Principle "Memória Compartilhada de Pesquisa e Conhecimento"
+Version change: 0.5.0 → 0.6.0 (MINOR — elevated explicit commit review/approval into a Core Principle and closed auto-commit loopholes)
+Modified principles:
+  - Development Workflow / Git "Confirmação Explícita de Commit" → promoted & expanded as Core Principle "Revisão e Aprovação Explícita de Commit"
+  - Governance "Commit Approval Rule" → strengthened (no default-yes; review before commit)
+Added sections:
+  - Core Principles: Revisão e Aprovação Explícita de Commit
 Removed sections: None
-Templates requiring updates: 
-  - .specify/templates/plan-template.md (⚠ pending - add memory catalog reference)
-  - .specify/templates/spec-template.md (⚠ pending - add research data capture)
-  - .specify/templates/tasks-template.md (⚠ pending - add memory persistence tasks)
-Follow-up TODOs: 
-  - TODO(RATIFICATION_DATE): Original adoption date unknown, marked as 2026-07-22
-  - Update plan/spec/tasks templates to reference shared memory catalog
+Templates requiring updates:
+  - .specify/templates/plan-template.md (✅ no structural change required; Constitution Check still points to constitution.md)
+  - .specify/templates/spec-template.md (✅ no change)
+  - .specify/templates/tasks-template.md (✅ no change)
+  - .specify/extensions.yml (✅ git commit hooks set optional)
+  - .specify/extensions/git-workflow/scripts/git-commit-hook.sh (✅ fail-closed: no TTY ⇒ no commit)
+  - .claude/skills/speckit-* (⚠ agents must follow new principle; hook optionality updated via extensions.yml)
+Follow-up TODOs: None
 -->
 
 # Philarmony Constitution
 
 ## Core Principles
 
+### Cavemen Protocol (Token Efficiency)
+All AI agents MUST communicate in minimal, telegraphic language. No filler phrases ("Of course!", "Sure!", "Here's what I did", "Great question"). No preamble before code. No post-code summaries unless explicitly requested. Prose is limited to what is strictly necessary for correctness. Code output is always complete and untruncated. Responses MUST be 1–3 sentences when no code is involved. If a question can be answered with a word or a number, use only that. Agents MUST apply this principle to ALL outputs: analysis reports, completion reports, inline comments in command files, and conversational turns.
+
+### Revisão e Aprovação Explícita de Commit
+Nenhum commit Git MUST ser criado automaticamente por agentes, hooks ou scripts sem que o usuário tenha tido chance explícita de revisar o código e autorizar a gravação.
+
+Regras não negociáveis:
+- Após concluir uma etapa (specify/plan/tasks/implement/constitution/etc.), o agente MUST apresentar: (1) resumo do que mudou, (2) lista dos arquivos principais, (3) mensagem de commit sugerida (Conventional Commits), (4) pergunta clara pedindo autorização.
+- O agente MUST aguardar resposta afirmativa explícita do usuário (ex.: "sim", "commit", "autorizo", "pode commitar") antes de executar `git add`/`git commit` ou qualquer hook que grave no Git.
+- Ausência de TTY, timeout, falha de leitura, ambiente não interativo ou prompt sem resposta MUST resultar em **não commitar** (fail-closed). Nunca interpretar silêncio, erro de `/dev/tty` ou default implícito como "sim".
+- Hooks de commit Speckit (`git-commit-hook.sh` e equivalentes) MUST ser opcionais na experiência do agente: o agente ofereceece a sugestão e só executa o hook/comando se o usuário autorizar.
+- "Revisar o código" inclui permitir que o usuário inspecione o diff no IDE/chat antes da autorização; o agente NÃO MUST pular essa etapa.
+
+Rationale: commits irreversíveis no histórico local/remoto sem revisão violam a confiança do fluxo Speckit e da governança do projeto.
+
 ### Orientação a Objetos e Segurança de Hardware
 Todos os componentes devem ser organizados usando princípios de orientação a objetos. Interfaces claras e tipagem forte garantem a segurança de dados e a modularidade. Funções que interagem diretamente com hardware devem estar encapsuladas em objetos com validação e safe abortos para parâmetros fora de controle (ex: temperatura, tensão), garantindo proteção contra danos ao hardware e abortos limpos (sem hangs).
 
 ### Desempenho Máximo e Eficiência
-Code must be optimized for ESP32's constrained resources. Use deterministic algorithms, avoid dynamic allocations, and implement profiling. Each function must have a clear performance contract (timing, memory). Blocking operations are forbidden. Use hardware-specific APIs where necessary for maximum throughput.
+Code MUST be optimized for ESP32's constrained resources. Use deterministic algorithms, avoid dynamic allocations, and implement profiling. Each function MUST have a clear performance contract (timing, memory). Blocking operations are forbidden. Use hardware-specific APIs where necessary for maximum throughput.
 
 ### Failsafe e Proteção de Hardware
-All hardware-control routines MUST include parameter validation that aborts on out-of-bounds values. Implement watchdog timers and safe fallback states. Must detect error conditions within defined timeouts and transition to safe operating states automatically, preventing hardware damage.
+All hardware-control routines MUST include parameter validation that aborts on out-of-bounds values. Implement watchdog timers and safe fallback states. MUST detect error conditions within defined timeouts and transition to safe operating states automatically, preventing hardware damage.
 
 ### Workspace de Dependências e Configurações
-A shared workspace configuration file (.vscode/workspace.json) must be maintained for consistent toolchains across machines. All dependencies listed in requirements.txt/package.json. Each new development tool must be added to this workspace file with proven documentation and licensing, ensuring reproducibility.
+A shared workspace configuration file (.vscode/workspace.json) MUST be maintained for consistent toolchains across machines. All dependencies listed in requirements.txt/package.json. Each new development tool MUST be added to this workspace file with proven documentation and licensing, ensuring reproducibility.
 
 ### Teste Automatizado e Qualidade
 Automation testing pipeline is NON-NEGOTIABLE. Tests represent complete user flows only. CI system MUST fail build if any test fails. Test results cached in memory catalog for AI reference. Only flow tests (not unit tests) are mandatory, each representing complete user journeys.
@@ -65,10 +84,11 @@ O catálogo deve ser versionado, consultável via query semântica, e sincroniza
 - Version tagging: Semantic versioning with patch for security bugs, minor for features
 
 **Git workflow requirements:**
-- Conventional Commits: All commit messages MUST follow Conventional Commits format (e.g., "feat: add new sensor driver", "fix: handle sensor timeout")
-- Branch strategy: Create new branch (feature/xxx) for each task block before implementation
-- Incremental commits: Make commits between tasks after validation of tests
-- Pull Requests: Open PR at end of each task block execution
+- Conventional Commits: All commit messages MUST follow Conventional Commits format with feature scope: `tipo(<feature>): descrição` (ex: `docs(filament-dryer-esp32): Add implementation plan`).
+- Revisão antes do commit: aplica-se o princípio Core "Revisão e Aprovação Explícita de Commit" em todas as etapas Speckit e em qualquer automação Git.
+- Branch strategy: Create new branch (`feature/<nome-do-projeto>`) for each task block before implementation
+- Incremental commits: Make commits between tasks only after validation of tests **and** explicit user authorization following code review opportunity
+- Pull Requests: Open PR at end of each task block execution only when the user requests it
 
 ## Language Support
 
@@ -97,5 +117,7 @@ Documentação completa em EN-US para contribuições open-source. Utilizada com
 - Use README.md in docs/ for runtime development guidance
 - **README Sync Rule**: Todo comando speckit que altere specs/plans/tasks DEVE invocar atualização do README.md como passo obrigatório. Falha na sincronização bloqueia merge. Implementação via hook `after_specify`/`after_plan`/`after_tasks` no `.specify/extensions.yml`.
 - **Memory Catalog Sync Rule**: Toda pesquisa, decisão arquitetural, descoberta técnica ou referência validada DEVE ser registrada no catálogo de memória compartilhada. Falha no registro bloqueia merge de PRs que introduzam novo conhecimento.
+- **Commit Approval Rule**: Nenhum commit MUST ser efetuado sem (1) oportunidade de o usuário revisar o código/diff e (2) aprovação explícita do usuário. Hooks e agentes MUST falhar fechado (não commitar) se a confirmação interativa não for obtida. Default implícito "sim" é PROIBIDO.
+- **Cavemen Compliance Rule**: All agents MUST be reviewed for Cavemen Protocol compliance. PRs introducing verbose preamble, filler acknowledgments, or redundant summaries in agent output MUST be rejected.
 
-**Version**: 0.3.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-23
+**Version**: 0.6.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-28

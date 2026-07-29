@@ -1,0 +1,186 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FilamentDryerHardwareConfig",
+  "type": "object",
+  "description": "Generic hardware configuration for Filament Dryer ESP32 - fully configurable sensors, actuators, displays, and control algorithms",
+  "properties": {
+    "sensors": {
+      "type": "array",
+      "description": "Array of sensor configurations",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "capabilities", "bus"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique sensor identifier"
+          },
+          "type": {
+            "type": "string",
+            "description": "Driver type identifier (e.g., sht3x, dht22, ds18b20, ntc, bme280, aht20, custom)"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["temperature", "humidity", "pressure"] },
+            "minItems": 1,
+            "description": "Measured quantities"
+          },
+          "bus": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": { "type": "string", "enum": ["i2c", "spi", "onewire", "uart", "adc"] },
+              "bus": { "type": "integer", "minimum": 0, "maximum": 1, "description": "I2C bus number (0 or 1)" },
+              "address": { "type": "integer", "description": "I2C/SPI device address" },
+              "sda_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+              "scl_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+              "pin": { "type": "integer", "minimum": 0, "maximum": 39, "description": "1-Wire/UART/ADC GPIO pin" },
+              "mosi_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+              "sclk_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+              "cs_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+              "baudrate": { "type": "integer", "description": "UART baudrate" }
+            }
+          },
+          "driver_params": {
+            "type": "object",
+            "description": "Driver-specific parameters (e.g., resolution, repeatability, oversampling)"
+          },
+          "calibration": {
+            "type": "object",
+            "properties": {
+              "temperature_offset": { "type": "number", "default": 0.0 },
+              "humidity_scale": { "type": "number", "default": 1.0 },
+              "pressure_offset": { "type": "number", "default": 0.0 }
+            }
+          }
+        }
+      }
+    },
+    "actuators": {
+      "type": "array",
+      "description": "Array of actuator configurations",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "role", "pins", "control"],
+        "properties": {
+          "id": { "type": "string", "description": "Unique actuator identifier" },
+          "type": {
+            "type": "string",
+            "enum": ["mosfet_pwm", "ssr", "fan_pwm", "fan_digital", "stepper", "servo", "custom"],
+            "description": "Actuator driver type"
+          },
+          "role": { "type": "string", "enum": ["heater", "fan", "custom"] },
+          "pins": {
+            "type": "object",
+            "required": ["pwm"],
+            "properties": {
+              "pwm": { "type": "integer", "minimum": 0, "maximum": 39 },
+              "dir": { "type": "integer", "minimum": 0, "maximum": 39 },
+              "enable": { "type": "integer", "minimum": 0, "maximum": 39 }
+            }
+          },
+          "control": {
+            "type": "object",
+            "required": ["algorithm"],
+            "properties": {
+              "algorithm": { "type": "string", "enum": ["pid", "bang_bang", "pwm_feedforward", "custom"] },
+              "pwm_freq_hz": { "type": "integer", "minimum": 1, "default": 1000 },
+              "max_power_pct": { "type": "integer", "minimum": 1, "maximum": 100, "default": 100 },
+              "cooldown_sec": { "type": "integer", "minimum": 0, "default": 30 },
+              "parameters": {
+                "type": "object",
+                "description": "Algorithm-specific parameters"
+              }
+            }
+          },
+          "safety_limits": {
+            "type": "object",
+            "properties": {
+              "max_temp_c": { "type": "number", "default": 80 },
+              "max_power_pct": { "type": "integer", "minimum": 1, "maximum": 100, "default": 100 },
+              "min_temp_c": { "type": "number" },
+              "rate_limit_c_per_sec": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "description": "Display configuration",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "driver": {
+          "type": "string",
+          "enum": ["none", "ssd1306", "sh1106", "st7789", "ili9341", "st7735", "gc9a01", "ili9488", "hd44780", "nextion", "auto"],
+          "default": "auto"
+        },
+        "bus": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "type": "string", "enum": ["i2c", "spi", "parallel_8bit", "uart"] },
+            "i2c_address": { "type": "integer" },
+            "sda_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+            "scl_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+            "spi_mosi": { "type": "integer", "minimum": 0, "maximum": 39 },
+            "spi_sclk": { "type": "integer", "minimum": 0, "maximum": 39 },
+            "spi_cs": { "type": "integer", "minimum": 0, "maximum": 39 },
+            "dc_pin": { "type": "integer", "minimum": 0, "maximum": 39 },
+            "rst_pin": { "type": "integer" },
+            "bl_pin": { "type": "integer", "minimum": 0, "maximum": 39 }
+          }
+        },
+        "geometry": {
+          "type": "object",
+          "properties": {
+            "width": { "type": "integer", "default": 128 },
+            "height": { "type": "integer", "default": 64 },
+            "rotation": { "type": "integer", "enum": [0, 90, 180, 270], "default": 0 }
+          }
+        },
+        "layout": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "font_scaling": { "type": "string", "enum": ["auto", "fixed"], "default": "auto" },
+            "compact_mode": { "type": "boolean", "default": false }
+          }
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "description": "Control algorithm configuration",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["pid", "bang_bang", "pwm_feedforward", "custom"],
+          "default": "pid"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Algorithm-specific parameters (e.g., kp, ki, kd for PID)"
+        },
+        "auto_tune": {
+          "type": "boolean",
+          "default": false
+        },
+        "safety_limits": {
+          "type": "object",
+          "properties": {
+            "hard_temp_limit_c": { "type": "number", "default": 80 },
+            "max_heater_power_pct": { "type": "integer", "minimum": 1, "maximum": 100, "default": 100 },
+            "sensor_timeout_ms": { "type": "integer", "default": 600 },
+            "thermal_runaway_time_sec": { "type": "integer", "default": 45 },
+            "thermal_runaway_temp_rise_c": { "type": "number", "default": 0.5 }
+          }
+        }
+      }
+    }
+  },
+  "required": ["sensors", "actuators"]
+}

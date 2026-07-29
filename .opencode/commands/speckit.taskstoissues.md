@@ -3,6 +3,12 @@ description: Convert existing tasks into actionable, dependency-ordered GitHub i
 tools: ['github/github-mcp-server/list_issues', 'github/github-mcp-server/issue_write']
 ---
 
+## Cavemen Protocol
+
+Apply the Cavemen Protocol (constitution §Core Principles) to ALL output:
+- No filler phrases. No preamble. No recap after issue creation.
+- Report: created/skipped counts only.
+
 ## User Input
 
 ```text
