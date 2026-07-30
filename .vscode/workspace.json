@@ -17,11 +17,13 @@
   "extensions": {
     "recommendations": [
       "platformio.platformio-ide",
-      "ms-vscode.cpptools"
+      "ms-vscode.cpptools",
+      "Dart-Code.dart-code",
+      "Dart-Code.flutter"
     ]
   },
   "philarmony": {
-    "toolchain": "PlatformIO + Arduino-ESP32 + GNU Make",
+    "toolchain": "PlatformIO + Arduino-ESP32 + GNU Make + Flutter Desktop",
     "dependencies": [
       "AsyncTCP",
       "ESPAsyncWebServer",
@@ -30,14 +32,26 @@
       "OneWire",
       "Adafruit GFX / SSD1306 / SH110X",
       "LiquidCrystal_I2C",
-      "GNU Make (Makefile façade)"
+      "GNU Make (Makefile façade)",
+      "Flutter 3.44.0 via FVM (`.fvmrc`)",
+      "flutter_libserialport",
+      "esptool (bundled per OS)",
+      "msix / create-dmg / AppImage+deb+rpm packagers"
     ],
     "test_command": "make test",
     "build_command": "make build",
     "flash_command": "make flash",
+    "flutter_sdk": "fvm (3.44.0)",
+    "installer_dev": "make run",
+    "installer_test": "make test-flutter",
+    "installer_package_linux": "make package-installer-linux",
+    "core_test": "make test-core",
     "pio_test_command": "pio test -e native",
     "pio_build_command": "pio run -e esp32devkitc",
     "docs": "https://docs.platformio.org/",
-    "makefile_contract": "specs/001-filament-dryer-esp32/contracts/makefile-targets.md"
+    "flutter_docs": "https://docs.flutter.dev/desktop",
+    "fvm_docs": "https://fvm.app/",
+    "makefile_contract": "specs/001-filament-dryer-esp32/contracts/makefile-targets.md",
+    "installer_packaging": "apps/esp32-desktop-installer/packaging/README.md"
   }
 }

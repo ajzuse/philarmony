@@ -1,0 +1,18 @@
+{
+  "@@locale": "pt",
+  "appTitle": "Instalador Philarmony",
+  "next": "Próximo",
+  "back": "Voltar",
+  "install": "Instalar",
+  "retry": "Tentar novamente",
+  "exportProfile": "Exportar perfil",
+  "importProfile": "Importar perfil",
+  "loadLastSession": "Carregar última sessão",
+  "newSetup": "Nova configuração",
+  "flashSuccess": "Flash concluído",
+  "networkWarn": "Dispositivo inacessível na rede (verificação opcional). O flash ainda foi bem-sucedido.",
+  "pinConflict": "Corrija conflitos de pinos antes de continuar",
+  "wifiPasswordRequired": "Redigite a senha WiFi antes do flash",
+  "noPorts": "Nenhuma porta USB serial encontrada. Instale drivers CH340/CP210x/FTDI e reconecte.",
+  "language": "Idioma"
+}

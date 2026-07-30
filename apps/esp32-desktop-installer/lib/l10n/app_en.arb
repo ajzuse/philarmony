@@ -1,0 +1,18 @@
+{
+  "@@locale": "en",
+  "appTitle": "Philarmony Installer",
+  "next": "Next",
+  "back": "Back",
+  "install": "Install",
+  "retry": "Retry",
+  "exportProfile": "Export profile",
+  "importProfile": "Import profile",
+  "loadLastSession": "Load last session",
+  "newSetup": "New setup",
+  "flashSuccess": "Flash Success",
+  "networkWarn": "Device not reachable on network (optional check). Flash still succeeded.",
+  "pinConflict": "Fix pin conflicts before continuing",
+  "wifiPasswordRequired": "Re-enter WiFi password before flashing",
+  "noPorts": "No USB serial ports found. Install CH340/CP210x/FTDI drivers and reconnect.",
+  "language": "Language"
+}

@@ -1,266 +1,257 @@
 # Tasks: ESP32 Desktop Installer
 
 **Input**: Design documents from `/specs/002-esp32-desktop-installer/`  
-**Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`  
-**Stack**: Flutter desktop + `packages/philarmony_core` + bundled esptool (DEC-010); host packages MSIX/DMG/AppImage/deb/rpm via Make (DEC-011)
+**Prerequisites**: `plan.md`, `spec.md` (Clarifications 2026-07-28), `research.md` (R8–R12), `data-model.md`, `contracts/`  
+**Stack**: Flutter **3.44.0 via FVM** (`.fvmrc`) + `philarmony_core` + bundled esptool (DEC-010/011)
 
-**Tests**: Not requested as TDD in the spec; add focused `flutter_test`/`dart test` where noted in Polish (plan + constitution automated-testing gate).
+**Progress note (2026-07-29)**: Implementation essentially complete except hardware VS-1 smoke (T031) and final quickstart VS-1/4/5 sign-off (T062). Run `make bundle-esptool` + `make sync-installer-firmware` before real flash.
 
-**Organization**: Tasks grouped by user story for independent implementation and testing.
+**Tests**: Polish includes `make test-flutter` (already green for core + wizard/widget).
 
 ## Format: `- [ ] [ID] [P?] [Story?] Description with file path`
 
-- **[P]**: Can run in parallel (different files, no dependencies on incomplete work)
-- **[Story]**: [US1]…[US5] maps to scenarios / FR groups below
+- **[P]**: Parallelizable  
+- **[Story]**: [US1]…[US5]
 
 ## Path Conventions
 
-- Shared domain: `packages/philarmony_core/`
-- Flutter app: `apps/esp32-desktop-installer/`
-- Packaging: `apps/esp32-desktop-installer/packaging/`, root `Makefile`, `.github/workflows/`
+- Shared: `packages/philarmony_core/`
+- App: `apps/esp32-desktop-installer/`
+- Tooling: root `Makefile`, `.fvmrc`, `.github/workflows/`
 
 ---
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Monorepo Flutter scaffold, assets layout, workspace tooling
+**Purpose**: Monorepo + FVM + desktop runners
 
-- [ ] T001 Create Dart package skeleton in `packages/philarmony_core/pubspec.yaml` and `packages/philarmony_core/lib/philarmony_core.dart`
-- [ ] T002 Create Flutter desktop app scaffold (windows/macos/linux enabled) in `apps/esp32-desktop-installer/pubspec.yaml` depending on `philarmony_core`
-- [ ] T003 [P] Add asset directories and placeholders in `apps/esp32-desktop-installer/assets/firmware/` and `apps/esp32-desktop-installer/assets/tools/{windows,macos,linux}/`
-- [ ] T004 [P] Ignore generated installers and Flutter build outputs in `.gitignore` (`apps/esp32-desktop-installer/dist/`, `build/`)
-- [ ] T005 [P] Document Flutter SDK + desktop + packaging host deps in `.vscode/workspace.json`
-- [ ] T006 [P] Add empty packaging tree in `apps/esp32-desktop-installer/packaging/{windows,macos,linux}/` and `apps/esp32-desktop-installer/packaging/README.md`
+- [x] T001 Create Dart package skeleton in `packages/philarmony_core/pubspec.yaml` and `packages/philarmony_core/lib/philarmony_core.dart`
+- [x] T002 Create Flutter desktop app in `apps/esp32-desktop-installer/pubspec.yaml` depending on `philarmony_core`
+- [x] T003 [P] Add asset placeholders in `apps/esp32-desktop-installer/assets/firmware/` and `apps/esp32-desktop-installer/assets/tools/{windows,macos,linux}/`
+- [x] T004 [P] Ignore Flutter/FVM/dist outputs in `.gitignore`
+- [x] T005 [P] Document Flutter/FVM + packaging in `.vscode/workspace.json` and `.vscode/settings.json` (`dart.flutterSdkPath` → `.fvm/flutter_sdk`)
+- [x] T006 [P] Add packaging tree in `apps/esp32-desktop-installer/packaging/`
+- [x] T007 Pin Flutter **3.44.0** via FVM in `.fvmrc` and `.fvm/fvm_config.json`
+- [x] T008 Generate desktop runners (`macos/`, `windows/`, `linux/`) under `apps/esp32-desktop-installer/`
+- [x] T009 Add Make shortcuts `run`, `run-macos`, `devices`, `doctor`, `pub-get`, `test-flutter`, `create-platforms` in `Makefile`
 
-**Checkpoint**: `flutter pub get` succeeds for app + core; app can `flutter run` empty shell on at least one desktop OS
+**Checkpoint**: `make run` / `make test-flutter` work with FVM
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Shared models, validation, NVS mapping, flash/serial abstractions — MUST complete before user stories
+**Purpose**: Shared models and validation
 
-**⚠️ CRITICAL**: No user story UI/flash work until this phase completes
+- [x] T010 [P] DeviceProfile / SensorConfig / PinMapping / DisplayConfig / WiFiConfig in `packages/philarmony_core/lib/src/models/`
+- [x] T011 [P] FilamentProfile builtins in `packages/philarmony_core/lib/src/models/filament_profile.dart`
+- [x] T012 [P] FirmwarePackage + FlashJob (`network_verify`) + InstallerSession in `packages/philarmony_core/lib/src/models/`
+- [x] T013 PinValidator in `packages/philarmony_core/lib/src/validation/pin_validator.dart`
+- [x] T014 [P] ProfileCodec aligned with `contracts/installer-profile.schema.json` in `packages/philarmony_core/lib/src/serialization/profile_codec.dart`
+- [x] T015 NvsConfigMapper in `packages/philarmony_core/lib/src/mapping/nvs_config_mapper.dart`
+- [x] T016 [P] DeviceDetector / FirmwareFlasher / PostFlashVerifier interfaces in `packages/philarmony_core/lib/src/device/`
+- [x] T017 ARB stubs + app shell in `apps/esp32-desktop-installer/lib/l10n/` and `apps/esp32-desktop-installer/lib/app.dart`
+- [x] T018 Unit tests PinValidator + ProfileStore in `packages/philarmony_core/test/core_test.dart`
 
-- [ ] T007 [P] Implement DeviceProfile / SensorConfig / PinMapping / DisplayConfig / WiFiConfig models in `packages/philarmony_core/lib/src/models/`
-- [ ] T008 [P] Implement FilamentProfile + built-in PLA/PETG/ABS/TPU/Nylon defaults in `packages/philarmony_core/lib/src/models/filament_profile.dart`
-- [ ] T009 [P] Implement FirmwarePackage + FlashJob + InstallerSession models in `packages/philarmony_core/lib/src/models/`
-- [ ] T010 Implement PinValidator (duplicates, reserved/strapping, PWM capability by chip) in `packages/philarmony_core/lib/src/validation/pin_validator.dart`
-- [ ] T011 [P] Implement DeviceProfile JSON (de)serialization aligned with `specs/002-esp32-desktop-installer/contracts/installer-profile.schema.json` in `packages/philarmony_core/lib/src/serialization/profile_codec.dart`
-- [ ] T012 Implement NVS/hardware JSON mapper per `contracts/nvs-config-mapping.md` in `packages/philarmony_core/lib/src/mapping/nvs_config_mapper.dart`
-- [ ] T013 [P] Define abstract DeviceDetector + FirmwareFlasher interfaces in `packages/philarmony_core/lib/src/device/`
-- [ ] T014 Wire app localization bootstrap (ARB stubs pt-BR/en-US) in `apps/esp32-desktop-installer/lib/l10n/` and `apps/esp32-desktop-installer/l10n.yaml`
-- [ ] T015 Create app shell with routing skeleton (wizard steps placeholders) in `apps/esp32-desktop-installer/lib/main.dart` and `apps/esp32-desktop-installer/lib/app.dart`
-
-**Checkpoint**: Foundation ready — `dart test` in core can target validators/mappers; user stories can proceed
+**Checkpoint**: `make test-core` passes
 
 ---
 
 ## Phase 3: User Story 1 — First-Time Device Setup (Priority: P1) 🎯 MVP
 
-**Goal**: USB detect → guided wizard (device, sensors, pins, display, WiFi, review) → flash bundled firmware + NVS → optional WS verify (Scenario 1 / FR-001–005, FR-007–008)
+**Goal**: Detect → wizard → flash → Flash Success = esptool verify; soft network check (R8/R11)
 
-**Independent Test**: Connect ESP32 → complete wizard with valid pins/WiFi → Install → device boots and responds (or flash log shows success stages per `contracts/flash-pipeline.md`)
+**Independent Test**: Wizard blocks bad pins; with port + bundled esptool + firmware.bin, flash stages complete; unreachable WS → warning only
 
-### Implementation for User Story 1
+### Done
 
-- [ ] T016 [P] [US1] Implement serial port enumeration via `flutter_libserialport` in `apps/esp32-desktop-installer/lib/device/serial_device_detector.dart`
-- [ ] T017 [P] [US1] Implement Device step UI (model, flash size, port select, troubleshooting empty list) in `apps/esp32-desktop-installer/lib/wizard/steps/device_step.dart`
-- [ ] T018 [P] [US1] Implement Sensors step UI (temp/humidity types + GPIO) in `apps/esp32-desktop-installer/lib/wizard/steps/sensors_step.dart`
-- [ ] T019 [P] [US1] Implement Pins step UI with conflict feedback in `apps/esp32-desktop-installer/lib/wizard/steps/pins_step.dart`
-- [ ] T020 [P] [US1] Implement Display step UI (driver, resolution, status fields) in `apps/esp32-desktop-installer/lib/wizard/steps/display_step.dart`
-- [ ] T021 [P] [US1] Implement WiFi step UI (SSID, password show/hide, optional static IP) in `apps/esp32-desktop-installer/lib/wizard/steps/wifi_step.dart`
-- [ ] T022 [US1] Implement Review step summarizing DeviceProfile + validation gate in `apps/esp32-desktop-installer/lib/wizard/steps/review_step.dart`
-- [ ] T023 [US1] Implement InstallerSessionController (step machine, Back/Next, validation_errors) in `apps/esp32-desktop-installer/lib/wizard/installer_session_controller.dart`
-- [ ] T024 [US1] Bundle esptool binaries + document provenance in `apps/esp32-desktop-installer/assets/tools/` and `apps/esp32-desktop-installer/packaging/README.md`
-- [ ] T025 [US1] Add script/Make target to copy firmware `001` build artifacts into `apps/esp32-desktop-installer/assets/firmware/` from PlatformIO output
-- [ ] T026 [US1] Implement FirmwareFlasher (esptool Process, stage parse, progress stream) in `apps/esp32-desktop-installer/lib/flash/esptool_firmware_flasher.dart`
-- [ ] T027 [US1] Implement NVS/config image writer using mapper output in `apps/esp32-desktop-installer/lib/flash/nvs_image_builder.dart`
-- [ ] T028 [US1] Implement Flash step UI (progress, stages, Retry without restore claim) in `apps/esp32-desktop-installer/lib/wizard/steps/flash_step.dart`
-- [ ] T029 [US1] Implement soft post-flash WS/HTTP verifier (`ok`/`skipped`/`warn`; never fails Flash Success) in `apps/esp32-desktop-installer/lib/flash/post_flash_verifier.dart`
-- [ ] T030 [US1] Wire wizard navigation end-to-end in `apps/esp32-desktop-installer/lib/wizard/wizard_page.dart`
+- [x] T019 [P] [US1] Serial enumeration via `flutter_libserialport` in `apps/esp32-desktop-installer/lib/device/serial_device_detector.dart`
+- [x] T020 [P] [US1] Device/Sensors/Pins/Display/WiFi/Review/Flash steps under `apps/esp32-desktop-installer/lib/wizard/steps/`
+- [x] T021 [US1] InstallerSessionController in `apps/esp32-desktop-installer/lib/wizard/installer_session_controller.dart`
+- [x] T022 [US1] WizardPage navigation in `apps/esp32-desktop-installer/lib/wizard/wizard_page.dart`
+- [x] T023 [US1] EsptoolFirmwareFlasher + SoftPostFlashVerifier in `apps/esp32-desktop-installer/lib/flash/`
+- [x] T024 [US1] NvsImageBuilder (JSON sidecar MVP) in `apps/esp32-desktop-installer/lib/flash/nvs_image_builder.dart`
+- [x] T025 [US1] macOS USB entitlements (sandbox off) in `apps/esp32-desktop-installer/macos/Runner/*entitlements`
+- [x] T026 [US1] Flow/widget tests in `apps/esp32-desktop-installer/test/`
 
-**Checkpoint**: First-time setup MVP works on one desktop OS with real or mocked flasher
+### Remaining
 
----
+- [x] T027 [US1] Bundle platform esptool binaries into `apps/esp32-desktop-installer/assets/tools/{macos,linux,windows}/` and document checksums in `apps/esp32-desktop-installer/packaging/README.md`
+- [x] T028 [US1] Wire `make sync-installer-firmware` output path into flasher default package in `apps/esp32-desktop-installer/lib/flash/esptool_firmware_flasher.dart` (resolve asset/`path_provider` absolute paths)
+- [x] T029 [US1] Replace JSON sidecar with firmware-compatible NVS/config partition image per `contracts/nvs-config-mapping.md` in `apps/esp32-desktop-installer/lib/flash/nvs_image_builder.dart`
+- [x] T030 [US1] Persist selected serial port across steps in `apps/esp32-desktop-installer/lib/wizard/installer_session_controller.dart` (avoid FlashStep default `/dev/ttyUSB0`)
+- [ ] T031 [US1] Hardware smoke VS-1 on real ESP32; record in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
 
-## Phase 4: User Story 2 — Filament Drying Profiles (Priority: P2)
-
-**Goal**: View built-ins, create/edit/delete customs (≤20), sync into flash NVS (FR-006; wizard `profiles` step)
-
-**Independent Test**: Add custom profile → appear in Review → after flash, firmware exposes profile (or NVS image contains profile payload per mapper)
-
-### Implementation for User Story 2
-
-- [ ] T031 [P] [US2] Implement Profiles step UI (built-in read-only, custom CRUD + validation) in `apps/esp32-desktop-installer/lib/wizard/steps/profiles_step.dart`
-- [ ] T032 [US2] Enforce max 20 customs + temp/duration/humidity ranges in `packages/philarmony_core/lib/src/validation/filament_profile_validator.dart`
-- [ ] T033 [US2] Include filament_profiles in NVS mapper path in `packages/philarmony_core/lib/src/mapping/nvs_config_mapper.dart`
-- [ ] T034 [US2] Insert Profiles step into wizard order in `apps/esp32-desktop-installer/lib/wizard/installer_session_controller.dart`
-
-**Checkpoint**: Profiles editable and included in flash payload
+**Checkpoint**: End-to-end USB flash on one desktop OS
 
 ---
 
-## Phase 5: User Story 3 — Configuration Profile Export/Import (Priority: P2)
+## Phase 4: User Story 2 — Filament Profiles (Priority: P2)
 
-**Goal**: Save/load JSON profiles for bulk flashing; WiFi password stripped/placeholder (Scenario 3 / FR-009)
+**Goal**: Built-ins + customs ≤20 in flash payload (FR-006)
 
-**Independent Test**: Export after Review → wipe session → Import → password re-entry required → flash succeeds
+**Independent Test**: Custom profile appears in Review and mapper blob
 
-### Implementation for User Story 3
+- [x] T032 [P] [US2] Profiles step UI in `apps/esp32-desktop-installer/lib/wizard/steps/profiles_step.dart`
+- [x] T033 [US2] FilamentProfileValidator in `packages/philarmony_core/lib/src/validation/filament_profile_validator.dart`
+- [x] T034 [US2] filament_profiles in NvsConfigMapper
+- [x] T035 [US2] Edit-custom-profile dialog (name/temp/duration/humidity) in `apps/esp32-desktop-installer/lib/wizard/steps/profiles_step.dart` (create-only today)
+- [x] T036 [US2] Unit tests for FilamentProfileValidator in `packages/philarmony_core/test/filament_profile_validator_test.dart`
 
-- [ ] T035 [P] [US3] Implement ProfileStore export/import with password redaction in `packages/philarmony_core/lib/src/serialization/profile_store.dart`
-- [ ] T036 [US3] Add Export/Import actions + file picker in `apps/esp32-desktop-installer/lib/wizard/profile_io_actions.dart`
-- [ ] T037 [US3] Validate imported JSON against schema version and surface errors in `apps/esp32-desktop-installer/lib/wizard/installer_session_controller.dart`
-- [ ] T038 [US3] Block flash until WiFi password re-entered after import in `apps/esp32-desktop-installer/lib/wizard/steps/wifi_step.dart`
-
-**Checkpoint**: Bulk config via JSON works without leaking passwords to disk
-
----
-
-## Phase 6: User Story 4 — Reconfiguration of Existing Device (Priority: P3)
-
-**Goal**: Reconnect previously flashed device, load **local** last session / JSON, adjust settings, re-flash (Scenario 2). No on-device NVS read.
-
-**Independent Test**: After one successful flash, relaunch → Load last session → change pin/WiFi → Retry flash applies new config (USB never dumps NVS)
-
-### Implementation for User Story 4
-
-- [ ] T039 [P] [US4] Implement chip/port identity helpers for UX only (no NVS dump) in `apps/esp32-desktop-installer/lib/device/chip_info_reader.dart`
-- [ ] T040 [US4] Add “Load last session / New setup” entry in `apps/esp32-desktop-installer/lib/wizard/home_entry_page.dart`
-- [ ] T041 [US4] Persist last successful DeviceProfile (sans password) to local app support dir in `apps/esp32-desktop-installer/lib/persistence/last_profile_store.dart`
-- [ ] T042 [US4] Confirm overwrite/re-erase messaging before flash in `apps/esp32-desktop-installer/lib/wizard/steps/review_step.dart`
-
-**Checkpoint**: Reconfigure path usable without forcing full blank wizard every time
+**Checkpoint**: Full CRUD for customs with validation errors surfaced in UI
 
 ---
 
-## Phase 7: User Story 5 — Host Application Distribution (Priority: P1 for release)
+## Phase 5: User Story 3 — Profile Export/Import (Priority: P2)
 
-**Goal**: Single-download installers — Windows MSIX, macOS DMG, Linux AppImage + deb + rpm via Make (FR-012 / DEC-011 / `contracts/desktop-distribution.md`)
+**Goal**: JSON bulk flash; password always `***`/omit (R10)
 
-**Independent Test**: `make package-installer-linux` produces three artifacts; MSIX/DMG build docs runnable; install on clean machine launches app (VS-4/VS-5 in quickstart)
+**Independent Test**: Export has no real password; import requires re-entry before flash
 
-### Implementation for User Story 5
+- [x] T037 [P] [US3] ProfileStore redaction in `packages/philarmony_core/lib/src/serialization/profile_store.dart`
+- [x] T038 [US3] Export/Import actions in `apps/esp32-desktop-installer/lib/wizard/profile_io_actions.dart`
+- [x] T039 [US3] Save export to user-chosen `.json` file (not only clipboard) via `file_picker` in `apps/esp32-desktop-installer/lib/wizard/profile_io_actions.dart`
+- [x] T040 [US3] Surfaced import schema errors in UI banner in `apps/esp32-desktop-installer/lib/wizard/wizard_page.dart`
 
-- [ ] T043 [P] [US5] Configure Windows MSIX (`msix` / `msix_config`) in `apps/esp32-desktop-installer/pubspec.yaml` and `apps/esp32-desktop-installer/packaging/windows/`
-- [ ] T044 [P] [US5] Configure macOS DMG packaging + notarization checklist (REQUIRED for public) in `apps/esp32-desktop-installer/packaging/macos/dmg.json` and packaging README
-- [ ] T045 [P] [US5] Configure Linux AppImage metadata in `apps/esp32-desktop-installer/packaging/linux/appimage.yml`
-- [ ] T046 [P] [US5] Configure Linux `.deb` metadata in `apps/esp32-desktop-installer/packaging/linux/deb/`
-- [ ] T047 [P] [US5] Configure Linux `.rpm` metadata (Fedora/RHEL-family) in `apps/esp32-desktop-installer/packaging/linux/rpm/`
-- [ ] T048 [US5] Add Makefile targets `package-installer-linux`, `package-installer-linux-appimage`, `package-installer-linux-deb`, `package-installer-linux-rpm` in `Makefile`
-- [ ] T049 [US5] Add optional `package-installer-windows` / `package-installer-macos` Make wrappers documenting host OS requirements in `Makefile`
-- [ ] T050 [US5] Implement CI workflow attaching MSIX/DMG/AppImage/deb/rpm in `.github/workflows/desktop-installer-release.yml`
-- [ ] T051 [US5] Document Download & Install (Win/macOS/`apt`/`dnf`/AppImage) in `docs/PT-BR/instalador.md` and `docs/EN-US/installer.md`
-- [ ] T052 [US5] Add HostReleaseArtifact naming/checksum notes to release checklist in `apps/esp32-desktop-installer/packaging/README.md`
-
-**Checkpoint**: Unsigned CI packages build; public signing secrets documented as follow-up when available
+**Checkpoint**: File-based export/import round-trip
 
 ---
 
-## Phase 8: Polish & Cross-Cutting Concerns
+## Phase 6: User Story 4 — Local Reconfigure (Priority: P3)
 
-**Purpose**: i18n completeness, diagnostics, docs sync, automated tests, quickstart validation
+**Goal**: Load last session / import — no USB NVS dump (R9)
 
-- [ ] T053 [P] Complete PT-BR and EN-US ARB strings for all wizard/errors in `apps/esp32-desktop-installer/lib/l10n/`
-- [ ] T054 [P] Implement flash log panel + export in `apps/esp32-desktop-installer/lib/wizard/widgets/flash_log_panel.dart` (FR-011)
-- [ ] T055 [P] Add unit tests for PinValidator and ProfileStore redaction in `packages/philarmony_core/test/`
-- [ ] T056 [P] Add widget/flow tests with mocked FirmwareFlasher in `apps/esp32-desktop-installer/test/`
-- [ ] T057 [P] Add third-party notices for bundled esptool in `apps/esp32-desktop-installer/NOTICES.md`
-- [ ] T058 Sync README Desktop Installer section + stack table with DEC-010/011 in `README.md`
-- [ ] T059 Run `specs/002-esp32-desktop-installer/quickstart.md` validation checklist (VS-1…VS-6) and record gaps in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
-- [ ] T060 [P] Optional Inno Setup `.exe` fallback config in `apps/esp32-desktop-installer/packaging/windows/inno/` if MSIX sideload blocked
+**Independent Test**: After flash → relaunch → Load last session → password empty → reflash
+
+- [x] T041 [P] [US4] ChipInfoReader UX-only in `apps/esp32-desktop-installer/lib/device/chip_info_reader.dart`
+- [x] T042 [US4] HomeEntryPage New/Load in `apps/esp32-desktop-installer/lib/wizard/home_entry_page.dart`
+- [x] T043 [US4] LastProfileStore in `apps/esp32-desktop-installer/lib/persistence/last_profile_store.dart`
+- [x] T044 [US4] Home “Import profile…” entry calling file picker in `apps/esp32-desktop-installer/lib/wizard/home_entry_page.dart`
+- [x] T045 [US4] Unit/integration test for LastProfileStore redaction in `apps/esp32-desktop-installer/test/last_profile_store_test.dart`
+
+**Checkpoint**: Three entry paths: New / Last / Import
+
+---
+
+## Phase 7: User Story 5 — Host Distribution (Priority: P1 for release)
+
+**Goal**: Single-download MSIX / notarized DMG / AppImage+deb+rpm via Make (FR-012 / R12)
+
+**Independent Test**: `make package-installer-linux-*` produce files under `dist/`; macOS public path documents notarize; Win/Linux unsigned warnings in docs
+
+### Done
+
+- [x] T046 [P] [US5] Packaging metadata stubs in `apps/esp32-desktop-installer/packaging/{windows,macos,linux}/`
+- [x] T047 [US5] Makefile package targets + FVM flutter wiring in `Makefile`
+- [x] T048 [US5] CI workflow FVM-aware in `.github/workflows/desktop-installer-release.yml`
+- [x] T049 [US5] Download & Install docs in `docs/PT-BR/instalador.md` and `docs/EN-US/installer.md`
+
+### Remaining
+
+- [x] T050 [US5] Implement AppImage wrap script using `apps/esp32-desktop-installer/packaging/linux/appimage.yml` invoked by `package-installer-linux-appimage` in `Makefile`
+- [x] T051 [US5] Implement `.deb` build (nfpm/fpm) from `apps/esp32-desktop-installer/packaging/linux/deb/control` in `Makefile`
+- [x] T052 [US5] Implement `.rpm` build from `apps/esp32-desktop-installer/packaging/linux/rpm/philarmony-installer.spec` in `Makefile`
+- [x] T053 [US5] Smoke `dart run msix:create` after `flutter build windows` on Windows CI / host; store artifact naming in `apps/esp32-desktop-installer/packaging/README.md`
+- [x] T054 [US5] macOS DMG script + notarization checklist (secrets) in `apps/esp32-desktop-installer/packaging/macos/` and CI notes
+- [x] T055 [P] [US5] Optional Inno Setup config in `apps/esp32-desktop-installer/packaging/windows/inno/`
+
+**Checkpoint**: At least one real host installer artifact per OS family in CI artifacts
+
+---
+
+## Phase 8: Polish & Cross-Cutting
+
+**Purpose**: i18n completeness, UX polish, docs, release readiness
+
+- [x] T056 [P] Flash log panel in `apps/esp32-desktop-installer/lib/wizard/widgets/flash_log_panel.dart`
+- [x] T057 [P] NOTICES.md for esptool in `apps/esp32-desktop-installer/NOTICES.md`
+- [x] T058 [P] Generate/consume flutter gen-l10n (`AppLocalizations`) instead of hardcoded strings in `apps/esp32-desktop-installer/lib/wizard/`
+- [x] T059 [P] Fix DropdownButtonFormField `value`→`initialValue` deprecations in wizard steps under `apps/esp32-desktop-installer/lib/wizard/steps/`
+- [x] T060 [P] Visual pinout diagram for selected model in `apps/esp32-desktop-installer/lib/wizard/steps/pins_step.dart` (FR-004)
+- [x] T061 Sync README roadmap % and feature status for 002 in `README.md`
+- [ ] T062 Complete quickstart checklist VS-1/VS-4/VS-5 after packaging+HW in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
 
 ---
 
 ## Dependencies & Execution Order
 
-### Phase Dependencies
-
-- **Setup (Phase 1)**: No dependencies
-- **Foundational (Phase 2)**: Depends on Setup — **BLOCKS** all user stories
-- **US1 (Phase 3)**: After Foundational — **MVP**
-- **US2 (Phase 4)**: After US1 wizard shell (needs session controller + flash mapper)
-- **US3 (Phase 5)**: After Foundational models/codec; best after US1 Review exists
-- **US4 (Phase 6)**: After US1 flash path
-- **US5 (Phase 7)**: Packaging configs after Setup; Make/CI need buildable app; full smoke needs US1 runnable
-- **Polish (Phase 8)**: After desired stories complete
-
-### User Story Dependencies
-
 ```text
-Phase1 → Phase2 → US1 (MVP)
-                 ↘ US3 (profiles JSON)  [can start after T011]
-                 ↘ US5 (host pkgs)      [packaging files // after T002]
-         US1 → US2 (filament step)
-         US1 → US4 (reconfigure)
-         US1+US5 → Polish
+Done: Phase1–2, most US1–US4 UI, US5 stubs
+Next (MVP close): T027–T031 (esptool+firmware+NVS+port+HW)
+Then: T050–T054 packaging artifacts
+Polish: T058–T062
+US2/US3/US4 polish (T035–T045) can parallel packaging
 ```
 
 ### Parallel Opportunities
 
-- T003–T006 in Setup
-- T007–T009, T011, T013 in Foundational
-- T017–T021 wizard steps in US1
-- T043–T047 packaging configs in US5
-- T053–T057 polish items
+- T027 // T028 path resolve after assets land  
+- T050–T052 Linux formats  
+- T035–T036, T039–T040, T044–T045  
+- T058–T060 polish UI  
 
 ---
 
-## Parallel Example: User Story 1
+## Parallel Example: Remaining US1 flash readiness
 
 ```bash
-# After T023 session controller exists, wizard steps in parallel:
-Task: "Implement Device step UI in apps/esp32-desktop-installer/lib/wizard/steps/device_step.dart"
-Task: "Implement Sensors step UI in apps/esp32-desktop-installer/lib/wizard/steps/sensors_step.dart"
-Task: "Implement Pins step UI in apps/esp32-desktop-installer/lib/wizard/steps/pins_step.dart"
-Task: "Implement Display step UI in apps/esp32-desktop-installer/lib/wizard/steps/display_step.dart"
-Task: "Implement WiFi step UI in apps/esp32-desktop-installer/lib/wizard/steps/wifi_step.dart"
+Task: "Bundle esptool into apps/esp32-desktop-installer/assets/tools/..."
+Task: "Resolve firmware asset paths in esptool_firmware_flasher.dart"
+Task: "Persist selected serial port in installer_session_controller.dart"
 ```
 
-## Parallel Example: User Story 5
+## Parallel Example: US5 packaging
 
 ```bash
-Task: "Configure Windows MSIX in apps/esp32-desktop-installer/packaging/windows/"
-Task: "Configure macOS DMG in apps/esp32-desktop-installer/packaging/macos/dmg.json"
-Task: "Configure Linux AppImage in apps/esp32-desktop-installer/packaging/linux/appimage.yml"
-Task: "Configure Linux deb in apps/esp32-desktop-installer/packaging/linux/deb/"
-Task: "Configure Linux rpm in apps/esp32-desktop-installer/packaging/linux/rpm/"
+Task: "AppImage wrap in Makefile + packaging/linux/appimage.yml"
+Task: "deb via nfpm from packaging/linux/deb/control"
+Task: "rpm via packaging/linux/rpm/philarmony-installer.spec"
 ```
 
 ---
 
 ## Implementation Strategy
 
-### MVP First (User Story 1 Only)
+### MVP close-out (recommended next)
 
-1. Phase 1 Setup → Phase 2 Foundational  
-2. Phase 3 US1 (detect → wizard → flash → verify)  
-3. **STOP and VALIDATE** on hardware per quickstart VS-1  
-4. Then US5 packaging so non-devs can install the app  
-
-### Incremental Delivery
-
-1. Setup + Foundational  
-2. US1 → demo first flash  
-3. US2 filament profiles  
-4. US3 JSON bulk  
-5. US4 reconfigure  
-6. US5 host installers (Make Linux + MSIX/DMG)  
-7. Polish i18n/logs/docs/tests  
+1. T027–T030 — make USB flash real without hardcoded ports/missing tools  
+2. T031 — hardware smoke  
+3. T050–T054 — ship host installers  
 
 ### Suggested MVP Scope
 
-**US1 only** (T001–T030), then prioritize **US5** (T043–T052) so the app is distributable; US2–US4 next.
+**US1 remaining (T027–T031)** then **US5 remaining (T050–T054)**.
 
 ---
 
 ## Notes
 
-- [P] = different files, no incomplete-task dependencies  
-- Do not flash without PinValidator success (failsafe)  
-- WiFi passwords never written to exported JSON  
-- Linux end users install `.rpm`/`.deb`/AppImage; `make package-installer-linux*` is for builders/CI  
-- Constitution: Philarmony; bilingual docs; commit only with explicit user approval  
+- Always use `fvm flutter` / `make run` (Flutter 3.44.0)  
+- Flash Success ≠ network reachability  
+- Never export real WiFi passwords  
+- No on-device NVS dump this phase  
+- Public macOS MUST be notarized; Win/Linux unsigned OK MVP with docs  
+- Commit only with explicit user approval  
 
-**Constitution compliance:** PROJECT_NAME = Philarmony, provisions per `.specify/memory/constitution.md`
+**Constitution compliance:** Philarmony per `.specify/memory/constitution.md`
+
+## Phase 9: Convergence
+
+**Purpose**: Close gaps between spec/plan intent and current implementation (post-implement assessment 2026-07-29). Does not replace open T031/T062 (hardware & checklist sign-off).
+
+- [x] T069 CRITICAL Add GPLv3 license headers to Dart sources under `apps/esp32-desktop-installer/lib/` and `packages/philarmony_core/lib/` per Constitution GPLv3 (missing)
+- [x] T063 CRITICAL Flash bootloader.bin + partitions.bin (and sync via `make sync-installer-firmware`) after erase alongside app@0x10000 + NVS@0x9000 in `apps/esp32-desktop-installer/lib/flash/esptool_firmware_flasher.dart` and `Makefile` per FR-008 / US1 (contradicts)
+- [x] T064 CRITICAL Fix ESP-IDF-compatible NVS page layout (entry bitmap + CRCs) in `packages/philarmony_core/lib/src/mapping/nvs_binary_writer.dart` or replace with Espressif `nvs_partition_gen`, with Preferences round-trip test per FR-008 / contracts/nvs-config-mapping.md (partial)
+- [x] T065 [P] Map dual temp+humidity sensors into Preferences `is_integrated` / `humidity_*` fields in `packages/philarmony_core/lib/src/mapping/nvs_config_mapper.dart` per FR-003 (partial)
+- [x] T066 Wire chip model + flash size detection (esptool chip_id/flash_id) into Device step via `apps/esp32-desktop-installer/lib/device/chip_info_reader.dart` and `apps/esp32-desktop-installer/lib/wizard/steps/device_step.dart` per FR-001 (missing)
+- [x] T067 Extend `.github/workflows/desktop-installer-release.yml` to run `bundle-esptool` + `sync-installer-firmware` and upload real AppImage/deb/rpm/MSIX/DMG artifacts (not raw Flutter bundles) per FR-012 / plan CI (partial)
+- [x] T068 Externalize remaining wizard/step strings to ARB and add in-app PT-BR/EN language selector in `apps/esp32-desktop-installer/lib/app.dart` + `lib/l10n/` + `lib/wizard/` per FR-010 (partial)
+- [x] T070 [P] Replace Chip-wrap pinout with model pinout diagram, reserved-pin highlights, and SPI pin fields in `apps/esp32-desktop-installer/lib/wizard/steps/pins_step.dart` per FR-004 (partial)
+- [x] T071 [P] Add display resolution presets, status field checkboxes, layout preview, and SPI dc/rst pins in `apps/esp32-desktop-installer/lib/wizard/steps/display_step.dart` per FR-005 (partial)
+- [x] T072 [P] Add optional static IP (ip/gateway/netmask/dns) UI + NVS mapping in `apps/esp32-desktop-installer/lib/wizard/steps/wifi_step.dart` and `packages/philarmony_core/` per FR-007 (missing)
+- [x] T073 [P] Allow custom profile to shadow builtin id in `apps/esp32-desktop-installer/lib/wizard/steps/profiles_step.dart` per FR-006 (partial)
+- [x] T074 Validate imports against `specs/002-esp32-desktop-installer/contracts/installer-profile.schema.json` in `packages/philarmony_core/lib/src/serialization/profile_codec.dart` per FR-009 (partial)
+- [x] T075 [P] Add flash log file export and verbose/quiet toggle in `apps/esp32-desktop-installer/lib/wizard/widgets/flash_log_panel.dart` per FR-011 (partial)
+- [x] T076 Pass configurable `--baud` (default 921600) to esptool in `apps/esp32-desktop-installer/lib/flash/esptool_firmware_flasher.dart` per FR-001 (missing)
+- [x] T077 [P] Add required vs optional field indicators across wizard steps under `apps/esp32-desktop-installer/lib/wizard/steps/` per FR-002 (missing)
+- [x] T078 [P] Add advanced custom sensor JSON driver UI (optional) in `apps/esp32-desktop-installer/lib/wizard/steps/sensors_step.dart` per FR-003 (missing)
