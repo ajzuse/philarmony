@@ -1,0 +1,14 @@
+name: philarmony_core
+description: Shared Philarmony domain models, validators, and NVS mapping for installer and control apps.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+
+dependencies:
+  meta: ^1.12.0
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^4.0.0

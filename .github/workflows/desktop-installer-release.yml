@@ -1,0 +1,104 @@
+name: Desktop Installer Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'installer-v*'
+
+env:
+  FVM_FLUTTER_VERSION: '3.44.0'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kuhnroyal/flutter-fvm-config-action/setup@v3
+        with:
+          path: .fvmrc
+      - name: Enable Linux desktop
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            python3-pip dpkg-dev rpm
+          fvm flutter config --enable-linux-desktop
+      - name: Create platforms if missing
+        working-directory: apps/esp32-desktop-installer
+        run: fvm flutter create --platforms=linux .
+      - name: Pub get + tests
+        run: |
+          cd packages/philarmony_core && fvm dart pub get && fvm dart test
+          cd ../../apps/esp32-desktop-installer && fvm flutter pub get
+      - name: Bundle esptool (linux)
+        run: ./scripts/bundle-esptool.sh linux
+      - name: Sync firmware assets (best-effort)
+        run: |
+          if command -v pio >/dev/null; then make sync-installer-firmware; \
+          else echo "pio missing — packaging without synced firmware.bin"; fi
+      - name: Package AppImage/deb/rpm
+        run: |
+          make package-installer-linux-appimage || true
+          make package-installer-linux-deb || true
+          make package-installer-linux-rpm || true
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-linux-packages
+          path: |
+            apps/esp32-desktop-installer/dist/**
+            apps/esp32-desktop-installer/build/linux/x64/release/bundle
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kuhnroyal/flutter-fvm-config-action/setup@v3
+        with:
+          path: .fvmrc
+      - run: fvm flutter config --enable-windows-desktop
+      - shell: bash
+        run: |
+          cd apps/esp32-desktop-installer
+          fvm flutter create --platforms=windows .
+          fvm flutter pub get
+          bash ../../scripts/bundle-esptool.sh windows || true
+          fvm flutter build windows --release
+          fvm dart run msix:create || true
+          mkdir -p dist
+          cp -r build/windows/x64/runner/Release dist/windows-release || true
+          cp *.msix dist/ 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-windows-msix
+          path: apps/esp32-desktop-installer/dist/**
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kuhnroyal/flutter-fvm-config-action/setup@v3
+        with:
+          path: .fvmrc
+      - run: fvm flutter config --enable-macos-desktop
+      - name: Build + DMG
+        run: |
+          cd apps/esp32-desktop-installer
+          fvm flutter create --platforms=macos .
+          fvm flutter pub get
+          bash ../../scripts/bundle-esptool.sh macos || true
+          fvm flutter build macos --release
+          bash packaging/macos/build_dmg.sh || true
+      - name: Notarization gate
+        run: |
+          echo "Public DMG MUST be notarized before GitHub Release."
+          echo "When secrets APPLE_ID / TEAM_ID / APP_SPECIFIC_PASSWORD / CERT are set, run notarytool here."
+          if [ -n "${{ secrets.APPLE_ID }}" ]; then
+            echo "APPLE_ID present — wire notarytool submit in a follow-up job"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-macos-dmg
+          path: |
+            apps/esp32-desktop-installer/dist/**
+            apps/esp32-desktop-installer/build/macos/Build/Products/Release

@@ -1,0 +1,2 @@
+# MSIX built via pubspec msix_config / `dart run msix:create`
+display_name: Philarmony Installer
