@@ -18,6 +18,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../installer_session_controller.dart';
 
 class WifiStep extends StatefulWidget {
@@ -40,14 +41,15 @@ class _WifiStepState extends State<WifiStep> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final wifi = widget.controller.profile.wifi;
     final staticIp = Map<String, String>.from(wifi.staticIp ?? {});
     return ListView(
       children: [
         TextFormField(
-          decoration: const InputDecoration(
-            labelText: 'SSID *',
-            helperText: 'Required',
+          decoration: InputDecoration(
+            labelText: '${l10n?.ssidLabel ?? 'SSID'} *',
+            helperText: l10n?.requiredField ?? 'Required',
           ),
           initialValue: wifi.ssid,
           onChanged: (v) {
@@ -57,8 +59,8 @@ class _WifiStepState extends State<WifiStep> {
         ),
         TextFormField(
           decoration: InputDecoration(
-            labelText: 'Password *',
-            helperText: 'Required before flash',
+            labelText: '${l10n?.passwordLabel ?? 'Password'} *',
+            helperText: l10n?.wifiPasswordRequired ?? 'Required before flash',
             suffixIcon: IconButton(
               icon: Icon(show ? Icons.visibility_off : Icons.visibility),
               onPressed: () => setState(() => show = !show),
@@ -71,12 +73,13 @@ class _WifiStepState extends State<WifiStep> {
           },
         ),
         if (!wifi.hasPassword)
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text('Re-enter WiFi password before flashing.'),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(l10n?.wifiPasswordRequired ??
+                'Re-enter WiFi password before flashing.'),
           ),
         SwitchListTile(
-          title: const Text('Static IP (optional)'),
+          title: Text(l10n?.staticIpTitle ?? 'Static IP (optional)'),
           value: useStatic,
           onChanged: (v) {
             setState(() => useStatic = v);

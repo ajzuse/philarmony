@@ -18,6 +18,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../installer_session_controller.dart';
 
 class DisplayStep extends StatelessWidget {
@@ -45,13 +46,14 @@ class DisplayStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final d = controller.profile.display;
     final pins = controller.profile.pinMapping;
     return ListView(
       children: [
         SwitchListTile(
-          title: const Text('Enable display'),
-          subtitle: const Text('Optional'),
+          title: Text(l10n?.enableDisplayLabel ?? 'Enable display'),
+          subtitle: Text(l10n?.optionalField ?? 'Optional'),
           value: d.enabled,
           onChanged: (v) {
             d.enabled = v;
@@ -60,7 +62,12 @@ class DisplayStep extends StatelessWidget {
         ),
         DropdownButtonFormField<String>(
           initialValue: d.driver,
-          decoration: const InputDecoration(labelText: 'Driver'),
+          decoration: InputDecoration(
+            labelText: l10n?.displayDriverLabel ?? 'Driver',
+            helperText: d.enabled
+                ? (l10n?.requiredField ?? 'Required')
+                : (l10n?.optionalField ?? 'Optional'),
+          ),
           items: const ['none', 'ssd1306', 'sh1106', 'st7789', 'ili9341', 'auto']
               .map((e) => DropdownMenuItem(value: e, child: Text(e)))
               .toList(),
@@ -70,10 +77,17 @@ class DisplayStep extends StatelessWidget {
           },
         ),
         DropdownButtonFormField<String>(
-          decoration: const InputDecoration(labelText: 'Resolution preset'),
+          decoration: InputDecoration(
+            labelText: l10n?.resolutionPresetLabel ?? 'Resolution preset',
+            helperText: l10n?.optionalField ?? 'Optional',
+          ),
           items: [
-            const DropdownMenuItem(value: 'custom', child: Text('Custom')),
-            ..._presets.keys.map((k) => DropdownMenuItem(value: k, child: Text(k))),
+            DropdownMenuItem(
+              value: 'custom',
+              child: Text(l10n?.customLabel ?? 'Custom'),
+            ),
+            ..._presets.keys
+                .map((k) => DropdownMenuItem(value: k, child: Text(k))),
           ],
           onChanged: (v) {
             if (v == null || v == 'custom') return;
@@ -84,7 +98,7 @@ class DisplayStep extends StatelessWidget {
           },
         ),
         TextFormField(
-          decoration: const InputDecoration(labelText: 'Width'),
+          decoration: InputDecoration(labelText: l10n?.widthLabel ?? 'Width'),
           initialValue: '${d.width}',
           onChanged: (v) {
             d.width = int.tryParse(v) ?? d.width;
@@ -92,7 +106,7 @@ class DisplayStep extends StatelessWidget {
           },
         ),
         TextFormField(
-          decoration: const InputDecoration(labelText: 'Height'),
+          decoration: InputDecoration(labelText: l10n?.heightLabel ?? 'Height'),
           initialValue: '${d.height}',
           onChanged: (v) {
             d.height = int.tryParse(v) ?? d.height;
@@ -100,7 +114,8 @@ class DisplayStep extends StatelessWidget {
           },
         ),
         const SizedBox(height: 8),
-        Text('Status fields', style: Theme.of(context).textTheme.titleSmall),
+        Text(l10n?.statusFieldsLabel ?? 'Status fields',
+            style: Theme.of(context).textTheme.titleSmall),
         Wrap(
           spacing: 8,
           children: _fieldOptions.map((f) {
@@ -120,28 +135,64 @@ class DisplayStep extends StatelessWidget {
           }).toList(),
         ),
         const SizedBox(height: 12),
-        Text('Layout preview', style: Theme.of(context).textTheme.titleSmall),
+        Text(l10n?.layoutPreviewLabel ?? 'Layout preview',
+            style: Theme.of(context).textTheme.titleSmall),
         Container(
           margin: const EdgeInsets.only(top: 8),
-          padding: const EdgeInsets.all(12),
+          height: 160,
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             border: Border.all(color: Theme.of(context).colorScheme.outline),
             borderRadius: BorderRadius.circular(8),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('${d.width}×${d.height} · ${d.driver}'),
-              const Divider(),
-              ...d.fields.map((f) => Text('• $f')),
-              if (d.fields.isEmpty) const Text('(no fields)'),
+              Text('${d.width}×${d.height} · ${d.driver}',
+                  style: Theme.of(context).textTheme.labelMedium),
+              const Divider(height: 12),
+              Expanded(
+                child: d.fields.isEmpty
+                    ? Center(child: Text(l10n?.noFieldsLabel ?? '(no fields)'))
+                    : GridView.builder(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 4,
+                          crossAxisSpacing: 4,
+                          childAspectRatio: 2.8,
+                        ),
+                        itemCount: d.fields.length,
+                        itemBuilder: (context, i) {
+                          final f = d.fields[i];
+                          return Container(
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.outlineVariant,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              f,
+                              style: const TextStyle(fontSize: 10),
+                              textAlign: TextAlign.center,
+                            ),
+                          );
+                        },
+                      ),
+              ),
             ],
           ),
         ),
         if (d.driver == 'st7789' || d.driver == 'ili9341') ...[
           const SizedBox(height: 8),
           TextFormField(
-            decoration: const InputDecoration(labelText: 'SPI DC pin'),
+            decoration: InputDecoration(
+              labelText: l10n?.spiDcLabel ?? 'SPI DC pin',
+              helperText: l10n?.optionalField ?? 'Optional',
+            ),
             initialValue: pins.spiDc?.toString() ?? '',
             onChanged: (v) {
               pins.spiDc = int.tryParse(v);
@@ -149,7 +200,10 @@ class DisplayStep extends StatelessWidget {
             },
           ),
           TextFormField(
-            decoration: const InputDecoration(labelText: 'SPI RESET pin'),
+            decoration: InputDecoration(
+              labelText: l10n?.spiResetLabel ?? 'SPI RESET pin',
+              helperText: l10n?.optionalField ?? 'Optional',
+            ),
             initialValue: pins.spiReset?.toString() ?? '',
             onChanged: (v) {
               pins.spiReset = int.tryParse(v);
@@ -157,6 +211,11 @@ class DisplayStep extends StatelessWidget {
             },
           ),
         ],
+        if (controller.session.validationErrors.isNotEmpty)
+          Text(
+            controller.session.validationErrors.join('\n'),
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
       ],
     );
   }
