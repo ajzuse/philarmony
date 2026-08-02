@@ -255,3 +255,27 @@ Task: "rpm via packaging/linux/rpm/philarmony-installer.spec"
 - [x] T076 Pass configurable `--baud` (default 921600) to esptool in `apps/esp32-desktop-installer/lib/flash/esptool_firmware_flasher.dart` per FR-001 (missing)
 - [x] T077 [P] Add required vs optional field indicators across wizard steps under `apps/esp32-desktop-installer/lib/wizard/steps/` per FR-002 (missing)
 - [x] T078 [P] Add advanced custom sensor JSON driver UI (optional) in `apps/esp32-desktop-installer/lib/wizard/steps/sensors_step.dart` per FR-003 (missing)
+
+## Phase 10: Convergence
+
+**Purpose**: Close residual gaps after Phase 9 tasks were marked complete (post-implement reassessment 2026-08-01). Does not replace open T031/T062 (hardware & checklist sign-off).
+
+- [ ] T079 CRITICAL Fail CI packaging when AppImage/deb/rpm/MSIX/DMG steps fail (remove `|| true`), stop uploading raw Flutter `bundle`/`Release` trees, and install packaging tools (`appimagetool`/dpkg/rpmbuild) in `.github/workflows/desktop-installer-release.yml` per FR-012 / plan:CI (contradicts)
+- [ ] T080 CRITICAL Publish GitHub Release attach + SHA-256 checksums for host installer artifacts from `.github/workflows/desktop-installer-release.yml` per FR-012 / contracts/desktop-distribution.md (missing)
+- [ ] T081 CRITICAL Add complete user-journey flow tests (wizard steps + soft network-verify warn path with mocked flasher) under `apps/esp32-desktop-installer/test/` per Constitution Teste Automatizado / plan:Testing (missing)
+- [ ] T082 Pass user-supplied/static IP or hotspot host `philarmony`/`192.168.4.1` into `SoftPostFlashVerifier.tryReach` from `apps/esp32-desktop-installer/lib/wizard/steps/flash_step.dart` per FR-008 / US1/AC (partial)
+- [ ] T083 Externalize remaining hardcoded wizard/step/log strings into ARB (`apps/esp32-desktop-installer/lib/l10n/`) and consume `AppLocalizations` across `lib/wizard/` per FR-010 (partial)
+- [ ] T084 [P] Ship model-specific pinout maps (ESP32/S2/S3/C3), flash/PSRAM reserved highlights, and PWM/ADC capability checks in `apps/esp32-desktop-installer/lib/wizard/steps/pins_step.dart` + `packages/philarmony_core/lib/src/validation/pin_validator.dart` per FR-004 (partial)
+- [ ] T085 Load and enforce `specs/002-esp32-desktop-installer/contracts/installer-profile.schema.json` (enums, ranges, required nested fields) in `packages/philarmony_core/lib/src/serialization/profile_codec.dart` per FR-009 (partial)
+- [ ] T086 Verify firmware + esptool checksums during flash preflight (replace hardcoded `checksumSha256: 'synced'`) in `apps/esp32-desktop-installer/lib/wizard/steps/flash_step.dart` + `lib/flash/esptool_firmware_flasher.dart` per contracts/flash-pipeline.md (missing)
+- [ ] T087 Wire macOS `notarytool` when Apple secrets are present and keep public-DMG notarization gate hard-fail in `.github/workflows/desktop-installer-release.yml` + `packaging/macos/` per FR-012 (partial)
+- [ ] T088 [P] Expose configurable flash/probe baud (default 921600) on Device step in `apps/esp32-desktop-installer/lib/wizard/steps/device_step.dart` wired through session → esptool/chip probe per FR-001 (partial)
+- [ ] T089 [P] Complete required vs optional field indicators and per-step Next validation for device/sensors/display/profiles under `apps/esp32-desktop-installer/lib/wizard/steps/` + `installer_session_controller.dart` per FR-002 (partial)
+- [ ] T090 Support custom partition table selection/path (or firmware-provided override) in flash pipeline under `apps/esp32-desktop-installer/lib/flash/` per FR-008 (missing)
+- [ ] T091 [P] Warn on unsupported ESP32 model with supported-variants list in `apps/esp32-desktop-installer/lib/wizard/steps/device_step.dart` per Edge Cases (missing)
+- [ ] T092 Show partial-state recovery warning when USB unplug mid-flash fails in `apps/esp32-desktop-installer/lib/wizard/steps/flash_step.dart` per Edge Cases / contracts/flash-pipeline.md (partial)
+- [ ] T093 [P] Map common flash/USB errors to suggested fixes in flash UI/log panel under `apps/esp32-desktop-installer/lib/wizard/` per FR-011 (partial)
+- [ ] T094 Require selected serial port before Device step can proceed in `apps/esp32-desktop-installer/lib/wizard/installer_session_controller.dart` per FR-001 (partial)
+- [ ] T095 [P] Replace bullet-list display layout preview with field-arrangement preview in `apps/esp32-desktop-installer/lib/wizard/steps/display_step.dart` per FR-005 (partial)
+- [ ] T096 [P] Apply advanced custom sensor JSON driver to humidity (not only temp parameters) in `apps/esp32-desktop-installer/lib/wizard/steps/sensors_step.dart` per FR-003 (partial)
+- [ ] T097 [P] When custom profile shadows a builtin id, hide or replace the builtin entry in `apps/esp32-desktop-installer/lib/wizard/steps/profiles_step.dart` per FR-006 (partial)
