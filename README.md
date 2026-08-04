@@ -4,7 +4,7 @@
 [![Platform: ESP32](https://img.shields.io/badge/Platform-ESP32-red.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![Language: C/C++](https://img.shields.io/badge/Language-C%2FC%2B%2B-orange.svg)]()
 [![Spec Kit](https://img.shields.io/badge/Spec%20Kit-v0.13.2-green.svg)]()
-[![Constitution](https://img.shields.io/badge/Constitution-v0.6.0-purple.svg)](.specify/memory/constitution.md)
+[![Constitution](https://img.shields.io/badge/Constitution-v0.7.0-purple.svg)](.specify/memory/constitution.md)
 
 ## 📋 Sobre o Projeto
 
@@ -64,6 +64,7 @@
 | 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | 🚧 Implement (60/62; HW smoke left) | 2026-07-29   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | 📝 Especificado | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
+| 5 | `005-automated-flow-testing` | Automated Flow Testing Catalog   | 📝 Especificado | 2026-08-04   |
 
 ---
 
@@ -204,19 +205,40 @@
 
 ---
 
+### 005 - Catálogo de Testes Automatizados (`specs/005-automated-flow-testing/`)
+
+**Objetivo**: Única especificação onde concentram-se todas as tasks de teste automatizado (jornadas/flow) do Philarmony.
+
+#### Diretriz (Constituição v0.7.0)
+- Specs de produto (001–004) mantêm jornadas e critérios de aceitação
+- Novas tasks de implementação de testes MUST nascer em `005-automated-flow-testing`
+- CI falha o PR se qualquer flow test mandatório falhar
+- Cobertura: firmware P1, instalador desktop P1; app (003) e touch (004) quando implementados
+
+#### Escopo da Spec
+| Área | Detalhes |
+|------|----------|
+| **Catálogo único** | Inventário e tracking de todo trabalho de teste automatizado |
+| **Firmware flows** | Hotspot, WS start/stop/status, fault abort, bounds de timing/segurança |
+| **Installer flows** | Wizard, flash mockado, soft network-verify, redaction de senha |
+| **App/Touch flows** | Slots de cobertura P1 quando 003/004 forem shipados |
+| **Gates** | Comandos locais documentados + CI fail-on-test |
+
+---
+
 ## 📊 Progresso Geral do Projeto
 
 ```
 ┌────────────────────────────┬────────────┬────────────────────────┬──────┐
 │ FASE                       │ STATUS     │ ENTREGÁVEIS            │  %   │
 ├────────────────────────────┼────────────┼────────────────────────┼──────┤
-│ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 4 Specs completas    │ 100% │
-│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 2/4  │
+│ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 5 Specs (incl. 005 tests) │ 100% │
+│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 2/5  │
 │ 3. Firmware Core           │ ✅ CONCLUÍDO │ ESP32 Base + WS + NVS + Make/CI │ 100% │
 │ 4. Touch UI                │ ⏳ AGUARDANDO │ LVGL + Touch Driver     │ 0%   │
 │ 5. Desktop Installer       │ 🚧 EM ANDAMENTO │ 60/62; HW/package smoke │ 97% │
 │ 6. Control App (Multi)     │ ⏳ AGUARDANDO │ Flutter + SQLite + WS   │ 0%   │
-│ 7. Integration & Testing   │ ⏳ FUTURO    │ E2E, CI/CD, Release     │ 0%   │
+│ 7. Integration & Testing   │ 📝 ESPECIFICADO │ Catálogo 005 (plan/tasks next) │ 10% │
 └────────────────────────────┴────────────┴────────────────────────┴──────┘
 ```
 
@@ -259,11 +281,12 @@ philarmony/
 │   ├── flow/
 │   └── integration/
 ├── examples/
-├── specs/                       # Especificações (4 atuais)
+├── specs/                       # Especificações (5 atuais)
 │   ├── 001-filament-dryer-esp32/
 │   ├── 002-esp32-desktop-installer/
 │   ├── 003-filament-dryer-control-app/
-│   └── 004-esp32-touchscreen-ui/
+│   ├── 004-esp32-touchscreen-ui/
+│   └── 005-automated-flow-testing/   # Catálogo único de tasks de teste
 ├── README.md                    # Este arquivo (auto-sincronizado)
 └── LICENSE
 ```
@@ -282,7 +305,7 @@ philarmony/
 
 ## 🧪 Testes
 
-Todo o desenvolvimento deve seguir as práticas de Test-First (TDD) sempre que possível. Se o TDD não for possível, apenas os testes de fluxo completo são permitidos.
+Flow tests de jornada completa são o gate mandatório (Constituição: Teste Automatizado e Qualidade). **Todas as tasks de teste automatizado concentram-se em** [`specs/005-automated-flow-testing`](specs/005-automated-flow-testing/spec.md) — specs de produto não acumulam novas tasks de implementação de testes.
 
 ---
 

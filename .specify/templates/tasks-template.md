@@ -9,7 +9,7 @@ description: "Task list template for feature implementation"
 
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: Automated test implementation tasks MUST NOT be added to product-feature `tasks.md` files. Concentrate all automated test tasks in `specs/005-automated-flow-testing` (Constitution: Teste Automatizado e Qualidade / Catálogo Único de Testes). Product specs keep user journeys and Independent Test descriptions only. Examples below that mention tests are illustrative for the testing catalog feature—not for product features.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
