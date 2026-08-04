@@ -39,6 +39,8 @@ class InstallerSession {
     List<String>? validationErrors,
     this.flashJob,
     this.selectedPortPath,
+    this.baudRate = 921600,
+    this.customPartitionTablePath,
   })  : sessionId = sessionId ?? DateTime.now().microsecondsSinceEpoch.toString(),
         deviceProfile = deviceProfile ?? DeviceProfile(),
         validationErrors = validationErrors ?? [];
@@ -51,6 +53,10 @@ class InstallerSession {
   FlashJob? flashJob;
   /// USB serial path selected on Device step (required for flash).
   String? selectedPortPath;
+  /// Serial baud for esptool flash/probe (FR-001, default 921600).
+  int baudRate;
+  /// Optional override for partitions.bin (FR-008 custom partition tables).
+  String? customPartitionTablePath;
 
   static const orderedSteps = WizardStep.values;
 

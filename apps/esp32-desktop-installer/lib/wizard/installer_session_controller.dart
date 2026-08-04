@@ -38,18 +38,65 @@ class InstallerSessionController extends ChangeNotifier {
   void validateCurrentStep() {
     session.validationErrors = [];
     switch (session.step) {
+      case WizardStep.device:
+        if (!EspGpioMap.supportedModels.contains(profile.deviceModel)) {
+          session.validationErrors = [
+            'Unsupported model ${profile.deviceModel}. '
+            'Supported: ${EspGpioMap.supportedModels.join(", ")}',
+          ];
+        }
+        if (session.selectedPortPath == null ||
+            session.selectedPortPath!.trim().isEmpty) {
+          session.validationErrors = [
+            ...session.validationErrors,
+            'Select a USB serial port',
+          ];
+        }
+        if (session.baudRate <= 0) {
+          session.validationErrors = [
+            ...session.validationErrors,
+            'Baud rate must be positive',
+          ];
+        }
+        break;
+      case WizardStep.sensors:
+        // Optional sensors OK; GPIO required when sensor != none
+        for (final s in profile.sensors) {
+          if (s.sensor != 'none' &&
+              s.gpioPin == null &&
+              !{'bme280', 'sht3x', 'sht31', 'aht20'}.contains(s.sensor)) {
+            session.validationErrors = [
+              'GPIO required for ${s.role} sensor ${s.sensor}',
+            ];
+          }
+        }
+        break;
       case WizardStep.pins:
       case WizardStep.review:
       case WizardStep.flash:
         final r = _pinValidator.validate(profile);
         if (!r.ok) session.validationErrors = r.errors;
         break;
+      case WizardStep.display:
+        if (profile.display.enabled && profile.display.driver == 'none') {
+          session.validationErrors = [
+            'Select a display driver or disable the display',
+          ];
+        }
+        break;
+      case WizardStep.profiles:
+        final customs =
+            profile.filamentProfiles.where((f) => !f.isBuiltin).length;
+        if (customs > FilamentProfileValidator.maxCustom) {
+          session.validationErrors = [
+            'Too many custom profiles (max ${FilamentProfileValidator.maxCustom})',
+          ];
+        }
+        break;
       case WizardStep.wifi:
         if (profile.wifi.ssid.trim().isEmpty) {
           session.validationErrors = ['SSID required'];
         }
-        break;
-      default:
         break;
     }
     notifyListeners();
@@ -121,6 +168,18 @@ class InstallerSessionController extends ChangeNotifier {
 
   void setSelectedPort(String? path) {
     session.selectedPortPath = path;
+    validateCurrentStep();
+    notifyListeners();
+  }
+
+  void setBaudRate(int baud) {
+    session.baudRate = baud;
+    validateCurrentStep();
+    notifyListeners();
+  }
+
+  void setCustomPartitionTablePath(String? path) {
+    session.customPartitionTablePath = path;
     notifyListeners();
   }
 

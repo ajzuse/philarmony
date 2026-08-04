@@ -17,11 +17,15 @@ jobs:
       - uses: kuhnroyal/flutter-fvm-config-action/setup@v3
         with:
           path: .fvmrc
-      - name: Enable Linux desktop
+      - name: Enable Linux desktop + packaging tools
         run: |
           sudo apt-get update -y
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
-            python3-pip dpkg-dev rpm
+            python3-pip dpkg-dev rpm fuse libfuse2 wget
+          # appimagetool for real AppImage artifacts
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -O /usr/local/bin/appimagetool
+          chmod +x /usr/local/bin/appimagetool
           fvm flutter config --enable-linux-desktop
       - name: Create platforms if missing
         working-directory: apps/esp32-desktop-installer
@@ -30,24 +34,30 @@ jobs:
         run: |
           cd packages/philarmony_core && fvm dart pub get && fvm dart test
           cd ../../apps/esp32-desktop-installer && fvm flutter pub get
+          fvm flutter test
       - name: Bundle esptool (linux)
         run: ./scripts/bundle-esptool.sh linux
-      - name: Sync firmware assets (best-effort)
+      - name: Sync firmware assets
         run: |
-          if command -v pio >/dev/null; then make sync-installer-firmware; \
-          else echo "pio missing — packaging without synced firmware.bin"; fi
+          if command -v pio >/dev/null; then
+            make sync-installer-firmware
+          else
+            echo "::error::pio missing — cannot sync firmware for release packages"
+            exit 1
+          fi
       - name: Package AppImage/deb/rpm
         run: |
-          make package-installer-linux-appimage || true
-          make package-installer-linux-deb || true
-          make package-installer-linux-rpm || true
+          make package-installer-linux-appimage
+          make package-installer-linux-deb
+          make package-installer-linux-rpm
+          # Require real installer artifacts (not raw Flutter bundle / tar fallbacks alone)
+          test -n "$(find apps/esp32-desktop-installer/dist -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) | head -1)"
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
           name: installer-linux-packages
-          path: |
-            apps/esp32-desktop-installer/dist/**
-            apps/esp32-desktop-installer/build/linux/x64/release/bundle
+          path: apps/esp32-desktop-installer/dist/**
+          if-no-files-found: error
 
   build-windows:
     runs-on: windows-latest
@@ -62,16 +72,17 @@ jobs:
           cd apps/esp32-desktop-installer
           fvm flutter create --platforms=windows .
           fvm flutter pub get
-          bash ../../scripts/bundle-esptool.sh windows || true
+          bash ../../scripts/bundle-esptool.sh windows
           fvm flutter build windows --release
-          fvm dart run msix:create || true
+          fvm dart run msix:create
           mkdir -p dist
-          cp -r build/windows/x64/runner/Release dist/windows-release || true
-          cp *.msix dist/ 2>/dev/null || true
+          cp *.msix dist/
+          test -n "$(ls dist/*.msix 2>/dev/null)"
       - uses: actions/upload-artifact@v4
         with:
           name: installer-windows-msix
           path: apps/esp32-desktop-installer/dist/**
+          if-no-files-found: error
 
   build-macos:
     runs-on: macos-latest
@@ -86,19 +97,62 @@ jobs:
           cd apps/esp32-desktop-installer
           fvm flutter create --platforms=macos .
           fvm flutter pub get
-          bash ../../scripts/bundle-esptool.sh macos || true
+          bash ../../scripts/bundle-esptool.sh macos
           fvm flutter build macos --release
-          bash packaging/macos/build_dmg.sh || true
-      - name: Notarization gate
+          bash packaging/macos/build_dmg.sh
+          test -f dist/PhilarmonyInstaller-macos.dmg
+      - name: Notarize public DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
-          echo "Public DMG MUST be notarized before GitHub Release."
-          echo "When secrets APPLE_ID / TEAM_ID / APP_SPECIFIC_PASSWORD / CERT are set, run notarytool here."
-          if [ -n "${{ secrets.APPLE_ID }}" ]; then
-            echo "APPLE_ID present — wire notarytool submit in a follow-up job"
+          DMG="apps/esp32-desktop-installer/dist/PhilarmonyInstaller-macos.dmg"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ -z "${APPLE_ID}" || -z "${APPLE_TEAM_ID}" || -z "${APPLE_APP_SPECIFIC_PASSWORD}" ]]; then
+              echo "::error::Public tag release requires Apple notarization secrets (APPLE_ID, APPLE_TEAM_ID, APPLE_APP_SPECIFIC_PASSWORD)"
+              exit 1
+            fi
+            bash apps/esp32-desktop-installer/packaging/macos/notarize.sh "$DMG"
+          elif [[ -n "${APPLE_ID}" ]]; then
+            bash apps/esp32-desktop-installer/packaging/macos/notarize.sh "$DMG"
+          else
+            echo "Skipping notarization (workflow_dispatch without Apple secrets). Not for public GitHub Release."
           fi
       - uses: actions/upload-artifact@v4
         with:
           name: installer-macos-dmg
-          path: |
-            apps/esp32-desktop-installer/dist/**
-            apps/esp32-desktop-installer/build/macos/Build/Products/Release
+          path: apps/esp32-desktop-installer/dist/**
+          if-no-files-found: error
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/installer-v')
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+      - name: Collect artifacts + SHA-256 checksums
+        run: |
+          mkdir -p out
+          find release-artifacts -type f \( \
+            -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \
+            -o -name '*.msix' -o -name '*.dmg' -o -name '*.exe' \
+          \) -exec cp -v {} out/ \;
+          test "$(ls -A out)"
+          cd out
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

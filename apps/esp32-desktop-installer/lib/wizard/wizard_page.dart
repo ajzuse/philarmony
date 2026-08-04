@@ -86,7 +86,7 @@ class _WizardPageState extends State<WizardPage> {
     final errors = c.session.validationErrors;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Step: ${c.session.step.name}'),
+        title: Text('${l10n.stepLabel}: ${c.session.step.name}'),
         actions: [
           IconButton(
             tooltip: l10n.exportProfile,
@@ -112,7 +112,7 @@ class _WizardPageState extends State<WizardPage> {
               actions: [
                 TextButton(
                   onPressed: () => setState(() => importBanner = null),
-                  child: const Text('Dismiss'),
+                  child: Text(l10n.dismissLabel),
                 ),
               ],
             ),
@@ -123,7 +123,7 @@ class _WizardPageState extends State<WizardPage> {
                 TextButton(
                   onPressed: () =>
                       ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
-                  child: const Text('OK'),
+                  child: Text(l10n.dismissLabel),
                 ),
               ],
             ),
