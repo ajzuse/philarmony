@@ -22,7 +22,7 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 
 ## User Scenarios & Testing
 
-> **Test task policy (Constitution v0.8.0):** Journeys and acceptance criteria live here. New **automated** test-implementation tasks → `specs/005-automated-flow-testing`. Open tasks on this feature, if any, are limited to **manual** validation. Completed historical automated tasks in `tasks.md` stay as history.
+> **Test task policy (Constitution v1.0.0):** Journeys, acceptance criteria, and **automated** test-implementation tasks live here. Open **manual** validation (HW smoke / checklist) → `specs/005-manual-validation`, named by stage (VS-*). Completed historical automated tasks in `tasks.md` stay as history.
 
 ### Primary User Scenarios
 

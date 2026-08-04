@@ -4,7 +4,7 @@
 [![Platform: ESP32](https://img.shields.io/badge/Platform-ESP32-red.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![Language: C/C++](https://img.shields.io/badge/Language-C%2FC%2B%2B-orange.svg)]()
 [![Spec Kit](https://img.shields.io/badge/Spec%20Kit-v0.13.2-green.svg)]()
-[![Constitution](https://img.shields.io/badge/Constitution-v0.8.0-purple.svg)](.specify/memory/constitution.md)
+[![Constitution](https://img.shields.io/badge/Constitution-v1.0.0-purple.svg)](.specify/memory/constitution.md)
 
 ## 📋 Sobre o Projeto
 
@@ -61,10 +61,10 @@
 | # | Spec | Nome | Status | Última Atualização |
 |---|------|------|--------|-------------------|
 | 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ✅ Implementado | 2026-07-28   |
-| 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | 🚧 Implement (60/62; HW smoke left) | 2026-07-29   |
+| 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | ✅ Implementado (manuais → 005) | 2026-08-04   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | 📝 Especificado | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
-| 5 | `005-automated-flow-testing` | Automated Flow Testing Catalog   | 📝 Especificado | 2026-08-04   |
+| 5 | `005-manual-validation` | Manual Validation Catalog   | 🚧 Tasks (VS-1/4/5 abertos) | 2026-08-04   |
 
 ---
 
@@ -205,25 +205,25 @@
 
 ---
 
-### 005 - Catálogo de Testes Automatizados (`specs/005-automated-flow-testing/`)
+### 005 - Catálogo de Validações Manuais (`specs/005-manual-validation/`)
 
-**Objetivo**: Única especificação para tasks de **teste automatizado** (jornadas/flow). Automação continua a ser implementada aqui.
+**Objetivo**: Única especificação para tasks abertas de **validação manual** (smoke HW, packaging host, sign-off de checklist), nomeadas por etapa (VS-*).
 
-#### Diretriz (Constituição v0.8.0)
-- Specs de produto (001–004): jornadas + critérios de aceitação; tasks abertas de teste limitadas a **manual** (smoke/checklist)
-- Tasks de implementação **automatizada** MUST nascer em `005-automated-flow-testing`
-- Histórico `[x]` de automação nas specs de produto permanece; sem resquícios abertos de automação fora de 005 (audit 2026-08-04)
-- Únicos abertos manuais fora de 005: `002` T031 / T062
-- CI falha o PR se qualquer flow test automatizado mandatório falhar
+#### Diretriz (Constituição v1.0.0)
+- Specs de produto (001–004): jornadas + critérios de aceitação + tasks de teste **automatizado**
+- Tasks abertas de validação **manual** MUST nascer em `005-manual-validation`
+- Histórico `[x]` de automação nas specs de produto permanece
+- Etapas manuais do installer: **VS-1** (T009), **VS-4** (T010), **VS-5** (T011); ledger em `002/.../quickstart-validation.md`
+- CI falha o PR se qualquer flow test automatizado mandatório falhar (automação nas specs de produto)
 
 #### Escopo da Spec
 | Área | Detalhes |
 |------|----------|
-| **Catálogo único (automação)** | Inventário e tracking de trabalho de teste automatizado |
-| **Firmware flows** | Hotspot, WS start/stop/status, fault abort, bounds de timing/segurança |
-| **Installer flows** | Wizard, flash mockado, soft network-verify, redaction de senha |
-| **App/Touch flows** | Slots de cobertura P1 quando 003/004 forem shipados |
-| **Gates** | Comandos locais documentados + CI fail-on-test |
+| **Catálogo único (manual)** | Inventário e tracking de smokes/checklists humanos |
+| **VS-1** | First-flash hardware smoke (ESP32 real) |
+| **VS-4 / VS-5** | Host packaging smoke Win/macOS e Linux |
+| **Futuro 003/004** | VS-CTRL-1 / VS-UI-1 quando essas features pedirem smoke |
+| **Ledger** | Resultados registrados nos checklists da spec de produto dona |
 
 ---
 
@@ -233,13 +233,13 @@
 ┌────────────────────────────┬────────────┬────────────────────────┬──────┐
 │ FASE                       │ STATUS     │ ENTREGÁVEIS            │  %   │
 ├────────────────────────────┼────────────┼────────────────────────┼──────┤
-│ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 5 Specs (incl. 005 tests) │ 100% │
-│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 2/5  │
+│ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 5 Specs (incl. 005 manuais) │ 100% │
+│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 3/5  │
 │ 3. Firmware Core           │ ✅ CONCLUÍDO │ ESP32 Base + WS + NVS + Make/CI │ 100% │
 │ 4. Touch UI                │ ⏳ AGUARDANDO │ LVGL + Touch Driver     │ 0%   │
-│ 5. Desktop Installer       │ 🚧 EM ANDAMENTO │ 60/62; HW/package smoke │ 97% │
+│ 5. Desktop Installer       │ ✅ CONCLUÍDO │ Produto done; manuais em 005 │ 100% │
 │ 6. Control App (Multi)     │ ⏳ AGUARDANDO │ Flutter + SQLite + WS   │ 0%   │
-│ 7. Integration & Testing   │ 📝 ESPECIFICADO │ Catálogo 005 (plan/tasks next) │ 10% │
+│ 7. Integration & Testing   │ 🚧 EM ANDAMENTO │ 005 manuais VS-1/4/5 abertos │ 40% │
 └────────────────────────────┴────────────┴────────────────────────┴──────┘
 ```
 
@@ -253,7 +253,7 @@
 | **GUI Firmware** | LVGL v8+ | Leve, touch-ready, double buffer, temas |
 | **WebSocket** | async_web_server / ESPAsyncWebServer | Non-blocking, multi-client, 1Hz nativo |
 | **NVS/Storage** | NVS (config) + SPIFFS (fonts/assets) | Wear-leveling, atômico, padrão ESP32 |
-| **Desktop Installer** | Flutter 3.44 (FVM) + esptool + MSIX/DMG/deb/rpm | `make run` / `make bundle-esptool`; 60/62 |
+| **Desktop Installer** | Flutter 3.44 (FVM) + esptool + MSIX/DMG/deb/rpm | `make run` / `make bundle-esptool`; produto done |
 | **Control App** | Flutter 3.x (Dart) | Single codebase Desktop+Mobile, SQLite, WS |
 | **Build/CI** | GitHub Actions + PlatformIO | Matrix build ESP32 variants, artifact upload |
 | **Docs** | Markdown PT-BR/EN-US em `/docs` | GitHub Pages ready, versionado com código |
@@ -287,7 +287,7 @@ philarmony/
 │   ├── 002-esp32-desktop-installer/
 │   ├── 003-filament-dryer-control-app/
 │   ├── 004-esp32-touchscreen-ui/
-│   └── 005-automated-flow-testing/   # Catálogo único de tasks de teste
+│   └── 005-manual-validation/        # Catálogo único de validações manuais
 ├── README.md                    # Este arquivo (auto-sincronizado)
 └── LICENSE
 ```
@@ -306,7 +306,7 @@ philarmony/
 
 ## 🧪 Testes
 
-Flow tests automatizados de jornada completa são o gate mandatório de CI (Constituição: Teste Automatizado e Qualidade). **Tasks de automação concentram-se em** [`specs/005-automated-flow-testing`](specs/005-automated-flow-testing/spec.md) e **continuam a ser implementadas**. Specs de produto só mantêm tasks abertas de **teste manual** (smoke/checklist); histórico `[x]` de automação permanece.
+Flow tests automatizados de jornada completa são o gate mandatório de CI (Constituição: Teste Automatizado e Qualidade). **Tasks de automação ficam nas specs de produto** (001–004) e **continuam a ser implementadas**. Tasks abertas de **validação manual** concentram-se em [`specs/005-manual-validation`](specs/005-manual-validation/spec.md), nomeadas por etapa (VS-*); histórico `[x]` de automação nas specs de produto permanece.
 
 ---
 

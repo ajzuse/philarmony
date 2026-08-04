@@ -4,11 +4,11 @@
 **Prerequisites**: `plan.md`, `spec.md` (Clarifications 2026-07-28), `research.md` (R8–R12), `data-model.md`, `contracts/`  
 **Stack**: Flutter **3.44.0 via FVM** (`.fvmrc`) + `philarmony_core` + bundled esptool (DEC-010/011)
 
-**Progress note (2026-07-29)**: Implementation essentially complete except hardware VS-1 smoke (T031) and final quickstart VS-1/4/5 sign-off (T062). Run `make bundle-esptool` + `make sync-installer-firmware` before real flash.
+**Progress note (2026-08-04)**: Product implementation tasks complete. Manual stages VS-1 / VS-4 / VS-5 moved to `specs/005-manual-validation` (T009–T011). Run `make bundle-esptool` + `make sync-installer-firmware` before real flash.
 
-**Tests**: Polish includes `make test-flutter` (already green for core + wizard/widget). Historical `[x]` automated tasks stay here as history. **New automated work → `specs/005-automated-flow-testing`**. Open remnants below are **manual only** (T031, T062).
+**Tests**: Polish includes `make test-flutter` (already green for core + wizard/widget). Historical `[x]` automated tasks stay here as history. **New automated work stays on this product spec**. Open **manual** stages → `specs/005-manual-validation`.
 
-**Test-policy audit (2026-08-04)**: No open automated-test tasks remain on this feature. T031/T062 classified `[MANUAL]` per Constitution v0.8.0.
+**Test-policy audit (2026-08-04)**: T031/T062 closed as migrated to 005 stage tasks (Constitution v1.0.0). No open manuals remain on this feature.
 
 ## Format: `- [ ] [ID] [P?] [Story?] Description with file path`
 
@@ -82,7 +82,7 @@
 - [x] T028 [US1] Wire `make sync-installer-firmware` output path into flasher default package in `apps/esp32-desktop-installer/lib/flash/esptool_firmware_flasher.dart` (resolve asset/`path_provider` absolute paths)
 - [x] T029 [US1] Replace JSON sidecar with firmware-compatible NVS/config partition image per `contracts/nvs-config-mapping.md` in `apps/esp32-desktop-installer/lib/flash/nvs_image_builder.dart`
 - [x] T030 [US1] Persist selected serial port across steps in `apps/esp32-desktop-installer/lib/wizard/installer_session_controller.dart` (avoid FlashStep default `/dev/ttyUSB0`)
-- [ ] T031 [US1] [MANUAL] Hardware smoke VS-1 on real ESP32; record in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
+- [x] T031 [US1] Moved → `specs/005-manual-validation` **T009 VS-1 First-flash hardware smoke** (results still in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`)
 
 **Checkpoint**: End-to-end USB flash on one desktop OS
 
@@ -171,18 +171,15 @@
 - [x] T059 [P] Fix DropdownButtonFormField `value`→`initialValue` deprecations in wizard steps under `apps/esp32-desktop-installer/lib/wizard/steps/`
 - [x] T060 [P] Visual pinout diagram for selected model in `apps/esp32-desktop-installer/lib/wizard/steps/pins_step.dart` (FR-004)
 - [x] T061 Sync README roadmap % and feature status for 002 in `README.md`
-- [ ] T062 [MANUAL] Complete quickstart checklist VS-1/VS-4/VS-5 after packaging+HW in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
+- [x] T062 Moved → `specs/005-manual-validation` **T010 VS-4** + **T011 VS-5** (and VS-1 via T009); ledger `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
 
 ---
 
 ## Dependencies & Execution Order
 
 ```text
-Done: Phase1–2, most US1–US4 UI, US5 stubs
-Next (MVP close): T027–T031 (esptool+firmware+NVS+port+HW)
-Then: T050–T054 packaging artifacts
-Polish: T058–T062
-US2/US3/US4 polish (T035–T045) can parallel packaging
+Done: Phase1–8 product tasks (incl. T027–T030, T050–T061)
+Manual stages (human): specs/005-manual-validation T009–T011 (VS-1 / VS-4 / VS-5)
 ```
 
 ### Parallel Opportunities
@@ -216,13 +213,12 @@ Task: "rpm via packaging/linux/rpm/philarmony-installer.spec"
 
 ### MVP close-out (recommended next)
 
-1. T027–T030 — make USB flash real without hardcoded ports/missing tools  
-2. T031 — hardware smoke  
-3. T050–T054 — ship host installers  
+1. Product tasks on this feature: complete  
+2. Manual stages: `specs/005-manual-validation` T009 (VS-1) then T010 // T011 (VS-4 // VS-5)  
 
 ### Suggested MVP Scope
 
-**US1 remaining (T027–T031)** then **US5 remaining (T050–T054)**.
+Product implementation complete; remaining release confidence is manual catalog US2.
 
 ---
 
@@ -239,7 +235,7 @@ Task: "rpm via packaging/linux/rpm/philarmony-installer.spec"
 
 ## Phase 9: Convergence
 
-**Purpose**: Close gaps between spec/plan intent and current implementation (post-implement assessment 2026-07-29). Does not replace open T031/T062 (hardware & checklist sign-off).
+**Purpose**: Close gaps between spec/plan intent and current implementation (post-implement assessment 2026-07-29). Manual stages live in `specs/005-manual-validation` (VS-1/VS-4/VS-5).
 
 - [x] T069 CRITICAL Add GPLv3 license headers to Dart sources under `apps/esp32-desktop-installer/lib/` and `packages/philarmony_core/lib/` per Constitution GPLv3 (missing)
 - [x] T063 CRITICAL Flash bootloader.bin + partitions.bin (and sync via `make sync-installer-firmware`) after erase alongside app@0x10000 + NVS@0x9000 in `apps/esp32-desktop-installer/lib/flash/esptool_firmware_flasher.dart` and `Makefile` per FR-008 / US1 (contradicts)
@@ -260,7 +256,7 @@ Task: "rpm via packaging/linux/rpm/philarmony-installer.spec"
 
 ## Phase 10: Convergence
 
-**Purpose**: Close residual gaps after Phase 9 tasks were marked complete (post-implement reassessment 2026-08-01). Does not replace open T031/T062 (hardware & checklist sign-off).
+**Purpose**: Close residual gaps after Phase 9 tasks were marked complete (post-implement reassessment 2026-08-01). Manual stages live in `specs/005-manual-validation` (VS-1/VS-4/VS-5).
 
 - [x] T079 CRITICAL Fail CI packaging when AppImage/deb/rpm/MSIX/DMG steps fail (remove `|| true`), stop uploading raw Flutter `bundle`/`Release` trees, and install packaging tools (`appimagetool`/dpkg/rpmbuild) in `.github/workflows/desktop-installer-release.yml` per FR-012 / plan:CI (contradicts)
 - [x] T080 CRITICAL Publish GitHub Release attach + SHA-256 checksums for host installer artifacts from `.github/workflows/desktop-installer-release.yml` per FR-012 / contracts/desktop-distribution.md (missing)

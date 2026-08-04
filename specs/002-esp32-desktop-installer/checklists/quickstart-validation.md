@@ -1,6 +1,7 @@
 # Quickstart validation (002)
 
-Date: 2026-07-29
+Date: 2026-07-29  
+**Manual stages owned by**: `specs/005-manual-validation` (T009 VS-1, T010 VS-4, T011 VS-5) — record PASS/PENDING here.
 
 | Scenario | Result | Notes |
 |----------|--------|-------|
