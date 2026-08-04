@@ -30,11 +30,8 @@ class ProfileStore {
 
   DeviceProfile importJson(String source) {
     final profile = _codec.decode(source);
-    // Ensure imported password cannot be used for flash until re-entered.
-    if (profile.wifi.password == ProfileCodec.redactedPassword ||
-        profile.wifi.password.isEmpty) {
-      profile.wifi.password = '';
-    }
+    // Always clear WiFi password on import (including plaintext) — force re-entry (FR-009).
+    profile.wifi.password = '';
     return profile;
   }
 

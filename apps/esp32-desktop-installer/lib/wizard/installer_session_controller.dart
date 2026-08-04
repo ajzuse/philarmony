@@ -97,6 +97,20 @@ class InstallerSessionController extends ChangeNotifier {
         if (profile.wifi.ssid.trim().isEmpty) {
           session.validationErrors = ['SSID required'];
         }
+        if (!profile.wifi.hasPassword) {
+          session.validationErrors = [
+            ...session.validationErrors,
+            'WiFi password required',
+          ];
+        }
+        final staticErrors =
+            NvsConfigMapper.validateStaticIp(profile.wifi.staticIp);
+        if (staticErrors.isNotEmpty) {
+          session.validationErrors = [
+            ...session.validationErrors,
+            ...staticErrors,
+          ];
+        }
         break;
     }
     notifyListeners();

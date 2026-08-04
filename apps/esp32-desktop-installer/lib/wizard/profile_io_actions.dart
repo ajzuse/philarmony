@@ -22,6 +22,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/app_localizations.dart';
 import 'installer_session_controller.dart';
 
 class ProfileIoActions {
@@ -29,9 +30,10 @@ class ProfileIoActions {
     BuildContext context,
     InstallerSessionController c,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final json = c.exportProfileJson();
     final path = await FilePicker.platform.saveFile(
-      dialogTitle: 'Export Philarmony profile',
+      dialogTitle: l10n?.exportProfileTitle ?? 'Export Philarmony profile',
       fileName: 'philarmony-profile.json',
       type: FileType.custom,
       allowedExtensions: const ['json'],
@@ -40,7 +42,12 @@ class ProfileIoActions {
       await File(path).writeAsString(json);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Saved $path (password redacted)')),
+          SnackBar(
+            content: Text(
+              l10n?.exportSavedSnack(path) ??
+                  'Saved $path (password redacted)',
+            ),
+          ),
         );
       }
       return;
@@ -48,8 +55,11 @@ class ProfileIoActions {
     await Clipboard.setData(ClipboardData(text: json));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Save cancelled — JSON copied (password redacted)'),
+        SnackBar(
+          content: Text(
+            l10n?.exportClipboardSnack ??
+                'Save cancelled — JSON copied (password redacted)',
+          ),
         ),
       );
     }
@@ -68,14 +78,15 @@ class ProfileIoActions {
 
   static Future<String?> importFromPath(
     InstallerSessionController c,
-    String path,
-  ) async {
+    String path, {
+    AppLocalizations? l10n,
+  }) async {
     try {
       final source = await File(path).readAsString();
       c.importProfileJson(source);
       return null;
     } catch (e) {
-      return 'Import failed: $e';
+      return l10n?.importFailed('$e') ?? 'Import failed: $e';
     }
   }
 }

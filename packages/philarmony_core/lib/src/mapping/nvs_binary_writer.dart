@@ -195,6 +195,71 @@ class NvsBinaryWriter {
     return out;
   }
 
+  /// Decode string entries written by [build] (Preferences-compatible round-trip).
+  /// Returns namespace → map of key → string value for the first active page set.
+  static Map<String, Map<String, String>> readStringEntries(Uint8List bytes) {
+    if (bytes.length < pageSize) {
+      throw ArgumentError('NVS image too small');
+    }
+    final result = <String, Map<String, String>>{};
+    final nsNames = <int, String>{}; // ns index → name
+    final pageCount = bytes.length ~/ pageSize;
+
+    for (var pi = 0; pi < pageCount; pi++) {
+      final pageOff = pi * pageSize;
+      final state = ByteData.sublistView(bytes, pageOff, pageOff + 4)
+          .getUint32(0, Endian.little);
+      if (state != stateActive) continue;
+
+      for (var ei = 0; ei < entriesPerPage; ei++) {
+        final bitIndex = ei * 2;
+        final byteIndex = pageOff + pageHeaderSize + (bitIndex ~/ 8);
+        final shift = bitIndex % 8;
+        final bits = (bytes[byteIndex] >> shift) & 0x3;
+        if (bits != entryStateWritten) continue;
+
+        final entryOff = pageOff + firstEntryOffset + ei * entrySize;
+        final ns = bytes[entryOff];
+        final type = bytes[entryOff + 1];
+        final span = bytes[entryOff + 2];
+        final keyBytes = bytes.sublist(entryOff + 8, entryOff + 24);
+        final keyEnd = keyBytes.indexOf(0);
+        final key = utf8.decode(
+          keyEnd < 0 ? keyBytes : keyBytes.sublist(0, keyEnd),
+        );
+
+        if (type == typeNamespace && ns == 0) {
+          final idx = bytes[entryOff + 24];
+          nsNames[idx] = key;
+          result.putIfAbsent(key, () => {});
+          continue;
+        }
+
+        if (type != typeString || span < 2) continue;
+        final dataLen =
+            ByteData.sublistView(bytes, entryOff + 24, entryOff + 26)
+                .getUint16(0, Endian.little);
+        final data = <int>[];
+        for (var s = 1; s < span && data.length < dataLen; s++) {
+          final chunkOff = pageOff + firstEntryOffset + (ei + s) * entrySize;
+          final remain = dataLen - data.length;
+          final n = remain > entrySize ? entrySize : remain;
+          data.addAll(bytes.sublist(chunkOff, chunkOff + n));
+        }
+        // Strip trailing NUL if present
+        if (data.isNotEmpty && data.last == 0) {
+          data.removeLast();
+        }
+        final nsName = nsNames[ns] ?? 'ns_$ns';
+        result.putIfAbsent(nsName, () => {});
+        result[nsName]![key] = utf8.decode(data);
+        // Skip blob payload entries that follow this header.
+        ei += span - 1;
+      }
+    }
+    return result;
+  }
+
   /// CRC-32 (ISO-HDLC / zlib), matching ESP-IDF NVS.
   static int _crc32(List<int> data) {
     var crc = 0xffffffff;

@@ -145,6 +145,12 @@ class PinValidator {
         seen[pin] = name;
       }
 
+      if (!map.usableGpios.contains(pin)) {
+        errors.add(
+          'GPIO $pin is not a usable GPIO on ${map.model}; cannot assign $name',
+        );
+      }
+
       if (map.flashReserved.contains(pin) || map.psramReserved.contains(pin)) {
         errors.add('GPIO $pin is reserved (flash/PSRAM) on ${map.model}; cannot assign $name');
       }
@@ -166,6 +172,11 @@ class PinValidator {
       if (s.sensor == 'none') continue;
       if (s.gpioPin != null) {
         final pin = s.gpioPin!;
+        if (!map.usableGpios.contains(pin)) {
+          errors.add(
+            'Sensor ${s.role} GPIO $pin is not a usable GPIO on ${map.model}',
+          );
+        }
         if (map.flashReserved.contains(pin) || map.psramReserved.contains(pin)) {
           errors.add('Sensor ${s.role} GPIO $pin is reserved (flash/PSRAM)');
         }
