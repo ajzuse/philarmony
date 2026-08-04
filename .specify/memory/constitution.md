@@ -1,19 +1,14 @@
 <!--
 Sync Impact Report:
-Version change: 0.5.0 → 0.6.0 (MINOR — elevated explicit commit review/approval into a Core Principle and closed auto-commit loopholes)
+Version change: 0.7.0 → 0.8.0 (MINOR — clarify manual vs automated test-task placement after product-spec audit)
 Modified principles:
-  - Development Workflow / Git "Confirmação Explícita de Commit" → promoted & expanded as Core Principle "Revisão e Aprovação Explícita de Commit"
-  - Governance "Commit Approval Rule" → strengthened (no default-yes; review before commit)
-Added sections:
-  - Core Principles: Revisão e Aprovação Explícita de Commit
+  - Teste Automatizado e Qualidade / Catálogo Único → automated-only in 005; manual smoke/checklists allowed on product specs
+  - Additional Constraints / Development Workflow testing bullets → same split
+Added sections: None
 Removed sections: None
 Templates requiring updates:
-  - .specify/templates/plan-template.md (✅ no structural change required; Constitution Check still points to constitution.md)
-  - .specify/templates/spec-template.md (✅ no change)
-  - .specify/templates/tasks-template.md (✅ no change)
-  - .specify/extensions.yml (✅ git commit hooks set optional)
-  - .specify/extensions/git-workflow/scripts/git-commit-hook.sh (✅ fail-closed: no TTY ⇒ no commit)
-  - .claude/skills/speckit-* (⚠ agents must follow new principle; hook optionality updated via extensions.yml)
+  - .specify/templates/tasks-template.md (✅ manual vs automated placement)
+  - specs/005-automated-flow-testing/spec.md (✅ v0.2.0 audit + split)
 Follow-up TODOs: None
 -->
 
@@ -51,6 +46,8 @@ A shared workspace configuration file (.vscode/workspace.json) MUST be maintaine
 ### Teste Automatizado e Qualidade
 Automation testing pipeline is NON-NEGOTIABLE. Tests represent complete user flows only. CI system MUST fail build if any test fails. Test results cached in memory catalog for AI reference. Only flow tests (not unit tests) are mandatory, each representing complete user journeys.
 
+**Catálogo Único de Testes Automatizados (obrigatório):** Todas as tasks de **teste automatizado** (criação, expansão, correção de cobertura, gates de CI ligados a suites, e Done-When de jornada automatizada) MUST ser concentradas em `specs/005-automated-flow-testing` e MUST continuar a ser implementadas. Specs de produto (001–004 e futuras) MUST manter jornadas/critérios de aceitação e Independent Test narrativos; NÃO MUST acumular tasks abertas de implementação de testes **automatizados**. Tasks abertas de **teste manual** (smoke em hardware real, sign-off de quickstart/checklist) MAY permanecer nas specs de produto e DEVEM ser marcadas como manuais. Tasks históricas `[x]` de automação em outras specs permanecem como histórico. Agentes (`/speckit.tasks`, `/speckit.converge`, `/speckit.implement`) MUST redirecionar novo trabalho de automação para o catálogo 005.
+
 ### Documentação Sincronizada (README Vivo)
 O arquivo README.md na raiz do projeto DEVE ser mantido automaticamente sincronizado com o estado atual do projeto. Qualquer comando speckit que crie, modifique ou remova especificações (`/speckit.specify`, `/speckit.plan`, `/speckit.tasks`) DEVE atualizar o README para refletir: progresso das fases, especificações completadas/em andamento, roadmap atualizado, stack tecnológico, estrutura do repositório e próximos passos. O README é a "single source of truth" para status do projeto visível a contribuidores e usuários.
 
@@ -69,7 +66,7 @@ O catálogo deve ser versionado, consultável via query semântica, e sincroniza
 - Core technology: ESP32, C/C++ (Arduino/PlatformIO)
 - Memory constraints: Maximum 4MB RAM usage, must be validated on target hardware
 - Performance targets: 100ms maximum response time for critical operations
-- Testing: Automated flow testing only, no mocks of hardware unless specifically tested
+- Testing: Automated flow testing is the CI gate (no mocks of hardware unless specifically tested); automated-test tasks live only under `specs/005-automated-flow-testing`; open manual smoke/checklist tasks may remain on product specs
 - Compliance: Must meet all safety standards for DIY equipment
 - Deployment: Pre-release builds must pass hardware simulation tests
 
@@ -79,6 +76,7 @@ O catálogo deve ser versionado, consultável via query semântica, e sincroniza
 - Code review process: Pair programming mandatory for all hardware interaction code
 - Code review gates: All PRs must have ✅ from two reviewers
 - Flow testing gates: Flow tests MUST pass before merge
+- Test task placement: New automated-test work MUST be tracked in `specs/005-automated-flow-testing`; open product-spec test tasks MUST be limited to manual validation (see Core Principle Teste Automatizado e Qualidade)
 - CI pipeline: Automated tests must pass for all PRs
 - Deployment approval: Release manager approval required for production releases
 - Version tagging: Semantic versioning with patch for security bugs, minor for features
@@ -120,4 +118,4 @@ Documentação completa em EN-US para contribuições open-source. Utilizada com
 - **Commit Approval Rule**: Nenhum commit MUST ser efetuado sem (1) oportunidade de o usuário revisar o código/diff e (2) aprovação explícita do usuário. Hooks e agentes MUST falhar fechado (não commitar) se a confirmação interativa não for obtida. Default implícito "sim" é PROIBIDO.
 - **Cavemen Compliance Rule**: All agents MUST be reviewed for Cavemen Protocol compliance. PRs introducing verbose preamble, filler acknowledgments, or redundant summaries in agent output MUST be rejected.
 
-**Version**: 0.6.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-07-28
+**Version**: 0.8.0 | **Ratified**: 2026-07-22 | **Last Amended**: 2026-08-04

@@ -24,6 +24,8 @@ A desktop application that simplifies initial configuration and firmware install
 
 ## User Scenarios & Testing
 
+> **Test task policy (Constitution v0.8.0):** Journeys and acceptance criteria live here. New **automated** test-implementation tasks → `specs/005-automated-flow-testing`. Open tasks on this feature are limited to **manual** validation (e.g. T031/T062 HW smoke & quickstart sign-off). Completed historical automated tasks in `tasks.md` stay as history.
+
 ### Primary User Scenarios
 
 **Scenario 1: First-Time Device Setup**

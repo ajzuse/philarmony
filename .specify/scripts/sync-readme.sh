@@ -8,8 +8,9 @@
 
 set -euo pipefail
 
-# Configurações
-PROJECT_ROOT="/Users/ajzuse/projects/secadora"
+# Configurações (resolve repo root from this script location)
+SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(CDPATH="" cd "$SCRIPT_DIR/../.." && pwd)"
 README_FILE="$PROJECT_ROOT/README.md"
 SPECS_DIR="$PROJECT_ROOT/specs"
 CONSTITUTION_FILE="$PROJECT_ROOT/.specify/memory/constitution.md"
@@ -109,11 +110,15 @@ generate_specs_table() {
             fi
             
             if [[ -f "$spec_file" ]]; then
-                last_update=$(grep -E '^\*\*Date\*\*:' "$spec_file" | sed 's/.*Date\*\*: *//' || stat -f "%Sm" -t "%Y-%m-%d" "$spec_file" 2>/dev/null || date -r "$spec_file" "+%Y-%m-%d" 2>/dev/null || echo "Unknown")
+                last_update=$(grep -E '^\*\*(Date|Created)\*\*:' "$spec_file" | head -1 | sed 's/.*\*\*: *//' || true)
+                if [[ -z "$last_update" ]]; then
+                    last_update=$(stat -c "%y" "$spec_file" 2>/dev/null | cut -d' ' -f1 || date -r "$spec_file" "+%Y-%m-%d" 2>/dev/null || echo "Unknown")
+                fi
                 feature_name=$(grep -E '^\*\*Feature Name\*\*:' "$spec_file" | sed 's/.*Feature Name\*\*: *//' || echo "$spec_name")
+                [[ -z "$feature_name" ]] && feature_name="$spec_name"
             else
                 feature_name="$spec_name"
-                last_update=$(stat -f "%Sm" -t "%Y-%m-%d" "$spec_dir" 2>/dev/null || date -r "$spec_dir" "+%Y-%m-%d" 2>/dev/null || echo "Unknown")
+                last_update=$(stat -c "%y" "$spec_dir" 2>/dev/null | cut -d' ' -f1 || date -r "$spec_dir" "+%Y-%m-%d" 2>/dev/null || echo "Unknown")
             fi
             
             table+="| ${count} | \`${spec_name}\` | ${feature_name} | ${status} | ${last_update} |\n"
@@ -275,7 +280,7 @@ ${specs_table}
 | Área | Detalhes |
 |------|----------|
 | **WiFi & Conectividade** | Conexão WiFi com fallback automático para Hotspot "philarmony"/"philarmony" (IP fixo 192.168.4.1) com servidor HTTP para configuração |
-| **WebSocket API** | Servidor WebSocket na porta **80** path `/ws` com tópicos: \`config/hardware\`, \`config/display\`, \`config/control\`, \`control/start\`, \`control/stop\`, \`control/pid_calibrate\`, \`status/subscribe\`, \`status/update\`, \`config/profiles/*\`, \`logs/stream\` |
+| **WebSocket API** | Servidor WebSocket na porta **80** path \`/ws\` com tópicos: \`config/hardware\`, \`config/display\`, \`config/control\`, \`control/start\`, \`control/stop\`, \`control/pid_calibrate\`, \`status/subscribe\`, \`status/update\`, \`config/profiles/*\`, \`logs/stream\` |
 | **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital, PID opcional, limite segurança 80°C hardcoded |
 | **Sensores** | DHT22, DS18B20, BME280 configuráveis via GPIO |
 | **Display** | SSD1306, SH1106 (I2C), ST7789, ILI9341 (SPI) - resolução configurável, campos selecionáveis |

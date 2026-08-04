@@ -5,7 +5,8 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="/Users/ajzuse/projects/secadora"
+SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(CDPATH="" cd "$SCRIPT_DIR/../.." && pwd)"
 README_FILE="$PROJECT_ROOT/README.md"
 CONSTITUTION_FILE="$PROJECT_ROOT/.specify/memory/constitution.md"
 
