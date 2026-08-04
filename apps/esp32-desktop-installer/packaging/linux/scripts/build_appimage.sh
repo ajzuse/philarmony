@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wrap Flutter linux release bundle as a portable AppImage-like tarball + optional appimagetool.
+# Wrap Flutter linux release bundle as AppImage (requires appimagetool).
 set -euo pipefail
 APP="$(cd "$(dirname "$0")/../../.." && pwd)"
 DIST="$APP/dist"
@@ -7,6 +7,10 @@ BUNDLE="$APP/build/linux/x64/release/bundle"
 mkdir -p "$DIST"
 if [[ ! -d "$BUNDLE" ]]; then
   echo "Missing $BUNDLE — run flutter build linux --release first"
+  exit 1
+fi
+if ! command -v appimagetool >/dev/null; then
+  echo "ERROR: appimagetool not found — install AppImageKit tools and re-run" >&2
   exit 1
 fi
 STAGE="$DIST/PhilarmonyInstaller.AppDir"
@@ -28,14 +32,9 @@ Type=Application
 Categories=Development;Electronics;
 EOF
 cp "$STAGE/usr/share/applications/philarmony-installer.desktop" "$STAGE/philarmony-installer.desktop"
-# Icon placeholder
+# Icon placeholder (appimagetool accepts empty/missing icon with warning)
 printf '' >"$STAGE/philarmony-installer.png" || true
-OUT_TAR="$DIST/PhilarmonyInstaller-linux-x64.tar.gz"
-tar -C "$STAGE" -czf "$OUT_TAR" .
-echo "Wrote $OUT_TAR"
-if command -v appimagetool >/dev/null; then
-  appimagetool "$STAGE" "$DIST/PhilarmonyInstaller-x86_64.AppImage"
-  echo "Wrote $DIST/PhilarmonyInstaller-x86_64.AppImage"
-else
-  echo "appimagetool not found — tar.gz portable bundle is ready; install appimagetool for .AppImage"
-fi
+OUT_APPIMAGE="$DIST/PhilarmonyInstaller-x86_64.AppImage"
+appimagetool "$STAGE" "$OUT_APPIMAGE"
+test -f "$OUT_APPIMAGE"
+echo "Wrote $OUT_APPIMAGE"

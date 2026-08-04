@@ -42,12 +42,18 @@ class HomeEntryPage extends StatelessWidget {
         title: Text(l10n.appTitle),
         actions: [
           PopupMenuButton<Locale>(
-            tooltip: 'Language',
+            tooltip: l10n.language,
             icon: const Icon(Icons.language),
             onSelected: (locale) => PhilarmonyInstallerApp.setLocale(context, locale),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: Locale('pt'), child: Text('Português')),
-              PopupMenuItem(value: Locale('en'), child: Text('English')),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: const Locale('pt'),
+                child: Text(l10n.languagePortuguese),
+              ),
+              PopupMenuItem(
+                value: const Locale('en'),
+                child: Text(l10n.languageEnglish),
+              ),
             ],
           ),
         ],

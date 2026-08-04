@@ -82,10 +82,10 @@ class PinsStep extends StatelessWidget {
           ),
         const SizedBox(height: 8),
         Text(
-          'Strapping: ${map.strapping.join(", ")}. '
-          'Flash reserved: ${map.flashReserved.join(", ")}. '
-          'PSRAM reserved: ${map.psramReserved.isEmpty ? "—": map.psramReserved.join(", ")}. '
-          'Input-only: ${map.inputOnly.isEmpty ? "—": map.inputOnly.join(", ")}.',
+          '${l10n?.pinLegendStrapping ?? 'Strapping'}: ${map.strapping.join(", ")}. '
+          '${l10n?.pinLegendFlash ?? 'Flash reserved'}: ${map.flashReserved.join(", ")}. '
+          '${l10n?.pinLegendPsram ?? 'PSRAM reserved'}: ${map.psramReserved.isEmpty ? "—": map.psramReserved.join(", ")}. '
+          '${l10n?.pinLegendInputOnly ?? 'Input-only'}: ${map.inputOnly.isEmpty ? "—": map.inputOnly.join(", ")}.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
@@ -105,6 +105,7 @@ class _EspPinoutDiagram extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final gpios = map.usableGpios;
     final mid = (gpios.length / 2).ceil();
@@ -160,7 +161,8 @@ class _EspPinoutDiagram extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text('$model package outline (GPIO map)',
+          Text(l10n?.pinoutPackageOutline(model) ??
+                  '$model package outline (GPIO map)',
               style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
           Row(
@@ -192,22 +194,22 @@ class _EspPinoutDiagram extends StatelessWidget {
             spacing: 8,
             children: [
               Chip(
-                label: const Text('Assigned'),
+                label: Text(l10n?.pinLegendAssigned ?? 'Assigned'),
                 visualDensity: VisualDensity.compact,
                 backgroundColor: scheme.primaryContainer,
               ),
               Chip(
-                label: const Text('Strapping'),
+                label: Text(l10n?.pinLegendStrapping ?? 'Strapping'),
                 visualDensity: VisualDensity.compact,
                 backgroundColor: scheme.tertiaryContainer,
               ),
               Chip(
-                label: const Text('Flash/PSRAM'),
+                label: Text(l10n?.pinLegendFlashPsram ?? 'Flash/PSRAM'),
                 visualDensity: VisualDensity.compact,
                 backgroundColor: scheme.secondaryContainer,
               ),
               Chip(
-                label: const Text('Input-only'),
+                label: Text(l10n?.pinLegendInputOnly ?? 'Input-only'),
                 visualDensity: VisualDensity.compact,
                 backgroundColor: scheme.errorContainer.withValues(alpha: 0.5),
               ),

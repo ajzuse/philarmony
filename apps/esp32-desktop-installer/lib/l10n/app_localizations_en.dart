@@ -56,6 +56,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get language => 'Language';
 
   @override
+  String get languagePortuguese => 'Português';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
   String get requiredField => 'Required';
 
   @override
@@ -81,6 +87,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customPartitionLabel => 'Custom partition table';
+
+  @override
+  String get clearLabel => 'Clear';
+
+  @override
+  String get selectPartitionsTitle => 'Select custom partitions.bin';
+
+  @override
+  String unsupportedChip(String chip, String supported) {
+    return 'Unsupported chip $chip. Supported variants: $supported. Select a supported model manually.';
+  }
+
+  @override
+  String get chipDetectFailed =>
+      'Could not auto-detect chip (select model manually)';
 
   @override
   String get partialFlashWarn =>
@@ -126,6 +147,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exhaustFanDigitalLabel => 'Exhaust fan digital';
+
+  @override
+  String get pinLegendStrapping => 'Strapping';
+
+  @override
+  String get pinLegendFlash => 'Flash reserved';
+
+  @override
+  String get pinLegendPsram => 'PSRAM reserved';
+
+  @override
+  String get pinLegendInputOnly => 'Input-only';
+
+  @override
+  String get pinLegendAssigned => 'Assigned';
+
+  @override
+  String get pinLegendFlashPsram => 'Flash/PSRAM';
+
+  @override
+  String pinoutPackageOutline(String model) {
+    return '$model package outline (GPIO map)';
+  }
 
   @override
   String get enableDisplayLabel => 'Enable display';
@@ -200,8 +244,73 @@ class AppLocalizationsEn extends AppLocalizations {
   String get staticIpTitle => 'Static IP (optional)';
 
   @override
+  String get wifiScanLabel => 'Scan nearby WiFi';
+
+  @override
+  String get wifiScanUnavailable =>
+      'No networks found (scan unsupported or permission denied). Enter SSID manually.';
+
+  @override
   String get dismissLabel => 'Dismiss';
 
   @override
   String get stepLabel => 'Step';
+
+  @override
+  String reviewModel(String model, int flashMb) {
+    return 'Model: $model ($flashMb MB)';
+  }
+
+  @override
+  String reviewHeaterPwm(int pin) {
+    return 'Heater PWM: $pin';
+  }
+
+  @override
+  String reviewWifiSsid(String ssid) {
+    return 'WiFi SSID: $ssid';
+  }
+
+  @override
+  String reviewProfiles(int count) {
+    return 'Profiles: $count';
+  }
+
+  @override
+  String reviewFirmware(String version) {
+    return 'Firmware: $version';
+  }
+
+  @override
+  String get reviewEraseWarning =>
+      'Install will erase and reflash the device with this configuration. There is no automatic restore of a previous firmware image.';
+
+  @override
+  String get flashLogVerbose => 'Verbose';
+
+  @override
+  String get flashLogQuiet => 'Quiet';
+
+  @override
+  String get flashLogExport => 'Export log';
+
+  @override
+  String get flashLogExportTitle => 'Export flash log';
+
+  @override
+  String get exportProfileTitle => 'Export Philarmony profile';
+
+  @override
+  String exportSavedSnack(String path) {
+    return 'Saved $path (password redacted)';
+  }
+
+  @override
+  String get exportClipboardSnack =>
+      'Save cancelled — JSON copied (password redacted)';
+
+  @override
+  String importFailed(String error) {
+    return 'Import failed: $error';
+  }
 }

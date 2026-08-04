@@ -18,6 +18,7 @@
 
 enum FlashJobState {
   idle,
+  preflight,
   erasing,
   writingApp,
   writingNvs,
@@ -25,6 +26,7 @@ enum FlashJobState {
   resetting,
   success,
   failed,
+  networkVerify,
 }
 
 enum NetworkVerifyStatus {

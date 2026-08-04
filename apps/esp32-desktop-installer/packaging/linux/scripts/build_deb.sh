@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build .deb from Flutter linux release bundle using dpkg-deb or nfpm.
+# Build .deb from Flutter linux release bundle using dpkg-deb.
 set -euo pipefail
 APP="$(cd "$(dirname "$0")/../../.." && pwd)"
 DIST="$APP/dist"
@@ -8,6 +8,10 @@ CTRL="$APP/packaging/linux/deb/control"
 mkdir -p "$DIST"
 if [[ ! -d "$BUNDLE" ]]; then
   echo "Missing $BUNDLE"; exit 1
+fi
+if ! command -v dpkg-deb >/dev/null; then
+  echo "ERROR: dpkg-deb not found — install dpkg-dev and re-run" >&2
+  exit 1
 fi
 STAGE="$DIST/deb-root"
 rm -rf "$STAGE"
@@ -31,15 +35,6 @@ Type=Application
 Categories=Development;Electronics;
 EOF
 OUT="$DIST/philarmony-installer_0.1.0_amd64.deb"
-if command -v dpkg-deb >/dev/null; then
-  dpkg-deb --build "$STAGE" "$OUT"
-elif command -v nfpm >/dev/null; then
-  echo "dpkg-deb missing; prefer running on Debian/Ubuntu CI"
-  exit 1
-else
-  echo "dpkg-deb not found — packing directory tree only at $STAGE"
-  tar -C "$STAGE" -czf "$DIST/philarmony-installer_0.1.0_amd64.deb.staging.tar.gz" .
-  echo "Wrote staging tarball; produce .deb on a Debian host"
-  exit 0
-fi
+dpkg-deb --build "$STAGE" "$OUT"
+test -f "$OUT"
 echo "Wrote $OUT"

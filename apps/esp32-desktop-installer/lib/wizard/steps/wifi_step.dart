@@ -18,6 +18,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../device/wifi_network_scanner.dart';
 import '../../l10n/app_localizations.dart';
 import '../installer_session_controller.dart';
 
@@ -32,6 +33,10 @@ class WifiStep extends StatefulWidget {
 class _WifiStepState extends State<WifiStep> {
   bool show = false;
   bool useStatic = false;
+  bool scanning = false;
+  List<String> nearbySsids = const [];
+  String? scanMessage;
+  final _scanner = WifiNetworkScanner();
 
   @override
   void initState() {
@@ -39,11 +44,30 @@ class _WifiStepState extends State<WifiStep> {
     useStatic = widget.controller.profile.wifi.staticIp != null;
   }
 
+  Future<void> _scan() async {
+    final l10n = AppLocalizations.of(context);
+    setState(() {
+      scanning = true;
+      scanMessage = null;
+    });
+    final ssids = await _scanner.scanNearbySsids();
+    if (!mounted) return;
+    setState(() {
+      scanning = false;
+      nearbySsids = ssids;
+      scanMessage = ssids.isEmpty
+          ? (l10n?.wifiScanUnavailable ??
+              'No networks found (scan unsupported or permission denied). Enter SSID manually.')
+          : null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final wifi = widget.controller.profile.wifi;
     final staticIp = Map<String, String>.from(wifi.staticIp ?? {});
+    final errors = widget.controller.session.validationErrors;
     return ListView(
       children: [
         TextFormField(
@@ -57,6 +81,45 @@ class _WifiStepState extends State<WifiStep> {
             widget.controller.updateProfile((p) => p);
           },
         ),
+        Row(
+          children: [
+            TextButton.icon(
+              onPressed: scanning ? null : _scan,
+              icon: scanning
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.wifi_find),
+              label: Text(l10n?.wifiScanLabel ?? 'Scan nearby WiFi'),
+            ),
+            if (scanMessage != null)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text(scanMessage!, style: Theme.of(context).textTheme.bodySmall),
+                ),
+              ),
+          ],
+        ),
+        if (nearbySsids.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            children: nearbySsids
+                .take(12)
+                .map(
+                  (ssid) => ActionChip(
+                    label: Text(ssid),
+                    onPressed: () {
+                      wifi.ssid = ssid;
+                      widget.controller.updateProfile((p) => p);
+                      setState(() {});
+                    },
+                  ),
+                )
+                .toList(),
+          ),
         TextFormField(
           decoration: InputDecoration(
             labelText: '${l10n?.passwordLabel ?? 'Password'} *',
@@ -97,7 +160,12 @@ class _WifiStepState extends State<WifiStep> {
         if (useStatic) ...[
           for (final key in ['ip', 'gateway', 'netmask', 'dns'])
             TextFormField(
-              decoration: InputDecoration(labelText: key.toUpperCase()),
+              decoration: InputDecoration(
+                labelText: key.toUpperCase(),
+                helperText: key == 'dns'
+                    ? (l10n?.optionalField ?? 'Optional')
+                    : (l10n?.requiredField ?? 'Required'),
+              ),
               initialValue: wifi.staticIp?[key] ?? '',
               onChanged: (v) {
                 wifi.staticIp ??= {};
@@ -106,6 +174,14 @@ class _WifiStepState extends State<WifiStep> {
               },
             ),
         ],
+        if (errors.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              errors.join('\n'),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
       ],
     );
   }

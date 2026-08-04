@@ -1,6 +1,25 @@
+/*
+ * Philarmony Filament Dryer — Desktop Installer / Shared Core
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:philarmony_core/philarmony_core.dart';
 
+import 'package:esp32_desktop_installer/device/serial_device_detector.dart';
 import 'package:esp32_desktop_installer/flash/esptool_firmware_flasher.dart';
 import 'package:esp32_desktop_installer/flash/flash_error_hints.dart';
 import 'package:esp32_desktop_installer/wizard/installer_session_controller.dart';
@@ -117,5 +136,64 @@ void main() {
     );
     expect(r.ok, isFalse);
     expect(r.errors.any((e) => e.contains('reserved')), isTrue);
+  });
+
+  test('wifi step requires non-empty password before next', () {
+    final c = InstallerSessionController();
+    c.session.step = WizardStep.wifi;
+    c.updateProfile(
+      (p) => p..wifi = WiFiConfig(ssid: 'lab', password: ''),
+    );
+    expect(c.session.canGoNext, isFalse);
+    expect(
+      c.session.validationErrors.any((e) => e.toLowerCase().contains('password')),
+      isTrue,
+    );
+    c.updateProfile(
+      (p) => p..wifi = WiFiConfig(ssid: 'lab', password: 'secret'),
+    );
+    expect(c.session.canGoNext, isTrue);
+  });
+
+  test('wifi step validates static IP fields', () {
+    final c = InstallerSessionController();
+    c.session.step = WizardStep.wifi;
+    c.updateProfile(
+      (p) => p
+        ..wifi = WiFiConfig(
+          ssid: 'lab',
+          password: 'secret',
+          staticIp: {
+            'ip': 'bad',
+            'gateway': '192.168.1.1',
+            'netmask': '255.255.255.0',
+            'dns': '',
+          },
+        ),
+    );
+    expect(c.session.canGoNext, isFalse);
+    expect(
+      c.session.validationErrors.any((e) => e.toLowerCase().contains('static')),
+      isTrue,
+    );
+  });
+
+  test('FlashJobState includes preflight', () {
+    expect(FlashJobState.values, contains(FlashJobState.preflight));
+  });
+
+  test('CP210x/CH340/FTDI USB-UART hints from VID/PID', () {
+    expect(
+      SerialDeviceDetector.usbUartHint(vid: 0x10C4, pid: 0xEA60),
+      contains('CP210'),
+    );
+    expect(
+      SerialDeviceDetector.usbUartHint(vid: 0x1A86, pid: 0x7523),
+      contains('CH340'),
+    );
+    expect(
+      SerialDeviceDetector.usbUartHint(vid: 0x0403, pid: 0x6001),
+      contains('FT'),
+    );
   });
 }

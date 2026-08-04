@@ -188,6 +188,18 @@ abstract class AppLocalizations {
   /// **'Language'**
   String get language;
 
+  /// No description provided for @languagePortuguese.
+  ///
+  /// In en, this message translates to:
+  /// **'Português'**
+  String get languagePortuguese;
+
+  /// No description provided for @languageEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get languageEnglish;
+
   /// No description provided for @requiredField.
   ///
   /// In en, this message translates to:
@@ -241,6 +253,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Custom partition table'**
   String get customPartitionLabel;
+
+  /// No description provided for @clearLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearLabel;
+
+  /// No description provided for @selectPartitionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select custom partitions.bin'**
+  String get selectPartitionsTitle;
+
+  /// No description provided for @unsupportedChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported chip {chip}. Supported variants: {supported}. Select a supported model manually.'**
+  String unsupportedChip(String chip, String supported);
+
+  /// No description provided for @chipDetectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not auto-detect chip (select model manually)'**
+  String get chipDetectFailed;
 
   /// No description provided for @partialFlashWarn.
   ///
@@ -325,6 +361,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Exhaust fan digital'**
   String get exhaustFanDigitalLabel;
+
+  /// No description provided for @pinLegendStrapping.
+  ///
+  /// In en, this message translates to:
+  /// **'Strapping'**
+  String get pinLegendStrapping;
+
+  /// No description provided for @pinLegendFlash.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash reserved'**
+  String get pinLegendFlash;
+
+  /// No description provided for @pinLegendPsram.
+  ///
+  /// In en, this message translates to:
+  /// **'PSRAM reserved'**
+  String get pinLegendPsram;
+
+  /// No description provided for @pinLegendInputOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Input-only'**
+  String get pinLegendInputOnly;
+
+  /// No description provided for @pinLegendAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned'**
+  String get pinLegendAssigned;
+
+  /// No description provided for @pinLegendFlashPsram.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash/PSRAM'**
+  String get pinLegendFlashPsram;
+
+  /// No description provided for @pinoutPackageOutline.
+  ///
+  /// In en, this message translates to:
+  /// **'{model} package outline (GPIO map)'**
+  String pinoutPackageOutline(String model);
 
   /// No description provided for @enableDisplayLabel.
   ///
@@ -470,6 +548,18 @@ abstract class AppLocalizations {
   /// **'Static IP (optional)'**
   String get staticIpTitle;
 
+  /// No description provided for @wifiScanLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan nearby WiFi'**
+  String get wifiScanLabel;
+
+  /// No description provided for @wifiScanUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No networks found (scan unsupported or permission denied). Enter SSID manually.'**
+  String get wifiScanUnavailable;
+
   /// No description provided for @dismissLabel.
   ///
   /// In en, this message translates to:
@@ -481,6 +571,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Step'**
   String get stepLabel;
+
+  /// No description provided for @reviewModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model: {model} ({flashMb} MB)'**
+  String reviewModel(String model, int flashMb);
+
+  /// No description provided for @reviewHeaterPwm.
+  ///
+  /// In en, this message translates to:
+  /// **'Heater PWM: {pin}'**
+  String reviewHeaterPwm(int pin);
+
+  /// No description provided for @reviewWifiSsid.
+  ///
+  /// In en, this message translates to:
+  /// **'WiFi SSID: {ssid}'**
+  String reviewWifiSsid(String ssid);
+
+  /// No description provided for @reviewProfiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Profiles: {count}'**
+  String reviewProfiles(int count);
+
+  /// No description provided for @reviewFirmware.
+  ///
+  /// In en, this message translates to:
+  /// **'Firmware: {version}'**
+  String reviewFirmware(String version);
+
+  /// No description provided for @reviewEraseWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Install will erase and reflash the device with this configuration. There is no automatic restore of a previous firmware image.'**
+  String get reviewEraseWarning;
+
+  /// No description provided for @flashLogVerbose.
+  ///
+  /// In en, this message translates to:
+  /// **'Verbose'**
+  String get flashLogVerbose;
+
+  /// No description provided for @flashLogQuiet.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet'**
+  String get flashLogQuiet;
+
+  /// No description provided for @flashLogExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export log'**
+  String get flashLogExport;
+
+  /// No description provided for @flashLogExportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export flash log'**
+  String get flashLogExportTitle;
+
+  /// No description provided for @exportProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Philarmony profile'**
+  String get exportProfileTitle;
+
+  /// No description provided for @exportSavedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {path} (password redacted)'**
+  String exportSavedSnack(String path);
+
+  /// No description provided for @exportClipboardSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Save cancelled — JSON copied (password redacted)'**
+  String get exportClipboardSnack;
+
+  /// No description provided for @importFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String importFailed(String error);
 }
 
 class _AppLocalizationsDelegate

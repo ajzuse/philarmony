@@ -92,23 +92,30 @@ class _DeviceStepState extends State<DeviceStep> {
         chipLabel =
             '${info.chipName}${info.flashSizeMb != null ? ' · ${info.flashSizeMb}MB flash' : ''}';
         if (!supported) {
-          modelWarning =
+          final l10n = AppLocalizations.of(context);
+          modelWarning = l10n?.unsupportedChip(
+                info.chipName,
+                EspGpioMap.supportedModels.join(', '),
+              ) ??
               'Unsupported chip ${info.chipName}. Supported variants: '
-              '${EspGpioMap.supportedModels.join(", ")}. Select a supported model manually.';
+                  '${EspGpioMap.supportedModels.join(", ")}. Select a supported model manually.';
         }
         probing = false;
       });
     } else {
       setState(() {
-        chipLabel = 'Could not auto-detect chip (select model manually)';
+        final l10n = AppLocalizations.of(context);
+        chipLabel = l10n?.chipDetectFailed ??
+            'Could not auto-detect chip (select model manually)';
         probing = false;
       });
     }
   }
 
   Future<void> _pickPartition() async {
+    final l10n = AppLocalizations.of(context);
     final result = await FilePicker.platform.pickFiles(
-      dialogTitle: 'Select custom partitions.bin',
+      dialogTitle: l10n?.selectPartitionsTitle ?? 'Select custom partitions.bin',
       type: FileType.any,
     );
     final path = result?.files.single.path;
@@ -194,7 +201,12 @@ class _DeviceStepState extends State<DeviceStep> {
                 items: ports
                     .map((e) => DropdownMenuItem(
                           value: e.path,
-                          child: Text(e.path),
+                          child: Text(
+                            e.description.isNotEmpty && e.description != e.path
+                                ? '${e.path} — ${e.description}'
+                                : e.path,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ))
                     .toList(),
                 onChanged: (v) async {
@@ -218,7 +230,7 @@ class _DeviceStepState extends State<DeviceStep> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                tooltip: 'Clear',
+                tooltip: l10n?.clearLabel ?? 'Clear',
                 onPressed: () {
                   widget.controller.setCustomPartitionTablePath(null);
                   setState(() {});
