@@ -1,6 +1,7 @@
 # Implementation Plan: ESP32 Desktop Installer
 
-**Branch**: `feature/002-esp32-desktop-installer` | **Date**: 2026-07-28 | **Spec**: `specs/002-esp32-desktop-installer/spec.md`
+**Branch**: `feature/002-esp32-desktop-installer` | **Date**: 2026-07-28 | **Spec**: `specs/002-esp32-desktop-installer/spec.md`  
+**Status**: Implemented (2026-08-04) — product tasks closed; host/HW manual stages tracked in `005-manual-validation`
 
 **Input**: Feature specification from `/specs/002-esp32-desktop-installer/spec.md`.
 

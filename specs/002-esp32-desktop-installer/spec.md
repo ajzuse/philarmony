@@ -5,8 +5,9 @@
 **Feature Name**: ESP32 Desktop Installer  
 **Short Name**: esp32-desktop-installer  
 **Version**: 0.1.0  
-**Status**: Draft  
+**Status**: Implemented  
 **Date**: 2026-07-23  
+**Completed**: 2026-08-04 (product tasks T001–T115; manual stages VS-1/VS-4/VS-5 → `specs/005-manual-validation`)  
 
 ## Executive Summary
 

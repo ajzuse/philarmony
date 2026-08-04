@@ -4,7 +4,7 @@
 **Prerequisites**: `plan.md`, `spec.md` (Clarifications 2026-07-28), `research.md` (R8–R12), `data-model.md`, `contracts/`  
 **Stack**: Flutter **3.44.0 via FVM** (`.fvmrc`) + `philarmony_core` + bundled esptool (DEC-010/011)
 
-**Progress note (2026-08-04)**: Product implementation tasks complete through Phase 11 (T098–T115). Manual stages VS-1 / VS-4 / VS-5 remain in `specs/005-manual-validation` (T009–T011). Run `make bundle-esptool` + `make sync-installer-firmware` before real flash.
+**Progress note (2026-08-04)**: Product implementation tasks complete through Phase 11 (T098–T115). Spec status → **Implemented**. Manual stages VS-1 / VS-4 / VS-5 remain in `specs/005-manual-validation` (T009–T011). Run `make bundle-esptool` + `make sync-installer-firmware` before real flash. Ready to merge to `main`.
 
 **Tests**: Polish includes `make test-flutter` (already green for core + wizard/widget). Historical `[x]` automated tasks stay here as history. **New automated work stays on this product spec**. Open **manual** stages → `specs/005-manual-validation`.
 
