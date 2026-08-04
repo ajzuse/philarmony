@@ -6,7 +6,9 @@
 
 **Progress note (2026-07-29)**: Implementation essentially complete except hardware VS-1 smoke (T031) and final quickstart VS-1/4/5 sign-off (T062). Run `make bundle-esptool` + `make sync-installer-firmware` before real flash.
 
-**Tests**: Polish includes `make test-flutter` (already green for core + wizard/widget).
+**Tests**: Polish includes `make test-flutter` (already green for core + wizard/widget). Historical `[x]` automated tasks stay here as history. **New automated work → `specs/005-automated-flow-testing`**. Open remnants below are **manual only** (T031, T062).
+
+**Test-policy audit (2026-08-04)**: No open automated-test tasks remain on this feature. T031/T062 classified `[MANUAL]` per Constitution v0.8.0.
 
 ## Format: `- [ ] [ID] [P?] [Story?] Description with file path`
 
@@ -80,7 +82,7 @@
 - [x] T028 [US1] Wire `make sync-installer-firmware` output path into flasher default package in `apps/esp32-desktop-installer/lib/flash/esptool_firmware_flasher.dart` (resolve asset/`path_provider` absolute paths)
 - [x] T029 [US1] Replace JSON sidecar with firmware-compatible NVS/config partition image per `contracts/nvs-config-mapping.md` in `apps/esp32-desktop-installer/lib/flash/nvs_image_builder.dart`
 - [x] T030 [US1] Persist selected serial port across steps in `apps/esp32-desktop-installer/lib/wizard/installer_session_controller.dart` (avoid FlashStep default `/dev/ttyUSB0`)
-- [ ] T031 [US1] Hardware smoke VS-1 on real ESP32; record in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
+- [ ] T031 [US1] [MANUAL] Hardware smoke VS-1 on real ESP32; record in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
 
 **Checkpoint**: End-to-end USB flash on one desktop OS
 
@@ -169,7 +171,7 @@
 - [x] T059 [P] Fix DropdownButtonFormField `value`→`initialValue` deprecations in wizard steps under `apps/esp32-desktop-installer/lib/wizard/steps/`
 - [x] T060 [P] Visual pinout diagram for selected model in `apps/esp32-desktop-installer/lib/wizard/steps/pins_step.dart` (FR-004)
 - [x] T061 Sync README roadmap % and feature status for 002 in `README.md`
-- [ ] T062 Complete quickstart checklist VS-1/VS-4/VS-5 after packaging+HW in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
+- [ ] T062 [MANUAL] Complete quickstart checklist VS-1/VS-4/VS-5 after packaging+HW in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
 
 ---
 
