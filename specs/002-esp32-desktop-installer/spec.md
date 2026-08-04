@@ -24,7 +24,7 @@ A desktop application that simplifies initial configuration and firmware install
 
 ## User Scenarios & Testing
 
-> **Test task policy (Constitution v0.8.0):** Journeys and acceptance criteria live here. New **automated** test-implementation tasks → `specs/005-automated-flow-testing`. Open tasks on this feature are limited to **manual** validation (e.g. T031/T062 HW smoke & quickstart sign-off). Completed historical automated tasks in `tasks.md` stay as history.
+> **Test task policy (Constitution v1.0.0):** Journeys, acceptance criteria, and **automated** test-implementation tasks live here. Open **manual** validation stages (VS-1 / VS-4 / VS-5) → `specs/005-manual-validation` (migrated from former T031/T062). Completed historical automated tasks in `tasks.md` stay as history. Results ledger remains `checklists/quickstart-validation.md`.
 
 ### Primary User Scenarios
 

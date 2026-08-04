@@ -3,7 +3,7 @@
 **Input**: Design documents from `/specs/001-filament-dryer-esp32/`
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`
 
-**Test-policy audit (2026-08-04)**: No open automated-test tasks remain. Historical `[x]` automated tasks kept as history. New automated work → `specs/005-automated-flow-testing`. Open product-spec test tasks limited to `[MANUAL]` (none open here).
+**Test-policy audit (2026-08-04)**: Historical `[x]` automated tasks kept as history. New **automated** work stays on this product spec. Open **manual** validation → `specs/005-manual-validation` (none open here).
 
 ---
 
