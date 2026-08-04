@@ -20,10 +20,15 @@ import 'dart:convert';
 
 import '../models/device_profile.dart';
 import '../models/filament_profile.dart';
+import 'installer_profile_schema.dart';
 
 /// JSON codec for installer profiles (schema v1).
 class ProfileCodec {
   static const redactedPassword = '***';
+
+  /// Parsed installer-profile.schema.json (loaded once).
+  static final Map<String, dynamic> schema =
+      jsonDecode(kInstallerProfileSchemaJson) as Map<String, dynamic>;
 
   Map<String, dynamic> toJson(
     DeviceProfile profile, {
@@ -174,48 +179,190 @@ class ProfileCodec {
     );
   }
 
-  /// Lightweight validation aligned with `installer-profile.schema.json`.
+  /// Validates [map] against embedded `installer-profile.schema.json`.
   void _validateSchema(Map<String, dynamic> map) {
-    const required = [
-      'profile_version',
-      'device_model',
-      'flash_size_mb',
-      'sensors',
-      'pin_mapping',
-      'display',
-      'filament_profiles',
-      'wifi',
-      'firmware_version',
-    ];
+    final required = List<String>.from(schema['required'] as List);
     for (final k in required) {
       if (!map.containsKey(k)) {
         throw FormatException('Missing required field: $k');
       }
     }
-    if (map['profile_version'] != 1) {
-      throw FormatException(
-        'Unsupported profile_version: ${map['profile_version']}',
+    if (schema['additionalProperties'] == false) {
+      final allowed = (schema['properties'] as Map).keys.toSet();
+      for (final k in map.keys) {
+        if (!allowed.contains(k)) {
+          throw FormatException('Unknown field: $k');
+        }
+      }
+    }
+
+    final props = schema['properties'] as Map<String, dynamic>;
+    _assertConst(map['profile_version'], props['profile_version'], 'profile_version');
+    _assertEnum(map['device_model'], props['device_model'], 'device_model');
+    _assertEnum(map['flash_size_mb'], props['flash_size_mb'], 'flash_size_mb');
+    _assertStringMin(map['firmware_version'], props['firmware_version'], 'firmware_version');
+
+    final sensors = map['sensors'];
+    if (sensors is! List) throw FormatException('sensors must be an array');
+    final sensorSchema = (props['sensors'] as Map)['items'] as Map<String, dynamic>;
+    for (var i = 0; i < sensors.length; i++) {
+      final s = sensors[i];
+      if (s is! Map) throw FormatException('sensors[$i] must be an object');
+      _validateObject(Map<String, dynamic>.from(s), sensorSchema, 'sensors[$i]');
+    }
+
+    final pins = map['pin_mapping'];
+    if (pins is! Map) throw FormatException('pin_mapping must be an object');
+    _validateObject(
+      Map<String, dynamic>.from(pins),
+      props['pin_mapping'] as Map<String, dynamic>,
+      'pin_mapping',
+    );
+
+    final display = map['display'];
+    if (display is! Map) throw FormatException('display must be an object');
+    _validateObject(
+      Map<String, dynamic>.from(display),
+      props['display'] as Map<String, dynamic>,
+      'display',
+    );
+
+    final filaments = map['filament_profiles'];
+    if (filaments is! List) {
+      throw FormatException('filament_profiles must be an array');
+    }
+    final filSchema = props['filament_profiles'] as Map<String, dynamic>;
+    final maxItems = filSchema['maxItems'] as int?;
+    if (maxItems != null && filaments.length > maxItems) {
+      throw FormatException('filament_profiles exceeds maxItems $maxItems');
+    }
+    final filItem = filSchema['items'] as Map<String, dynamic>;
+    for (var i = 0; i < filaments.length; i++) {
+      final f = filaments[i];
+      if (f is! Map) {
+        throw FormatException('filament_profiles[$i] must be an object');
+      }
+      _validateObject(
+        Map<String, dynamic>.from(f),
+        filItem,
+        'filament_profiles[$i]',
       );
     }
-    const models = {'ESP32', 'ESP32-S2', 'ESP32-S3', 'ESP32-C3'};
-    if (!models.contains(map['device_model'])) {
-      throw FormatException('Invalid device_model: ${map['device_model']}');
+
+    final wifi = map['wifi'];
+    if (wifi is! Map) throw FormatException('wifi must be an object');
+    _validateObject(
+      Map<String, dynamic>.from(wifi),
+      props['wifi'] as Map<String, dynamic>,
+      'wifi',
+    );
+  }
+
+  void _validateObject(
+    Map<String, dynamic> obj,
+    Map<String, dynamic> schemaObj,
+    String path,
+  ) {
+    final required = List<String>.from(schemaObj['required'] as List? ?? const []);
+    for (final k in required) {
+      if (!obj.containsKey(k) || obj[k] == null) {
+        throw FormatException('$path.$k is required');
+      }
     }
-    if (![4, 8, 16].contains(map['flash_size_mb'])) {
-      throw FormatException('Invalid flash_size_mb: ${map['flash_size_mb']}');
+    if (schemaObj['additionalProperties'] == false) {
+      final allowed = ((schemaObj['properties'] as Map?) ?? {}).keys.toSet();
+      for (final k in obj.keys) {
+        if (!allowed.contains(k)) {
+          throw FormatException('$path has unknown field: $k');
+        }
+      }
     }
-    if (map['sensors'] is! List) {
-      throw FormatException('sensors must be an array');
+    final properties = (schemaObj['properties'] as Map<String, dynamic>?) ?? {};
+    for (final entry in obj.entries) {
+      final propSchema = properties[entry.key];
+      if (propSchema is! Map) continue;
+      _assertValue(entry.value, Map<String, dynamic>.from(propSchema), '$path.${entry.key}');
     }
-    if (map['pin_mapping'] is! Map ||
-        (map['pin_mapping'] as Map)['heater_pwm'] == null) {
-      throw FormatException('pin_mapping.heater_pwm is required');
+  }
+
+  void _assertValue(dynamic value, Map<String, dynamic> prop, String path) {
+    if (value == null) {
+      final types = prop['type'];
+      if (types is List && types.contains('null')) return;
+      if (types == 'null') return;
+      // null allowed when not required (already checked)
+      return;
     }
-    if (map['display'] is! Map) {
-      throw FormatException('display must be an object');
+    if (prop.containsKey('enum')) {
+      _assertEnum(value, prop, path);
     }
-    if (map['wifi'] is! Map) {
-      throw FormatException('wifi must be an object');
+    if (prop.containsKey('const')) {
+      _assertConst(value, prop, path);
+    }
+    final type = prop['type'];
+    final types = type is List ? type.cast<String>() : [if (type is String) type];
+    if (types.contains('integer') && value is! int) {
+      if (!(types.contains('number') && value is num)) {
+        throw FormatException('$path must be integer');
+      }
+    }
+    if (types.contains('number') && value is! num) {
+      throw FormatException('$path must be number');
+    }
+    if (types.contains('string') && value is! String) {
+      throw FormatException('$path must be string');
+    }
+    if (types.contains('boolean') && value is! bool) {
+      throw FormatException('$path must be boolean');
+    }
+    if (types.contains('array') && value is! List) {
+      throw FormatException('$path must be array');
+    }
+    if (types.contains('object') && value is! Map) {
+      throw FormatException('$path must be object');
+    }
+    if (value is num) {
+      final min = prop['minimum'];
+      final max = prop['maximum'];
+      if (min is num && value < min) {
+        throw FormatException('$path must be >= $min');
+      }
+      if (max is num && value > max) {
+        throw FormatException('$path must be <= $max');
+      }
+    }
+    if (value is String) {
+      final minLen = prop['minLength'];
+      if (minLen is int && value.length < minLen) {
+        throw FormatException('$path minLength $minLen');
+      }
+    }
+    if (value is Map && prop['properties'] is Map) {
+      _validateObject(Map<String, dynamic>.from(value), prop, path);
+    }
+  }
+
+  void _assertEnum(dynamic value, Map<String, dynamic> prop, String path) {
+    final enumVals = prop['enum'] as List?;
+    if (enumVals == null) return;
+    if (!enumVals.contains(value)) {
+      throw FormatException('Invalid $path: $value (allowed: $enumVals)');
+    }
+  }
+
+  void _assertConst(dynamic value, Map<String, dynamic> prop, String path) {
+    if (prop['const'] != null && value != prop['const']) {
+      throw FormatException('$path must be ${prop['const']}');
+    }
+  }
+
+  void _assertStringMin(dynamic value, Map<String, dynamic> prop, String path) {
+    if (value is! String || value.isEmpty) {
+      throw FormatException('$path must be a non-empty string');
+    }
+    final minLen = prop['minLength'];
+    if (minLen is int && value.length < minLen) {
+      throw FormatException('$path minLength $minLen');
     }
   }
 }

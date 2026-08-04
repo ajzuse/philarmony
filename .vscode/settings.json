@@ -10,7 +10,7 @@
     ".specify/scripts/bash/": true,
     ".specify/scripts/powershell/": true
   },
-  "dart.flutterSdkPath": ".fvm/flutter_sdk",
+  "dart.flutterSdkPath": ".fvm/versions/3.44.0",
   "dart.sdkPath": ".fvm/flutter_sdk/bin/cache/dart-sdk",
   "search.exclude": {
     "**/.fvm": true

@@ -21,6 +21,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:philarmony_core/philarmony_core.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../installer_session_controller.dart';
 
 class SensorsStep extends StatefulWidget {
@@ -33,9 +34,11 @@ class SensorsStep extends StatefulWidget {
 
 class _SensorsStepState extends State<SensorsStep> {
   bool advanced = false;
+  String advancedTarget = 'temperature';
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final sensors = widget.controller.profile.sensors;
     SensorConfig temp = sensors.firstWhere(
       (s) => s.role == 'temperature',
@@ -56,9 +59,13 @@ class _SensorsStepState extends State<SensorsStep> {
       );
     }
 
+    final target = advancedTarget == 'humidity' ? hum : temp;
+
     return ListView(
       children: [
-        const Text('Temperature sensor *'),
+        Text('${l10n?.tempSensorLabel ?? 'Temperature sensor'} *'),
+        Text(l10n?.requiredField ?? 'Required',
+            style: Theme.of(context).textTheme.bodySmall),
         DropdownButton<String>(
           value: temp.sensor,
           items: const [
@@ -76,7 +83,12 @@ class _SensorsStepState extends State<SensorsStep> {
           },
         ),
         TextFormField(
-          decoration: const InputDecoration(labelText: 'Temp GPIO'),
+          decoration: InputDecoration(
+            labelText: l10n?.tempGpioLabel ?? 'Temp GPIO',
+            helperText: temp.sensor == 'none'
+                ? (l10n?.optionalField ?? 'Optional')
+                : (l10n?.requiredField ?? 'Required'),
+          ),
           initialValue: temp.gpioPin?.toString() ?? '',
           onChanged: (v) {
             temp.gpioPin = int.tryParse(v);
@@ -84,7 +96,9 @@ class _SensorsStepState extends State<SensorsStep> {
           },
         ),
         const SizedBox(height: 16),
-        const Text('Humidity sensor'),
+        Text(l10n?.humiditySensorLabel ?? 'Humidity sensor'),
+        Text(l10n?.optionalField ?? 'Optional',
+            style: Theme.of(context).textTheme.bodySmall),
         DropdownButton<String>(
           value: hum.sensor,
           items: const ['none', 'dht22', 'bme280', 'sht3x', 'aht20']
@@ -96,7 +110,10 @@ class _SensorsStepState extends State<SensorsStep> {
           },
         ),
         TextFormField(
-          decoration: const InputDecoration(labelText: 'Humidity GPIO'),
+          decoration: InputDecoration(
+            labelText: l10n?.humidityGpioLabel ?? 'Humidity GPIO',
+            helperText: l10n?.optionalField ?? 'Optional',
+          ),
           initialValue: hum.gpioPin?.toString() ?? '',
           onChanged: (v) {
             hum.gpioPin = int.tryParse(v);
@@ -104,29 +121,55 @@ class _SensorsStepState extends State<SensorsStep> {
           },
         ),
         SwitchListTile(
-          title: const Text('Advanced: custom JSON driver'),
-          subtitle: const Text('Optional — merges into sensor parameters'),
+          title: Text(l10n?.advancedDriverTitle ?? 'Advanced: custom JSON driver'),
+          subtitle: Text(
+            l10n?.advancedDriverSubtitle ??
+                'Optional — merges into sensor parameters',
+          ),
           value: advanced,
           onChanged: (v) => setState(() => advanced = v),
         ),
-        if (advanced)
+        if (advanced) ...[
+          DropdownButtonFormField<String>(
+            initialValue: advancedTarget,
+            decoration: InputDecoration(
+              labelText: l10n?.driverTargetLabel ?? 'Apply JSON to',
+              helperText: l10n?.optionalField ?? 'Optional',
+            ),
+            items: const [
+              DropdownMenuItem(value: 'temperature', child: Text('Temperature')),
+              DropdownMenuItem(value: 'humidity', child: Text('Humidity')),
+            ],
+            onChanged: (v) => setState(() => advancedTarget = v ?? 'temperature'),
+          ),
           TextFormField(
-            decoration: const InputDecoration(
-              labelText: 'Driver JSON',
+            decoration: InputDecoration(
+              labelText: l10n?.driverJsonLabel ?? 'Driver JSON',
               helperText: '{"driver":"…","options":{…}}',
             ),
             maxLines: 4,
-            initialValue: const JsonEncoder.withIndent('  ')
-                .convert(temp.parameters.isEmpty ? {'driver': ''} : temp.parameters),
+            initialValue: const JsonEncoder.withIndent('  ').convert(
+              target.parameters.isEmpty ? {'driver': ''} : target.parameters,
+            ),
             onChanged: (v) {
               try {
                 final map = jsonDecode(v) as Map<String, dynamic>;
-                temp.parameters = map;
+                if (advancedTarget == 'humidity') {
+                  hum.parameters = map;
+                } else {
+                  temp.parameters = map;
+                }
                 save();
               } catch (_) {
                 // keep typing until valid JSON
               }
             },
+          ),
+        ],
+        if (widget.controller.session.validationErrors.isNotEmpty)
+          Text(
+            widget.controller.session.validationErrors.join('\n'),
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
       ],
     );

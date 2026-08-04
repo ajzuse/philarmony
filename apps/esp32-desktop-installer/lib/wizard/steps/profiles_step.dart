@@ -19,11 +19,27 @@
 import 'package:flutter/material.dart';
 import 'package:philarmony_core/philarmony_core.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../installer_session_controller.dart';
 
 class ProfilesStep extends StatelessWidget {
   const ProfilesStep({super.key, required this.controller});
   final InstallerSessionController controller;
+
+  /// Visible list: builtins hidden when a custom profile shadows the same id.
+  List<(FilamentProfile, int)> _visible(List<FilamentProfile> list) {
+    final shadowed = list
+        .where((f) => !f.isBuiltin)
+        .map((f) => f.id)
+        .toSet();
+    final out = <(FilamentProfile, int)>[];
+    for (var i = 0; i < list.length; i++) {
+      final f = list[i];
+      if (f.isBuiltin && shadowed.contains(f.id)) continue;
+      out.add((f, i));
+    }
+    return out;
+  }
 
   Future<void> _edit(
     BuildContext context,
@@ -49,28 +65,53 @@ class ProfilesStep extends StatelessWidget {
       text: (base?.targetHumidityPct ?? 15).toString(),
     );
 
+    final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(shadowBuiltin
-            ? 'Override builtin (${base?.id})'
-            : (existing == null ? 'Add custom profile' : 'Edit custom profile')),
+            ? '${l10n?.overrideBuiltinTitle ?? 'Override builtin'} (${base?.id})'
+            : (existing == null
+                ? (l10n?.addCustomProfile ?? 'Add custom profile')
+                : (l10n?.editCustomProfile ?? 'Edit custom profile'))),
         content: SizedBox(
           width: 360,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: namePt, decoration: const InputDecoration(labelText: 'Name PT')),
-              TextField(controller: nameEn, decoration: const InputDecoration(labelText: 'Name EN')),
-              TextField(controller: temp, decoration: const InputDecoration(labelText: 'Temp °C'), keyboardType: TextInputType.number),
-              TextField(controller: dur, decoration: const InputDecoration(labelText: 'Duration min'), keyboardType: TextInputType.number),
-              TextField(controller: hum, decoration: const InputDecoration(labelText: 'Humidity %'), keyboardType: TextInputType.number),
+              TextField(
+                  controller: namePt,
+                  decoration: InputDecoration(
+                      labelText: l10n?.namePtLabel ?? 'Name PT')),
+              TextField(
+                  controller: nameEn,
+                  decoration: InputDecoration(
+                      labelText: l10n?.nameEnLabel ?? 'Name EN')),
+              TextField(
+                  controller: temp,
+                  decoration: InputDecoration(
+                      labelText: l10n?.tempCLabel ?? 'Temp °C'),
+                  keyboardType: TextInputType.number),
+              TextField(
+                  controller: dur,
+                  decoration: InputDecoration(
+                      labelText: l10n?.durationMinLabel ?? 'Duration min'),
+                  keyboardType: TextInputType.number),
+              TextField(
+                  controller: hum,
+                  decoration: InputDecoration(
+                      labelText: l10n?.humidityPctLabel ?? 'Humidity %'),
+                  keyboardType: TextInputType.number),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n?.cancelLabel ?? 'Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n?.saveLabel ?? 'Save')),
         ],
       ),
     );
@@ -93,11 +134,16 @@ class ProfilesStep extends StatelessWidget {
     );
     if (errs.isNotEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errs.join('; '))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(errs.join('; '))));
       }
       return;
     }
-    if (shadowBuiltin || existing == null) {
+    if (shadowBuiltin) {
+      // Replace any prior custom with same id, keep builtin in list but hidden.
+      list.removeWhere((e) => !e.isBuiltin && e.id == f.id);
+      list.add(f);
+    } else if (existing == null) {
       list.add(f);
     } else {
       list[index] = f;
@@ -107,40 +153,45 @@ class ProfilesStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final list = controller.profile.filamentProfiles;
     final customs = list.where((f) => !f.isBuiltin).length;
+    final visible = _visible(list);
     return Column(
       children: [
         Expanded(
           child: ListView.builder(
-            itemCount: list.length,
+            itemCount: visible.length,
             itemBuilder: (context, i) {
-              final f = list[i];
+              final (f, index) = visible[i];
+              final isShadow = !f.isBuiltin &&
+                  list.any((b) => b.isBuiltin && b.id == f.id);
               return ListTile(
                 title: Text('${f.nameEn} / ${f.namePt}'),
                 subtitle: Text(
                   '${f.targetTempC}°C · ${f.defaultDurationMin} min · ${f.targetHumidityPct}%'
-                  '${f.isBuiltin ? ' (builtin)' : ''}',
+                  '${f.isBuiltin ? ' (builtin)' : isShadow ? ' (overrides builtin)' : ''}',
                 ),
-                onTap: f.isBuiltin ? null : () => _edit(context, f, i),
+                onTap: f.isBuiltin ? null : () => _edit(context, f, index),
                 trailing: f.isBuiltin
                     ? IconButton(
-                        tooltip: 'Override builtin (shadow)',
+                        tooltip: l10n?.overrideBuiltinTitle ??
+                            'Override builtin (shadow)',
                         icon: const Icon(Icons.copy_all),
                         onPressed: () =>
-                            _edit(context, f, i, shadowBuiltin: true),
+                            _edit(context, f, index, shadowBuiltin: true),
                       )
                     : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             icon: const Icon(Icons.edit),
-                            onPressed: () => _edit(context, f, i),
+                            onPressed: () => _edit(context, f, index),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete),
                             onPressed: () {
-                              list.removeAt(i);
+                              list.removeAt(index);
                               controller.updateProfile((p) => p);
                             },
                           ),
@@ -154,7 +205,7 @@ class ProfilesStep extends StatelessWidget {
           onPressed: customs >= FilamentProfileValidator.maxCustom
               ? null
               : () => _edit(context, null, -1),
-          child: const Text('Add custom profile'),
+          child: Text(l10n?.addCustomProfile ?? 'Add custom profile'),
         ),
       ],
     );

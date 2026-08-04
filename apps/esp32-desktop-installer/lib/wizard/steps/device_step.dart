@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:philarmony_core/philarmony_core.dart';
 
@@ -38,6 +39,9 @@ class _DeviceStepState extends State<DeviceStep> {
   final chipReader = ChipInfoReader();
   String? chipLabel;
   bool probing = false;
+  String? modelWarning;
+
+  static const _baudChoices = [115200, 230400, 460800, 921600];
 
   @override
   void initState() {
@@ -56,6 +60,8 @@ class _DeviceStepState extends State<DeviceStep> {
     if (list.isNotEmpty) {
       widget.controller.setSelectedPort(list.first.path);
       await _probe(list.first.path);
+    } else {
+      widget.controller.setSelectedPort(null);
     }
   }
 
@@ -63,12 +69,19 @@ class _DeviceStepState extends State<DeviceStep> {
     setState(() {
       probing = true;
       chipLabel = null;
+      modelWarning = null;
     });
-    final info = await chipReader.probe(path);
+    final info = await chipReader.probe(
+      path,
+      baud: widget.controller.session.baudRate,
+    );
     if (!mounted) return;
     if (info != null) {
+      final supported = EspGpioMap.supportedModels.contains(info.chipName);
       widget.controller.updateProfile((pr) {
-        pr.deviceModel = info.chipName;
+        if (supported) {
+          pr.deviceModel = info.chipName;
+        }
         if (info.flashSizeMb != null &&
             const [4, 8, 16].contains(info.flashSizeMb)) {
           pr.flashSizeMb = info.flashSizeMb!;
@@ -78,6 +91,11 @@ class _DeviceStepState extends State<DeviceStep> {
       setState(() {
         chipLabel =
             '${info.chipName}${info.flashSizeMb != null ? ' · ${info.flashSizeMb}MB flash' : ''}';
+        if (!supported) {
+          modelWarning =
+              'Unsupported chip ${info.chipName}. Supported variants: '
+              '${EspGpioMap.supportedModels.join(", ")}. Select a supported model manually.';
+        }
         probing = false;
       });
     } else {
@@ -88,34 +106,51 @@ class _DeviceStepState extends State<DeviceStep> {
     }
   }
 
+  Future<void> _pickPartition() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Select custom partitions.bin',
+      type: FileType.any,
+    );
+    final path = result?.files.single.path;
+    if (path != null) {
+      widget.controller.setCustomPartitionTablePath(path);
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final p = widget.controller.profile;
     final selected = widget.controller.selectedPortPath;
+    final baud = widget.controller.session.baudRate;
+    final errors = widget.controller.session.validationErrors;
     return ListView(
       children: [
         DropdownButtonFormField<String>(
           key: ValueKey('model-${p.deviceModel}'),
-          initialValue: p.deviceModel,
-          decoration: const InputDecoration(
-            labelText: 'ESP32 model *',
-            helperText: 'Required',
+          initialValue: EspGpioMap.supportedModels.contains(p.deviceModel)
+              ? p.deviceModel
+              : 'ESP32',
+          decoration: InputDecoration(
+            labelText: '${l10n?.deviceModelLabel ?? 'ESP32 model'} *',
+            helperText: l10n?.requiredField ?? 'Required',
           ),
-          items: const ['ESP32', 'ESP32-S2', 'ESP32-S3', 'ESP32-C3']
+          items: EspGpioMap.supportedModels
               .map((e) => DropdownMenuItem(value: e, child: Text(e)))
               .toList(),
           onChanged: (v) {
             if (v == null) return;
             widget.controller.updateProfile((pr) => pr..deviceModel = v);
+            setState(() => modelWarning = null);
           },
         ),
         DropdownButtonFormField<int>(
           key: ValueKey('flash-${p.flashSizeMb}'),
           initialValue: p.flashSizeMb,
-          decoration: const InputDecoration(
-            labelText: 'Flash size (MB) *',
-            helperText: 'Required',
+          decoration: InputDecoration(
+            labelText: '${l10n?.flashSizeLabel ?? 'Flash size (MB)'} *',
+            helperText: l10n?.requiredField ?? 'Required',
           ),
           items: const [4, 8, 16]
               .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
@@ -123,6 +158,23 @@ class _DeviceStepState extends State<DeviceStep> {
           onChanged: (v) {
             if (v == null) return;
             widget.controller.updateProfile((pr) => pr..flashSizeMb = v);
+          },
+        ),
+        DropdownButtonFormField<int>(
+          key: ValueKey('baud-$baud'),
+          initialValue: _baudChoices.contains(baud) ? baud : 921600,
+          decoration: InputDecoration(
+            labelText: '${l10n?.baudLabel ?? 'Baud rate'} *',
+            helperText: l10n?.optionalAdvanced ?? 'Default 921600 (configurable)',
+          ),
+          items: _baudChoices
+              .map((e) => DropdownMenuItem(value: e, child: Text('$e')))
+              .toList(),
+          onChanged: (v) async {
+            if (v == null) return;
+            widget.controller.setBaudRate(v);
+            final port = widget.controller.selectedPortPath;
+            if (port != null) await _probe(port);
           },
         ),
         const SizedBox(height: 12),
@@ -135,9 +187,9 @@ class _DeviceStepState extends State<DeviceStep> {
                         ports.any((e) => e.path == selected)
                     ? selected
                     : null,
-                decoration: const InputDecoration(
-                  labelText: 'USB port *',
-                  helperText: 'Required',
+                decoration: InputDecoration(
+                  labelText: '${l10n?.usbPortLabel ?? 'USB port'} *',
+                  helperText: l10n?.requiredField ?? 'Required',
                 ),
                 items: ports
                     .map((e) => DropdownMenuItem(
@@ -154,17 +206,59 @@ class _DeviceStepState extends State<DeviceStep> {
             IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
           ],
         ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(l10n?.customPartitionLabel ?? 'Custom partition table'),
+          subtitle: Text(
+            widget.controller.session.customPartitionTablePath ??
+                (l10n?.optionalField ?? 'Optional — default bundled partitions.bin'),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Clear',
+                onPressed: () {
+                  widget.controller.setCustomPartitionTablePath(null);
+                  setState(() {});
+                },
+                icon: const Icon(Icons.clear),
+              ),
+              IconButton(
+                onPressed: _pickPartition,
+                icon: const Icon(Icons.folder_open),
+              ),
+            ],
+          ),
+        ),
         if (probing) const LinearProgressIndicator(),
         if (chipLabel != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(chipLabel!),
           ),
+        if (modelWarning != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              modelWarning!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
         if (ports.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Text(l10n?.noPorts ??
                 'No USB serial ports found. Install CH340/CP210x/FTDI drivers and reconnect.'),
+          ),
+        if (errors.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              errors.join('\n'),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ),
       ],
     );

@@ -23,6 +23,7 @@ import 'dart:io';
 import 'package:philarmony_core/philarmony_core.dart';
 
 import 'flash_asset_resolver.dart';
+import 'flash_checksum.dart';
 import 'nvs_image_builder.dart';
 
 /// Drives bundled esptool via [Process]. Stages match flash-pipeline contract.
@@ -81,6 +82,22 @@ class EsptoolFirmwareFlasher implements FirmwareFlasher {
         }
 
         final esptool = await FlashAssetResolver.resolveEsptool();
+        final packageHash = await FlashChecksum.combinedPackageChecksum(
+          firmware: appPath,
+          bootloader: bootPath!,
+          partitions: partPath!,
+          esptool: esptool,
+        );
+        if (package.checksumSha256.isNotEmpty &&
+            package.checksumSha256 != 'synced' &&
+            package.checksumSha256 != packageHash) {
+          throw StateError(
+            'Firmware package checksum mismatch '
+            '(expected ${package.checksumSha256}, got $packageHash)',
+          );
+        }
+        emit(FlashJobState.erasing, 10, 'checksum ok $packageHash');
+
         final nvsPath = await _nvsBuilder.writeTempConfig(profile);
         final portArgs = <String>[
           '--port',
@@ -98,9 +115,9 @@ class EsptoolFirmwareFlasher implements FirmwareFlasher {
           'write_flash',
           '--verify',
           '0x1000',
-          bootPath!,
+          bootPath,
           '0x8000',
-          partPath!,
+          partPath,
           '0x10000',
           appPath,
         ], controller);
@@ -175,21 +192,44 @@ class SoftPostFlashVerifier implements PostFlashVerifier {
     String? host,
     Duration timeout = const Duration(seconds: 5),
   }) async {
-    host = (host == null || host.isEmpty) ? '192.168.4.1' : host;
-    try {
-      final client = HttpClient();
-      client.connectionTimeout = timeout;
-      final req = await client
-          .getUrl(Uri.parse('http://$host/api/info'))
-          .timeout(timeout);
-      final res = await req.close().timeout(timeout);
-      client.close(force: true);
-      if (res.statusCode >= 200 && res.statusCode < 500) {
-        return NetworkVerifyStatus.ok;
-      }
-      return NetworkVerifyStatus.warn;
-    } catch (_) {
-      return NetworkVerifyStatus.warn;
+    final hosts = <String>[
+      if (host != null && host.isNotEmpty) host,
+      'philarmony',
+      '192.168.4.1',
+    ];
+    // Deduplicate preserving order
+    final seen = <String>{};
+    final ordered = <String>[];
+    for (final h in hosts) {
+      if (seen.add(h)) ordered.add(h);
     }
+
+    var anyAttempt = false;
+    for (final h in ordered) {
+      anyAttempt = true;
+      try {
+        final client = HttpClient();
+        client.connectionTimeout = timeout;
+        final req = await client
+            .getUrl(Uri.parse('http://$h/api/info'))
+            .timeout(timeout);
+        final res = await req.close().timeout(timeout);
+        client.close(force: true);
+        if (res.statusCode >= 200 && res.statusCode < 500) {
+          return NetworkVerifyStatus.ok;
+        }
+      } catch (_) {
+        // try next host
+      }
+    }
+    return anyAttempt ? NetworkVerifyStatus.warn : NetworkVerifyStatus.skipped;
+  }
+
+  /// Prefer user static IP, then optional explicit host, then hotspot defaults.
+  static String? resolveHost(DeviceProfile profile, {String? explicit}) {
+    final staticIp = profile.wifi.staticIp?['ip']?.trim();
+    if (staticIp != null && staticIp.isNotEmpty) return staticIp;
+    if (explicit != null && explicit.trim().isNotEmpty) return explicit.trim();
+    return null; // tryReach will fall through to philarmony / 192.168.4.1
   }
 }
