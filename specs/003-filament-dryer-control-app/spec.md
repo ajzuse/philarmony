@@ -14,7 +14,7 @@ A cross-platform application (Desktop: Windows/macOS/Linux, Mobile: Android/iOS)
 
 ## User Scenarios & Testing
 
-> **Test task policy (Constitution v0.8.0):** Journeys and acceptance criteria live here. New **automated** test-implementation tasks → `specs/005-automated-flow-testing`. When `tasks.md` is generated, open test tasks on this feature are limited to **manual** validation; automation continues under the 005 catalog.
+> **Test task policy (Constitution v1.0.0):** Journeys, acceptance criteria, and **automated** test-implementation tasks live here. Open **manual** validation (device/UI smoke) → `specs/005-manual-validation`, named by stage. When `tasks.md` is generated, keep automation on this feature; do not leave open manuals here.
 
 ### Primary User Scenarios
 
