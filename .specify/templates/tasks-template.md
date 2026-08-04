@@ -9,7 +9,7 @@ description: "Task list template for feature implementation"
 
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: **Automated** test implementation tasks (flow/widget/CI) belong on the **product** feature `tasks.md` (001–004 and future product specs) and MUST continue to be implemented there. Open **manual** validation tasks (hardware smoke, packaging host smoke, quickstart checklist sign-off) MUST NOT stay on product specs — concentrate them in `specs/005-manual-validation`, named after the manual stage (e.g. VS-1, VS-4). Mark manual tasks `[MANUAL]`. Completed historical `[x]` automated tasks on product specs stay as history. Independent Test descriptions on product stories remain narrative acceptance guidance.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 

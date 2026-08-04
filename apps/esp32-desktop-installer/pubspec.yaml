@@ -1,0 +1,46 @@
+name: esp32_desktop_installer
+description: Philarmony ESP32 Desktop Installer — guided USB flash and host packaging.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+  flutter: ">=3.44.0 <3.45.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+  philarmony_core:
+    path: ../../packages/philarmony_core
+  flutter_libserialport: ^0.4.0
+  path_provider: ^2.1.4
+  file_picker: ^8.0.0
+  path: ^1.9.0
+  web_socket_channel: ^3.0.0
+  http: ^1.2.0
+  crypto: ^3.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  msix: ^3.16.0
+
+flutter:
+  generate: true
+  uses-material-design: true
+  assets:
+    - assets/firmware/
+    - assets/tools/windows/
+    - assets/tools/macos/
+    - assets/tools/linux/
+
+msix_config:
+  display_name: Philarmony Installer
+  publisher_display_name: Philarmony
+  identity_name: local.philarmony.installer
+  msix_version: 0.1.0.0
+  capabilities: internetClient,serialcommunication

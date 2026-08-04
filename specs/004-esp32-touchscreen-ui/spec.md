@@ -14,6 +14,8 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 
 ## User Scenarios & Testing
 
+> **Test task policy (Constitution v1.0.0):** Journeys, acceptance criteria, and **automated** test-implementation tasks live here. Open **manual** validation (on-device UI smoke) → `specs/005-manual-validation`, named by stage. When `tasks.md` is generated, keep automation on this feature; do not leave open manuals here.
+
 ### Primary User Scenarios
 
 **Scenario 1: Start Drying Cycle via Touchscreen**

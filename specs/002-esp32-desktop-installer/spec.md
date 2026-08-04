@@ -5,14 +5,27 @@
 **Feature Name**: ESP32 Desktop Installer  
 **Short Name**: esp32-desktop-installer  
 **Version**: 0.1.0  
-**Status**: Draft  
+**Status**: Implemented  
 **Date**: 2026-07-23  
+**Completed**: 2026-08-04 (product tasks T001–T115; manual stages VS-1/VS-4/VS-5 → `specs/005-manual-validation`)  
 
 ## Executive Summary
 
 A desktop application that simplifies initial configuration and firmware installation for the Philarmony filament dryer ESP32 device. The installer provides a guided setup wizard allowing users to configure sensor types, ESP32 model, display presence/resolution, GPIO pin mappings, and WiFi credentials before flashing a pre-configured firmware binary to the device via USB. This eliminates the need for manual WebSocket configuration after first boot.
 
+## Clarifications
+
+### Session 2026-07-28
+
+- Q: How does the installer confirm success after flash (WebSocket verify)? → A: Optional verify (B): esptool verify = Flash Success; WS/HTTP only if device IP known or hotspot `philarmony` reachable; otherwise success with network-verify warning
+- Q: Where does Scenario 2 “existing configuration” come from? → A: Local store only (A): last profile / JSON import; no NVS read from ESP over USB in this phase
+- Q: How is WiFi password handled in JSON export (FR-009)? → A: Always omit/`***` placeholder (A); never store real password in export; user re-enters on import
+- Q: What does flash “rollback” mean on mid-flash failure? → A: No automatic pre-erase restore (B); Retry re-runs erase→write→verify with current package; clear recovery messaging
+- Q: Signing requirements for first public host installer GitHub Release? → A: macOS DMG MUST be signed+notarized for public release (B); Windows/Linux may ship unsigned in MVP with documented warnings; Win Authenticode / Linux GPG follow later
+
 ## User Scenarios & Testing
+
+> **Test task policy (Constitution v1.0.0):** Journeys, acceptance criteria, and **automated** test-implementation tasks live here. Open **manual** validation stages (VS-1 / VS-4 / VS-5) → `specs/005-manual-validation` (migrated from former T031/T062). Completed historical automated tasks in `tasks.md` stay as history. Results ledger remains `checklists/quickstart-validation.md`.
 
 ### Primary User Scenarios
 
@@ -29,10 +42,10 @@ A desktop application that simplifies initial configuration and firmware install
 
 **Scenario 2: Reconfiguration of Existing Device**
 1. User connects previously configured ESP32 via USB
-2. Launches installer, detects existing configuration
-3. Modifies sensor type, pin mapping, or WiFi credentials
+2. Launches installer and chooses **Load last session** or **Import profile** (config comes from **local disk only** — this phase does **not** read NVS from the ESP over USB)
+3. Modifies sensor type, pin mapping, or WiFi credentials (WiFi password re-entered if redacted)
 4. Re-flashes updated firmware
-5. Device retains new configuration on boot
+5. Device boots with new configuration
 
 **Scenario 3: Bulk Configuration for Multiple Devices**
 1. User saves configuration profile as JSON file
@@ -48,17 +61,19 @@ A desktop application that simplifies initial configuration and firmware install
 | Pin mapping | In pin configuration step | User assigns heater to GPIO25, fan to GPIO26 | Firmware uses specified GPIOs for PWM output |
 | Display config | In display step | User selects SSD1306 128x64, enables status fields | Firmware initializes I2C display with selected layout |
 | WiFi config | In WiFi step | User enters SSID/password | Firmware stores credentials in NVS, connects on boot |
-| Profile save/load | User has completed configuration | User clicks Save Profile | JSON file created with all settings for reuse |
-| Flash verification | Flash completes | Device reboots | Installer verifies device responds on WebSocket port |
+| Profile save/load | User has completed configuration | User clicks Save Profile | JSON file created with settings; WiFi password omitted/`***`; SSID retained |
+| Flash verification | Flash completes | Device reboots | **Flash Success** if esptool verify OK; installer **attempts** WS/HTTP only when target reachable (user-supplied IP or hotspot `philarmony`); if unreachable, show warning but do **not** fail the install |
 
 ### Edge Cases
 
 - USB device not detected: Clear error message with troubleshooting steps
 - Invalid GPIO pin combination (conflicts): Validation prevents invalid mappings
-- Flash failure: Rollback option, detailed error log, retry button
+- Flash failure: **Retry** re-runs full flash of current package; detailed error log + export; no automatic restore of prior firmware image
 - Unsupported ESP32 model: Warning with list of supported variants
-- WiFi credentials invalid: Device falls back to hotspot mode (per firmware spec)
+- WiFi credentials invalid: Device falls back to hotspot mode (per firmware spec); installer may still report Flash Success if esptool verify OK
 - Display not detected on boot: Firmware continues headless, logs warning
+- Post-flash WS unreachable: Non-blocking warning; user can open control app later on LAN
+- USB unplug mid-flash: Treat as flash failure; Retry when reconnect; warn device may be in partial state
 
 ## Functional Requirements
 
@@ -112,11 +127,12 @@ A desktop application that simplifies initial configuration and firmware install
 - Flash process: Erase → Write firmware → Write config partition → Verify → Reset
 - Progress bar with stage indicators (erasing, writing, verifying)
 - Support for custom partition tables
-
+- **Post-flash network check (optional)**: After reset, attempt WS/HTTP only if the device is reachable (hotspot `philarmony` / `192.168.4.1`, or user-provided IP). Unreachable network MUST NOT fail an otherwise successful esptool verify — show a non-blocking warning instead.
 ### FR-009: Configuration Profiles
 - Export complete configuration to JSON file
 - Import configuration from JSON file
-- Profile includes: device model, sensors, pins, display, WiFi (password encrypted or placeholder)
+- Profile includes: device model, sensors, pins, display, WiFi **SSID** (password MUST be omitted or replaced with `***` — never plaintext, never encrypted-at-rest in the JSON file)
+- On import, user MUST re-enter WiFi password before flash is allowed
 - Version field for forward compatibility
 
 ### FR-010: Multi-language Support
@@ -130,6 +146,15 @@ A desktop application that simplifies initial configuration and firmware install
 - Log export for troubleshooting
 - Verbose/quiet mode toggle
 
+### FR-012: Host Application Distribution
+- Provide **single-download** installers for the desktop app itself (not only the ESP32 flash payload)
+- **Windows**: `.msix` (optional Inno `.exe`); **macOS**: `.dmg` (signed + notarized for public release)
+- **Linux** (first-class): **AppImage**, **`.deb`** (Debian/Ubuntu), **`.rpm`** (Fedora and other Red Hat–based: RHEL, Rocky, Alma, …)
+- Linux **package builds** exposed via repo **Makefile** targets (`package-installer-linux*`); end users install from downloaded packages, not by cloning + `make`
+- End users MUST install without Flutter SDK, Xcode, or Visual Studio
+- Installer payload embeds firmware binaries + flash tooling so device setup needs no second download
+- Public releases published with checksums (e.g. GitHub Releases)
+- **Signing (MVP public release)**: macOS `.dmg` MUST be Developer ID–signed and Apple-notarized before public GitHub Release. Windows MSIX/EXE and Linux AppImage/deb/rpm MAY be unsigned in MVP if README/docs warn about SmartScreen/`dnf`/`apt` trust prompts; Authenticode and Linux GPG SHOULD follow in a later release
 ## Non-Functional Requirements
 
 ### Performance
@@ -139,17 +164,21 @@ A desktop application that simplifies initial configuration and firmware install
 
 ### Usability
 - Wizard completable in <3 minutes for typical setup
-- No command-line knowledge required
+- No command-line knowledge required (except optional Linux AppImage `chmod +x` / `dnf`/`apt` one-liners documented)
+- **Host install**: one download per OS/format; no unzip of Flutter `Release/` folders
 - Tooltips for technical terms (PWM, GPIO, NVS, etc.)
 - Accessible color contrast, keyboard navigation
 
 ### Reliability
-- Verify firmware checksum after flash
-- Automatic rollback on verification failure
+- Verify firmware checksum after flash (esptool) — this is the gate for **Flash Success**
+- Optional WS/HTTP reachability check does not override a successful flash verify
+- On flash failure: **no automatic restore** of a pre-erase image; offer **Retry** (full erase→write→verify of the current bundled package) plus detailed log export and recovery docs
 - Survive USB disconnect during configuration (not during flash)
+- Host installers use OS-native install/uninstall semantics (MSIX/DMG/deb/rpm)
 
 ### Compatibility
-- Windows 10/11 (x64), macOS 12+ (Intel/Apple Silicon), Linux (Ubuntu 20.04+, AppImage/Flatpak)
+- Windows 10/11 (x64) via **MSIX** (optional Inno `.exe` fallback); macOS 12+ via **DMG**
+- Linux x64 via **AppImage**, **`.deb`**, **`.rpm`** (Fedora / RHEL-family); builds via `make package-installer-linux*`
 - ESP32 Arduino core compatible firmware format
 - ESP-IDF bootloader compatible
 
@@ -192,7 +221,7 @@ A desktop application that simplifies initial configuration and firmware install
 
 ### WiFiConfig
 - `ssid`: string
-- `password`: string (encrypted in profile)
+- `password`: string (in-session / flash only; **never** persisted in exported JSON — use omit or `***`)
 - `static_ip`: object (optional: ip, gateway, netmask, dns)
 
 ### FilamentProfile
@@ -233,12 +262,14 @@ A desktop application that simplifies initial configuration and firmware install
 6. WiFi password stored in profile as placeholder; user re-enters on import
 7. Single firmware binary supports all configured sensor/display combinations via runtime config
 8. Installer does not modify bootloader or partition table (uses firmware-provided defaults)
+9. Reconfiguration prefill uses installer local storage / JSON only — not on-device NVS dump
+10. First public host release: macOS notarized required; Windows/Linux unsigned allowed with docs warnings
 
 ## Dependencies & Constraints
 
 - **Firmware coupling**: Installer must match firmware's NVS schema version
 - **USB drivers**: OS-level requirement outside installer control
-- **Signed binaries**: macOS/Windows may require code signing for distribution
+- **Signed binaries**: Public macOS DMG MUST be notarized; Windows/Linux unsigned allowed in MVP with documented warnings
 - **GPLv3 compliance**: Installer source must be open; firmware already GPLv3
 - **Constitutional**: PT-BR/EN-US documentation, safety validation for pin assignments
 
@@ -251,6 +282,8 @@ A desktop application that simplifies initial configuration and firmware install
 - Multi-device simultaneous flashing
 - Custom firmware module selection
 - Real-time sensor calibration wizard
+- Reading existing device NVS/config over USB (reconfigure uses local last-session / JSON import only)
+- Automatic restore of a dumped pre-erase firmware image after a failed flash
 
 ## Appendix: Configuration Profile JSON Schema
 
@@ -289,7 +322,7 @@ A desktop application that simplifies initial configuration and firmware install
   ],
   "wifi": {
     "ssid": "MyNetwork",
-    "password": "***ENCRYPTED***",
+    "password": "***",
     "static_ip": null
   },
   "firmware_version": "0.1.0",

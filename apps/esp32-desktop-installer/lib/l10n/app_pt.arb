@@ -1,0 +1,143 @@
+{
+  "@@locale": "pt",
+  "appTitle": "Instalador Philarmony",
+  "next": "Próximo",
+  "back": "Voltar",
+  "install": "Instalar",
+  "retry": "Tentar novamente",
+  "exportProfile": "Exportar perfil",
+  "importProfile": "Importar perfil",
+  "loadLastSession": "Carregar última sessão",
+  "newSetup": "Nova configuração",
+  "flashSuccess": "Flash concluído",
+  "networkWarn": "Dispositivo inacessível na rede (verificação opcional). O flash ainda foi bem-sucedido.",
+  "pinConflict": "Corrija conflitos de pinos antes de continuar",
+  "wifiPasswordRequired": "Redigite a senha WiFi antes do flash",
+  "noPorts": "Nenhuma porta USB serial encontrada. Instale drivers CH340/CP210x/FTDI e reconecte.",
+  "language": "Idioma",
+  "languagePortuguese": "Português",
+  "languageEnglish": "English",
+  "requiredField": "Obrigatório",
+  "optionalField": "Opcional",
+  "optionalAdvanced": "Padrão 921600 (configurável)",
+  "deviceModelLabel": "Modelo ESP32",
+  "flashSizeLabel": "Tamanho do flash (MB)",
+  "baudLabel": "Taxa baud",
+  "usbPortLabel": "Porta USB",
+  "serialPortLabel": "Porta serial",
+  "customPartitionLabel": "Tabela de partições personalizada",
+  "clearLabel": "Limpar",
+  "selectPartitionsTitle": "Selecionar partitions.bin personalizado",
+  "unsupportedChip": "Chip não suportado {chip}. Variantes suportadas: {supported}. Selecione um modelo suportado manualmente.",
+  "@unsupportedChip": {
+    "placeholders": {
+      "chip": { "type": "String" },
+      "supported": { "type": "String" }
+    }
+  },
+  "chipDetectFailed": "Não foi possível detectar o chip (selecione o modelo manualmente)",
+  "partialFlashWarn": "O USB pode ter sido desconectado durante o flash. O dispositivo pode estar em estado parcial — reconecte e tente novamente com erase→write→verify completo.",
+  "retryHelp": "Tentar novamente executa erase→write→verify completo do pacote atual. Nenhuma imagem anterior é restaurada automaticamente.",
+  "tempSensorLabel": "Sensor de temperatura",
+  "humiditySensorLabel": "Sensor de umidade",
+  "tempGpioLabel": "GPIO temperatura",
+  "humidityGpioLabel": "GPIO umidade",
+  "advancedDriverTitle": "Avançado: driver JSON personalizado",
+  "advancedDriverSubtitle": "Opcional — mescla nos parâmetros do sensor",
+  "driverTargetLabel": "Aplicar JSON em",
+  "driverJsonLabel": "JSON do driver",
+  "pinoutTitle": "Pinagem",
+  "heaterPwmLabel": "PWM aquecedor",
+  "exhaustFanPwmLabel": "PWM exaustor",
+  "exhaustFanDigitalLabel": "Exaustor digital",
+  "pinLegendStrapping": "Strapping",
+  "pinLegendFlash": "Flash reservado",
+  "pinLegendPsram": "PSRAM reservado",
+  "pinLegendInputOnly": "Somente entrada",
+  "pinLegendAssigned": "Atribuído",
+  "pinLegendFlashPsram": "Flash/PSRAM",
+  "pinoutPackageOutline": "Contorno do pacote {model} (mapa GPIO)",
+  "@pinoutPackageOutline": {
+    "placeholders": {
+      "model": { "type": "String" }
+    }
+  },
+  "enableDisplayLabel": "Ativar display",
+  "displayDriverLabel": "Driver",
+  "resolutionPresetLabel": "Preset de resolução",
+  "customLabel": "Personalizado",
+  "widthLabel": "Largura",
+  "heightLabel": "Altura",
+  "statusFieldsLabel": "Campos de status",
+  "layoutPreviewLabel": "Prévia do layout",
+  "noFieldsLabel": "(sem campos)",
+  "spiDcLabel": "Pino SPI DC",
+  "spiResetLabel": "Pino SPI RESET",
+  "addCustomProfile": "Adicionar perfil personalizado",
+  "editCustomProfile": "Editar perfil personalizado",
+  "overrideBuiltinTitle": "Sobrescrever embutido",
+  "namePtLabel": "Nome PT",
+  "nameEnLabel": "Nome EN",
+  "tempCLabel": "Temp °C",
+  "durationMinLabel": "Duração min",
+  "humidityPctLabel": "Umidade %",
+  "cancelLabel": "Cancelar",
+  "saveLabel": "Salvar",
+  "ssidLabel": "SSID",
+  "passwordLabel": "Senha",
+  "staticIpTitle": "IP estático (opcional)",
+  "wifiScanLabel": "Buscar WiFi próximos",
+  "wifiScanUnavailable": "Nenhuma rede encontrada (busca sem suporte ou sem permissão). Digite o SSID manualmente.",
+  "dismissLabel": "Dispensar",
+  "stepLabel": "Etapa",
+  "reviewModel": "Modelo: {model} ({flashMb} MB)",
+  "@reviewModel": {
+    "placeholders": {
+      "model": { "type": "String" },
+      "flashMb": { "type": "int" }
+    }
+  },
+  "reviewHeaterPwm": "PWM aquecedor: {pin}",
+  "@reviewHeaterPwm": {
+    "placeholders": {
+      "pin": { "type": "int" }
+    }
+  },
+  "reviewWifiSsid": "WiFi SSID: {ssid}",
+  "@reviewWifiSsid": {
+    "placeholders": {
+      "ssid": { "type": "String" }
+    }
+  },
+  "reviewProfiles": "Perfis: {count}",
+  "@reviewProfiles": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "reviewFirmware": "Firmware: {version}",
+  "@reviewFirmware": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "reviewEraseWarning": "A instalação apagará e reflasheará o dispositivo com esta configuração. Não há restauração automática de uma imagem de firmware anterior.",
+  "flashLogVerbose": "Detalhado",
+  "flashLogQuiet": "Resumido",
+  "flashLogExport": "Exportar log",
+  "flashLogExportTitle": "Exportar log de flash",
+  "exportProfileTitle": "Exportar perfil Philarmony",
+  "exportSavedSnack": "Salvo em {path} (senha omitida)",
+  "@exportSavedSnack": {
+    "placeholders": {
+      "path": { "type": "String" }
+    }
+  },
+  "exportClipboardSnack": "Salvar cancelado — JSON copiado (senha omitida)",
+  "importFailed": "Falha na importação: {error}",
+  "@importFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  }
+}

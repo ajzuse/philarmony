@@ -1,0 +1,225 @@
+name: Desktop Installer Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'installer-v*'
+
+env:
+  FVM_FLUTTER_VERSION: '3.44.0'
+
+jobs:
+  build-firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PlatformIO
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install platformio
+          pio --version
+      - name: Build + sync firmware into installer assets
+        run: make sync-installer-firmware
+      - name: Verify firmware binaries
+        run: |
+          for f in firmware.bin bootloader.bin partitions.bin; do
+            test -s "apps/esp32-desktop-installer/assets/firmware/$f"
+          done
+          ls -la apps/esp32-desktop-installer/assets/firmware/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-firmware-assets
+          path: apps/esp32-desktop-installer/assets/firmware/*
+          if-no-files-found: error
+
+  build-linux:
+    needs: [build-firmware]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kuhnroyal/flutter-fvm-config-action/setup@v3
+        with:
+          path: .fvmrc
+      - name: Enable Linux desktop + packaging tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            python3-pip dpkg-dev rpm fuse libfuse2 wget
+          # appimagetool for real AppImage artifacts
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -O /usr/local/bin/appimagetool
+          chmod +x /usr/local/bin/appimagetool
+          fvm flutter config --enable-linux-desktop
+      - name: Create platforms if missing
+        working-directory: apps/esp32-desktop-installer
+        run: fvm flutter create --platforms=linux .
+      - name: Pub get + tests
+        run: |
+          cd packages/philarmony_core && fvm dart pub get && fvm dart test
+          cd ../../apps/esp32-desktop-installer && fvm flutter pub get
+          fvm flutter test
+      - name: Bundle esptool (linux)
+        run: ./scripts/bundle-esptool.sh linux
+      - name: Restore firmware assets
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-firmware-assets
+          path: apps/esp32-desktop-installer/assets/firmware
+      - name: Verify synced firmware assets
+        run: |
+          for f in firmware.bin bootloader.bin partitions.bin; do
+            test -s "apps/esp32-desktop-installer/assets/firmware/$f"
+          done
+      - name: Package AppImage/deb/rpm
+        run: |
+          make package-installer-linux-appimage
+          make package-installer-linux-deb
+          make package-installer-linux-rpm
+          # Require AppImage AND deb AND rpm (FR-012)
+          test -n "$(find apps/esp32-desktop-installer/dist -type f -name '*.AppImage' | head -1)"
+          test -n "$(find apps/esp32-desktop-installer/dist -type f -name '*.deb' | head -1)"
+          test -n "$(find apps/esp32-desktop-installer/dist -type f -name '*.rpm' | head -1)"
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-linux-packages
+          path: apps/esp32-desktop-installer/dist/**
+          if-no-files-found: error
+
+  build-windows:
+    needs: [build-firmware]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kuhnroyal/flutter-fvm-config-action/setup@v3
+        with:
+          path: .fvmrc
+      - run: fvm flutter config --enable-windows-desktop
+      - name: Restore firmware assets
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-firmware-assets
+          path: apps/esp32-desktop-installer/assets/firmware
+      - shell: bash
+        run: |
+          for f in firmware.bin bootloader.bin partitions.bin; do
+            test -s "apps/esp32-desktop-installer/assets/firmware/$f"
+          done
+          cd apps/esp32-desktop-installer
+          fvm flutter create --platforms=windows .
+          fvm flutter pub get
+          bash ../../scripts/bundle-esptool.sh windows
+          fvm flutter build windows --release
+          fvm dart run msix:create
+          mkdir -p dist
+          cp *.msix dist/
+          test -n "$(ls dist/*.msix 2>/dev/null)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-windows-msix
+          path: apps/esp32-desktop-installer/dist/**
+          if-no-files-found: error
+
+  build-macos:
+    needs: [build-firmware]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kuhnroyal/flutter-fvm-config-action/setup@v3
+        with:
+          path: .fvmrc
+      - run: fvm flutter config --enable-macos-desktop
+      - name: Restore firmware assets
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-firmware-assets
+          path: apps/esp32-desktop-installer/assets/firmware
+      - name: Build signed DMG
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          for f in firmware.bin bootloader.bin partitions.bin; do
+            test -s "apps/esp32-desktop-installer/assets/firmware/$f"
+          done
+          cd apps/esp32-desktop-installer
+          fvm flutter create --platforms=macos .
+          fvm flutter pub get
+          bash ../../scripts/bundle-esptool.sh macos
+          fvm flutter build macos --release
+          # Codesign .app BEFORE packaging into DMG (T099)
+          APP_BUNDLE="$(find build/macos -name '*.app' -type d | head -1)"
+          if [[ -z "$APP_BUNDLE" || ! -d "$APP_BUNDLE" ]]; then
+            echo "::error::macOS .app not found after flutter build"
+            exit 1
+          fi
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ -z "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+              echo "::error::Public tag release requires APPLE_SIGNING_IDENTITY to codesign before DMG"
+              exit 1
+            fi
+          fi
+          if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+            echo "codesign app before DMG: $APP_BUNDLE"
+            codesign --deep --force --options runtime \
+              --sign "$APPLE_SIGNING_IDENTITY" "$APP_BUNDLE"
+            codesign --verify --deep --strict "$APP_BUNDLE"
+          else
+            echo "Skipping codesign (workflow_dispatch without APPLE_SIGNING_IDENTITY)."
+          fi
+          bash packaging/macos/build_dmg.sh
+          test -f dist/PhilarmonyInstaller-macos.dmg
+      - name: Notarize public DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          DMG="apps/esp32-desktop-installer/dist/PhilarmonyInstaller-macos.dmg"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ -z "${APPLE_ID}" || -z "${APPLE_TEAM_ID}" || -z "${APPLE_APP_SPECIFIC_PASSWORD}" ]]; then
+              echo "::error::Public tag release requires Apple notarization secrets (APPLE_ID, APPLE_TEAM_ID, APPLE_APP_SPECIFIC_PASSWORD)"
+              exit 1
+            fi
+            bash apps/esp32-desktop-installer/packaging/macos/notarize.sh "$DMG"
+          elif [[ -n "${APPLE_ID}" ]]; then
+            bash apps/esp32-desktop-installer/packaging/macos/notarize.sh "$DMG"
+          else
+            echo "Skipping notarization (workflow_dispatch without Apple secrets). Not for public GitHub Release."
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-macos-dmg
+          path: apps/esp32-desktop-installer/dist/**
+          if-no-files-found: error
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/installer-v')
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+      - name: Collect artifacts + SHA-256 checksums
+        run: |
+          mkdir -p out
+          find release-artifacts -type f \( \
+            -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \
+            -o -name '*.msix' -o -name '*.dmg' -o -name '*.exe' \
+          \) -exec cp -v {} out/ \;
+          test "$(ls -A out)"
+          cd out
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

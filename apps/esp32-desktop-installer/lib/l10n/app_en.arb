@@ -1,0 +1,143 @@
+{
+  "@@locale": "en",
+  "appTitle": "Philarmony Installer",
+  "next": "Next",
+  "back": "Back",
+  "install": "Install",
+  "retry": "Retry",
+  "exportProfile": "Export profile",
+  "importProfile": "Import profile",
+  "loadLastSession": "Load last session",
+  "newSetup": "New setup",
+  "flashSuccess": "Flash Success",
+  "networkWarn": "Device not reachable on network (optional check). Flash still succeeded.",
+  "pinConflict": "Fix pin conflicts before continuing",
+  "wifiPasswordRequired": "Re-enter WiFi password before flashing",
+  "noPorts": "No USB serial ports found. Install CH340/CP210x/FTDI drivers and reconnect.",
+  "language": "Language",
+  "languagePortuguese": "Português",
+  "languageEnglish": "English",
+  "requiredField": "Required",
+  "optionalField": "Optional",
+  "optionalAdvanced": "Default 921600 (configurable)",
+  "deviceModelLabel": "ESP32 model",
+  "flashSizeLabel": "Flash size (MB)",
+  "baudLabel": "Baud rate",
+  "usbPortLabel": "USB port",
+  "serialPortLabel": "Serial port",
+  "customPartitionLabel": "Custom partition table",
+  "clearLabel": "Clear",
+  "selectPartitionsTitle": "Select custom partitions.bin",
+  "unsupportedChip": "Unsupported chip {chip}. Supported variants: {supported}. Select a supported model manually.",
+  "@unsupportedChip": {
+    "placeholders": {
+      "chip": { "type": "String" },
+      "supported": { "type": "String" }
+    }
+  },
+  "chipDetectFailed": "Could not auto-detect chip (select model manually)",
+  "partialFlashWarn": "USB may have disconnected mid-flash. The device may be in a partial state — reconnect and Retry a full erase→write→verify.",
+  "retryHelp": "Retry re-runs a full erase→write→verify of the current package. No previous firmware image is restored automatically.",
+  "tempSensorLabel": "Temperature sensor",
+  "humiditySensorLabel": "Humidity sensor",
+  "tempGpioLabel": "Temp GPIO",
+  "humidityGpioLabel": "Humidity GPIO",
+  "advancedDriverTitle": "Advanced: custom JSON driver",
+  "advancedDriverSubtitle": "Optional — merges into sensor parameters",
+  "driverTargetLabel": "Apply JSON to",
+  "driverJsonLabel": "Driver JSON",
+  "pinoutTitle": "Pinout",
+  "heaterPwmLabel": "Heater PWM",
+  "exhaustFanPwmLabel": "Exhaust fan PWM",
+  "exhaustFanDigitalLabel": "Exhaust fan digital",
+  "pinLegendStrapping": "Strapping",
+  "pinLegendFlash": "Flash reserved",
+  "pinLegendPsram": "PSRAM reserved",
+  "pinLegendInputOnly": "Input-only",
+  "pinLegendAssigned": "Assigned",
+  "pinLegendFlashPsram": "Flash/PSRAM",
+  "pinoutPackageOutline": "{model} package outline (GPIO map)",
+  "@pinoutPackageOutline": {
+    "placeholders": {
+      "model": { "type": "String" }
+    }
+  },
+  "enableDisplayLabel": "Enable display",
+  "displayDriverLabel": "Driver",
+  "resolutionPresetLabel": "Resolution preset",
+  "customLabel": "Custom",
+  "widthLabel": "Width",
+  "heightLabel": "Height",
+  "statusFieldsLabel": "Status fields",
+  "layoutPreviewLabel": "Layout preview",
+  "noFieldsLabel": "(no fields)",
+  "spiDcLabel": "SPI DC pin",
+  "spiResetLabel": "SPI RESET pin",
+  "addCustomProfile": "Add custom profile",
+  "editCustomProfile": "Edit custom profile",
+  "overrideBuiltinTitle": "Override builtin",
+  "namePtLabel": "Name PT",
+  "nameEnLabel": "Name EN",
+  "tempCLabel": "Temp °C",
+  "durationMinLabel": "Duration min",
+  "humidityPctLabel": "Humidity %",
+  "cancelLabel": "Cancel",
+  "saveLabel": "Save",
+  "ssidLabel": "SSID",
+  "passwordLabel": "Password",
+  "staticIpTitle": "Static IP (optional)",
+  "wifiScanLabel": "Scan nearby WiFi",
+  "wifiScanUnavailable": "No networks found (scan unsupported or permission denied). Enter SSID manually.",
+  "dismissLabel": "Dismiss",
+  "stepLabel": "Step",
+  "reviewModel": "Model: {model} ({flashMb} MB)",
+  "@reviewModel": {
+    "placeholders": {
+      "model": { "type": "String" },
+      "flashMb": { "type": "int" }
+    }
+  },
+  "reviewHeaterPwm": "Heater PWM: {pin}",
+  "@reviewHeaterPwm": {
+    "placeholders": {
+      "pin": { "type": "int" }
+    }
+  },
+  "reviewWifiSsid": "WiFi SSID: {ssid}",
+  "@reviewWifiSsid": {
+    "placeholders": {
+      "ssid": { "type": "String" }
+    }
+  },
+  "reviewProfiles": "Profiles: {count}",
+  "@reviewProfiles": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "reviewFirmware": "Firmware: {version}",
+  "@reviewFirmware": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "reviewEraseWarning": "Install will erase and reflash the device with this configuration. There is no automatic restore of a previous firmware image.",
+  "flashLogVerbose": "Verbose",
+  "flashLogQuiet": "Quiet",
+  "flashLogExport": "Export log",
+  "flashLogExportTitle": "Export flash log",
+  "exportProfileTitle": "Export Philarmony profile",
+  "exportSavedSnack": "Saved {path} (password redacted)",
+  "@exportSavedSnack": {
+    "placeholders": {
+      "path": { "type": "String" }
+    }
+  },
+  "exportClipboardSnack": "Save cancelled — JSON copied (password redacted)",
+  "importFailed": "Import failed: {error}",
+  "@importFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  }
+}

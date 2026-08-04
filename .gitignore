@@ -60,6 +60,25 @@ temp/
 .pioenvs/
 .piolibdeps/
 
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.flutter-plugins
+.flutter-plugins-dependencies
+apps/**/build/
+packages/**/.dart_tool/
+apps/esp32-desktop-installer/dist/
+*.iml
+
+# Bundled flash tools (fetched via make bundle-esptool)
+apps/esp32-desktop-installer/assets/tools/**/esptool
+apps/esp32-desktop-installer/assets/tools/**/esptool.exe
+!apps/esp32-desktop-installer/assets/tools/**/README.md
+
 # C++ build artifacts
 *.o
 *.a
@@ -68,6 +87,9 @@ temp/
 *.bin
 *.hex
 *.map
+
+# Keep firmware asset placeholders; ignore large copied binaries optionally
+# apps/esp32-desktop-installer/assets/firmware/*.bin
 
 # ESP-IDF / Arduino
 sdkconfig
@@ -78,3 +100,9 @@ managed_components/
 # Backup files created during editing
 *.bak
 *.orig
+
+# FVM — pin is committed (.fvmrc + .fvm/fvm_config.json); SDK symlink is not
+!.fvm/fvm_config.json
+
+# FVM Version Cache
+.fvm/

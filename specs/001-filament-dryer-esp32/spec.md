@@ -22,6 +22,8 @@ Implement the base firmware structure for an open-source DIY filament dryer runn
 
 ## User Scenarios & Testing
 
+> **Test task policy (Constitution v1.0.0):** Journeys, acceptance criteria, and **automated** test-implementation tasks live here. Open **manual** validation (HW smoke / checklist) → `specs/005-manual-validation`, named by stage (VS-*). Completed historical automated tasks in `tasks.md` stay as history.
+
 ### Primary User Scenarios
 
 **Scenario 1: Initial Setup via Hotspot**

@@ -1,0 +1,8 @@
+Package: philarmony-installer
+Version: 0.1.0
+Section: electronics
+Priority: optional
+Architecture: amd64
+Maintainer: Philarmony <dev@philarmony.local>
+Description: Philarmony ESP32 desktop installer
+Depends: libgtk-3-0, libblkid1, liblzma5

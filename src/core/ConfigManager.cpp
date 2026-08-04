@@ -75,6 +75,20 @@ WifiConfig ConfigManager::getWifiConfig() const {
             config.ssid = doc["ssid"] | "";
             config.password = doc["password"] | "";
             config.valid = !config.ssid.isEmpty();
+            // Flat fields (installer NVS) or nested static_ip object
+            if (doc["static_ip"].is<JsonObject>()) {
+                JsonObject sip = doc["static_ip"].as<JsonObject>();
+                config.ip = sip["ip"] | "";
+                config.gateway = sip["gateway"] | "";
+                config.netmask = sip["netmask"] | "255.255.255.0";
+                config.dns = sip["dns"] | "";
+            } else {
+                config.ip = doc["ip"] | "";
+                config.gateway = doc["gateway"] | "";
+                config.netmask = doc["netmask"] | "255.255.255.0";
+                config.dns = doc["dns"] | "";
+            }
+            config.use_static_ip = doc["use_static_ip"] | !config.ip.isEmpty();
         }
     }
     return config;
@@ -86,6 +100,18 @@ bool ConfigManager::setWifiConfig(const WifiConfig& config) {
     JsonDocument doc;
     doc["ssid"] = config.ssid;
     doc["password"] = config.password;
+    doc["use_static_ip"] = config.use_static_ip && !config.ip.isEmpty();
+    if (!config.ip.isEmpty()) {
+        doc["ip"] = config.ip;
+        doc["gateway"] = config.gateway;
+        doc["netmask"] = config.netmask.isEmpty() ? "255.255.255.0" : config.netmask;
+        doc["dns"] = config.dns;
+        JsonObject sip = doc["static_ip"].to<JsonObject>();
+        sip["ip"] = config.ip;
+        sip["gateway"] = config.gateway;
+        sip["netmask"] = config.netmask.isEmpty() ? "255.255.255.0" : config.netmask;
+        sip["dns"] = config.dns;
+    }
     
     String json;
     serializeJson(doc, json);
@@ -632,6 +658,18 @@ String ConfigManager::toJson() const {
     wifi_obj["ssid"] = wifi.ssid;
     wifi_obj["password"] = wifi.password;
     wifi_obj["valid"] = wifi.valid;
+    wifi_obj["use_static_ip"] = wifi.use_static_ip;
+    if (!wifi.ip.isEmpty()) {
+        wifi_obj["ip"] = wifi.ip;
+        wifi_obj["gateway"] = wifi.gateway;
+        wifi_obj["netmask"] = wifi.netmask;
+        wifi_obj["dns"] = wifi.dns;
+        JsonObject sip = wifi_obj.createNestedObject("static_ip");
+        sip["ip"] = wifi.ip;
+        sip["gateway"] = wifi.gateway;
+        sip["netmask"] = wifi.netmask;
+        sip["dns"] = wifi.dns;
+    }
     
     // Sensor
     JsonObject sensor_obj = doc.createNestedObject("sensor");
@@ -736,6 +774,19 @@ bool ConfigManager::fromJson(const String& json) {
         wifi.ssid = wifiObj["ssid"] | "";
         wifi.password = wifiObj["password"] | "";
         wifi.valid = !wifi.ssid.isEmpty();
+        if (wifiObj["static_ip"].is<JsonObject>()) {
+            JsonObject sip = wifiObj["static_ip"].as<JsonObject>();
+            wifi.ip = sip["ip"] | "";
+            wifi.gateway = sip["gateway"] | "";
+            wifi.netmask = sip["netmask"] | "255.255.255.0";
+            wifi.dns = sip["dns"] | "";
+        } else {
+            wifi.ip = wifiObj["ip"] | "";
+            wifi.gateway = wifiObj["gateway"] | "";
+            wifi.netmask = wifiObj["netmask"] | "255.255.255.0";
+            wifi.dns = wifiObj["dns"] | "";
+        }
+        wifi.use_static_ip = wifiObj["use_static_ip"] | !wifi.ip.isEmpty();
         setWifiConfig(wifi);
     }
     
