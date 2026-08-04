@@ -18,6 +18,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../installer_session_controller.dart';
 
 class ReviewStep extends StatelessWidget {
@@ -26,18 +27,25 @@ class ReviewStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final p = controller.profile;
     return ListView(
       children: [
-        Text('Model: ${p.deviceModel} (${p.flashSizeMb} MB)'),
-        Text('Heater PWM: ${p.pinMapping.heaterPwm}'),
-        Text('WiFi SSID: ${p.wifi.ssid}'),
-        Text('Profiles: ${p.filamentProfiles.length}'),
-        Text('Firmware: ${p.firmwareVersion}'),
+        Text(l10n?.reviewModel(p.deviceModel, p.flashSizeMb) ??
+            'Model: ${p.deviceModel} (${p.flashSizeMb} MB)'),
+        Text(l10n?.reviewHeaterPwm(p.pinMapping.heaterPwm) ??
+            'Heater PWM: ${p.pinMapping.heaterPwm}'),
+        Text(l10n?.reviewWifiSsid(p.wifi.ssid) ??
+            'WiFi SSID: ${p.wifi.ssid}'),
+        Text(l10n?.reviewProfiles(p.filamentProfiles.length) ??
+            'Profiles: ${p.filamentProfiles.length}'),
+        Text(l10n?.reviewFirmware(p.firmwareVersion) ??
+            'Firmware: ${p.firmwareVersion}'),
         const SizedBox(height: 16),
-        const Text(
-          'Install will erase and reflash the device with this configuration. '
-          'There is no automatic restore of a previous firmware image.',
+        Text(
+          l10n?.reviewEraseWarning ??
+              'Install will erase and reflash the device with this configuration. '
+                  'There is no automatic restore of a previous firmware image.',
         ),
         if (controller.session.validationErrors.isNotEmpty)
           Text(

@@ -8,7 +8,7 @@
 #define MyAppExeName "esp32_desktop_installer.exe"
 
 [Setup]
-AppId={{A7C2E5F1-9B44-4D3A-9E2C-PhilarmonyInst}
+AppId={{A7C2E5F1-9B44-4D3A-9E2C-7B8F0A1D2E3F}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}

@@ -91,11 +91,51 @@ class NvsConfigMapper {
     };
   }
 
-  Map<String, dynamic> toWifiNvs(DeviceProfile profile) => {
-        'ssid': profile.wifi.ssid,
-        'password': profile.wifi.password,
-        if (profile.wifi.staticIp != null) 'static_ip': profile.wifi.staticIp,
-      };
+  /// WiFi NVS shape consumed by firmware [WifiConfig] (flat static fields).
+  Map<String, dynamic> toWifiNvs(DeviceProfile profile) {
+    final wifi = <String, dynamic>{
+      'ssid': profile.wifi.ssid,
+      'password': profile.wifi.password,
+    };
+    final staticIp = profile.wifi.staticIp;
+    if (staticIp != null) {
+      // Nested form (installer export / docs) + flat keys firmware applies via WiFi.config
+      wifi['static_ip'] = staticIp;
+      final ip = staticIp['ip']?.trim() ?? '';
+      final gateway = staticIp['gateway']?.trim() ?? '';
+      final netmask = staticIp['netmask']?.trim() ?? '';
+      final dns = staticIp['dns']?.trim() ?? '';
+      if (ip.isNotEmpty) wifi['ip'] = ip;
+      if (gateway.isNotEmpty) wifi['gateway'] = gateway;
+      if (netmask.isNotEmpty) wifi['netmask'] = netmask;
+      if (dns.isNotEmpty) wifi['dns'] = dns;
+      wifi['use_static_ip'] = ip.isNotEmpty;
+    }
+    return wifi;
+  }
+
+  /// IPv4 dotted-quad validation for optional static IP fields (FR-007).
+  static final ipv4Pattern = RegExp(
+    r'^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$',
+  );
+
+  static List<String> validateStaticIp(Map<String, String>? staticIp) {
+    if (staticIp == null) return const [];
+    final errors = <String>[];
+    for (final key in ['ip', 'gateway', 'netmask', 'dns']) {
+      final v = staticIp[key]?.trim() ?? '';
+      if (v.isEmpty) {
+        if (key == 'ip' || key == 'gateway' || key == 'netmask') {
+          errors.add('Static IP $key is required when static IP is enabled');
+        }
+        continue;
+      }
+      if (!ipv4Pattern.hasMatch(v)) {
+        errors.add('Static IP $key is not a valid IPv4 address: $v');
+      }
+    }
+    return errors;
+  }
 
   List<Map<String, dynamic>> toFilamentProfilesNvs(DeviceProfile profile) =>
       profile.filamentProfiles
@@ -150,6 +190,9 @@ class NvsConfigMapper {
     final sensorType =
         temp == null || temp.sensor == 'none' ? 'sht31' : temp.sensor;
 
+    final tempParams = Map<String, dynamic>.from(temp?.parameters ?? const {});
+    final humParams = Map<String, dynamic>.from(hum?.parameters ?? const {});
+
     final sensor = <String, dynamic>{
       'type': sensorType,
       'is_integrated': integrated,
@@ -158,10 +201,20 @@ class NvsConfigMapper {
       'gpio_pin': temp?.gpioPin ?? -1,
       'sda_pin': sda,
       'scl_pin': scl,
-      'temperature_offset': 0.0,
-      'temperature_scale': 1.0,
-      'humidity_offset': 0.0,
-      'humidity_scale': 1.0,
+      'temperature_offset': (tempParams['temperature_offset'] as num?)?.toDouble() ??
+          (tempParams['offset'] as num?)?.toDouble() ??
+          0.0,
+      'temperature_scale': (tempParams['temperature_scale'] as num?)?.toDouble() ??
+          (tempParams['scale'] as num?)?.toDouble() ??
+          1.0,
+      'humidity_offset': (humParams['humidity_offset'] as num?)?.toDouble() ??
+          (humParams['offset'] as num?)?.toDouble() ??
+          (tempParams['humidity_offset'] as num?)?.toDouble() ??
+          0.0,
+      'humidity_scale': (humParams['humidity_scale'] as num?)?.toDouble() ??
+          (humParams['scale'] as num?)?.toDouble() ??
+          (tempParams['humidity_scale'] as num?)?.toDouble() ??
+          1.0,
       'humidity_type': integrated ? '' : (hum?.sensor ?? ''),
       'humidity_i2c_address': integrated ? 0 : (hum?.i2cAddress ?? 0),
       'humidity_gpio_pin': integrated ? -1 : (hum?.gpioPin ?? -1),
@@ -170,6 +223,8 @@ class NvsConfigMapper {
       'extra_temp_type': '',
       'extra_temp_gpio_pin': -1,
       'extra_temp_i2c_address': 0,
+      if (tempParams.isNotEmpty) 'parameters': tempParams,
+      if (!integrated && humParams.isNotEmpty) 'humidity_parameters': humParams,
     };
 
     final fanIsPwm = profile.pinMapping.exhaustFanPwm != null;

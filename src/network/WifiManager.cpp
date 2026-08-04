@@ -68,6 +68,24 @@ void WifiManager::beginConnectAsync(const String& ssid, const String& password) 
 
     WiFi.mode(ap_active_ ? WIFI_AP_STA : WIFI_STA);
     WiFi.disconnect(false);
+
+    if (current_config_.use_static_ip && !current_config_.ip.isEmpty()) {
+        IPAddress ip, gateway, netmask, dns;
+        if (ip.fromString(current_config_.ip) &&
+            gateway.fromString(current_config_.gateway.isEmpty()
+                                   ? current_config_.ip
+                                   : current_config_.gateway) &&
+            netmask.fromString(current_config_.netmask.isEmpty()
+                                   ? "255.255.255.0"
+                                   : current_config_.netmask)) {
+            if (!current_config_.dns.isEmpty() && dns.fromString(current_config_.dns)) {
+                WiFi.config(ip, gateway, netmask, dns);
+            } else {
+                WiFi.config(ip, gateway, netmask);
+            }
+        }
+    }
+
     WiFi.begin(ssid.c_str(), password.c_str());
 }
 

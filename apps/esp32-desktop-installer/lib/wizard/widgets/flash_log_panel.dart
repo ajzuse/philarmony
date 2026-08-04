@@ -22,6 +22,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../l10n/app_localizations.dart';
+
 class FlashLogPanel extends StatefulWidget {
   const FlashLogPanel({
     super.key,
@@ -53,13 +55,15 @@ class _FlashLogPanelState extends State<FlashLogPanel> {
             l.contains('error') ||
             l.contains('erase') ||
             l.contains('write_flash') ||
-            l.contains('verify'))
+            l.contains('verify') ||
+            l.contains('preflight'))
         .toList();
   }
 
   Future<void> _exportFile() async {
+    final l10n = AppLocalizations.of(context);
     final path = await FilePicker.platform.saveFile(
-      dialogTitle: 'Export flash log',
+      dialogTitle: l10n?.flashLogExportTitle ?? 'Export flash log',
       fileName: 'philarmony-flash.log',
     );
     if (path != null) {
@@ -71,13 +75,18 @@ class _FlashLogPanelState extends State<FlashLogPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final lines = _visible;
     return Column(
       children: [
         Row(
           children: [
             FilterChip(
-              label: Text(verbose ? 'Verbose' : 'Quiet'),
+              label: Text(
+                verbose
+                    ? (l10n?.flashLogVerbose ?? 'Verbose')
+                    : (l10n?.flashLogQuiet ?? 'Quiet'),
+              ),
               selected: verbose,
               onSelected: (v) => setState(() => verbose = v),
             ),
@@ -85,7 +94,7 @@ class _FlashLogPanelState extends State<FlashLogPanel> {
             TextButton.icon(
               onPressed: _exportFile,
               icon: const Icon(Icons.save_alt),
-              label: const Text('Export log'),
+              label: Text(l10n?.flashLogExport ?? 'Export log'),
             ),
           ],
         ),

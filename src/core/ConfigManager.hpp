@@ -126,6 +126,11 @@ struct WifiConfig {
     String ssid;
     String password;
     bool valid = false;
+    bool use_static_ip = false;
+    String ip;
+    String gateway;
+    String netmask;
+    String dns;
 };
 
 struct ControlConfig {

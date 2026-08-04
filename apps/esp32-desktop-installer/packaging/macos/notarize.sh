@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Notarize and staple a macOS DMG for public release (FR-012).
+# The .app MUST already be codesigned before build_dmg.sh (see CI / build_dmg.sh).
 set -euo pipefail
 
 DMG="${1:-}"
@@ -11,13 +12,6 @@ fi
 : "${APPLE_ID:?APPLE_ID required}"
 : "${APPLE_TEAM_ID:?APPLE_TEAM_ID required}"
 : "${APPLE_APP_SPECIFIC_PASSWORD:?APPLE_APP_SPECIFIC_PASSWORD required}"
-
-APP_BUNDLE="$(find "$(dirname "$DMG")/../build/macos" -name '*.app' -type d 2>/dev/null | head -1 || true)"
-if [[ -n "${APPLE_SIGNING_IDENTITY:-}" && -n "${APP_BUNDLE}" && -d "${APP_BUNDLE}" ]]; then
-  echo "codesign app bundle: $APP_BUNDLE"
-  codesign --deep --force --options runtime \
-    --sign "$APPLE_SIGNING_IDENTITY" "$APP_BUNDLE"
-fi
 
 echo "Submitting $DMG to notarytool…"
 xcrun notarytool submit "$DMG" \

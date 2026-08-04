@@ -56,6 +56,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get language => 'Idioma';
 
   @override
+  String get languagePortuguese => 'Português';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
   String get requiredField => 'Obrigatório';
 
   @override
@@ -81,6 +87,21 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get customPartitionLabel => 'Tabela de partições personalizada';
+
+  @override
+  String get clearLabel => 'Limpar';
+
+  @override
+  String get selectPartitionsTitle => 'Selecionar partitions.bin personalizado';
+
+  @override
+  String unsupportedChip(String chip, String supported) {
+    return 'Chip não suportado $chip. Variantes suportadas: $supported. Selecione um modelo suportado manualmente.';
+  }
+
+  @override
+  String get chipDetectFailed =>
+      'Não foi possível detectar o chip (selecione o modelo manualmente)';
 
   @override
   String get partialFlashWarn =>
@@ -126,6 +147,29 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get exhaustFanDigitalLabel => 'Exaustor digital';
+
+  @override
+  String get pinLegendStrapping => 'Strapping';
+
+  @override
+  String get pinLegendFlash => 'Flash reservado';
+
+  @override
+  String get pinLegendPsram => 'PSRAM reservado';
+
+  @override
+  String get pinLegendInputOnly => 'Somente entrada';
+
+  @override
+  String get pinLegendAssigned => 'Atribuído';
+
+  @override
+  String get pinLegendFlashPsram => 'Flash/PSRAM';
+
+  @override
+  String pinoutPackageOutline(String model) {
+    return 'Contorno do pacote $model (mapa GPIO)';
+  }
 
   @override
   String get enableDisplayLabel => 'Ativar display';
@@ -200,8 +244,73 @@ class AppLocalizationsPt extends AppLocalizations {
   String get staticIpTitle => 'IP estático (opcional)';
 
   @override
+  String get wifiScanLabel => 'Buscar WiFi próximos';
+
+  @override
+  String get wifiScanUnavailable =>
+      'Nenhuma rede encontrada (busca sem suporte ou sem permissão). Digite o SSID manualmente.';
+
+  @override
   String get dismissLabel => 'Dispensar';
 
   @override
   String get stepLabel => 'Etapa';
+
+  @override
+  String reviewModel(String model, int flashMb) {
+    return 'Modelo: $model ($flashMb MB)';
+  }
+
+  @override
+  String reviewHeaterPwm(int pin) {
+    return 'PWM aquecedor: $pin';
+  }
+
+  @override
+  String reviewWifiSsid(String ssid) {
+    return 'WiFi SSID: $ssid';
+  }
+
+  @override
+  String reviewProfiles(int count) {
+    return 'Perfis: $count';
+  }
+
+  @override
+  String reviewFirmware(String version) {
+    return 'Firmware: $version';
+  }
+
+  @override
+  String get reviewEraseWarning =>
+      'A instalação apagará e reflasheará o dispositivo com esta configuração. Não há restauração automática de uma imagem de firmware anterior.';
+
+  @override
+  String get flashLogVerbose => 'Detalhado';
+
+  @override
+  String get flashLogQuiet => 'Resumido';
+
+  @override
+  String get flashLogExport => 'Exportar log';
+
+  @override
+  String get flashLogExportTitle => 'Exportar log de flash';
+
+  @override
+  String get exportProfileTitle => 'Exportar perfil Philarmony';
+
+  @override
+  String exportSavedSnack(String path) {
+    return 'Salvo em $path (senha omitida)';
+  }
+
+  @override
+  String get exportClipboardSnack =>
+      'Salvar cancelado — JSON copiado (senha omitida)';
+
+  @override
+  String importFailed(String error) {
+    return 'Falha na importação: $error';
+  }
 }
