@@ -14,6 +14,8 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 
 ## User Scenarios & Testing
 
+> **Test task policy (Constitution v0.8.0):** Journeys and acceptance criteria live here. New **automated** test-implementation tasks → `specs/005-automated-flow-testing`. When `tasks.md` is generated, open test tasks on this feature are limited to **manual** validation; automation continues under the 005 catalog.
+
 ### Primary User Scenarios
 
 **Scenario 1: Start Drying Cycle via Touchscreen**

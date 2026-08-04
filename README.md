@@ -4,7 +4,7 @@
 [![Platform: ESP32](https://img.shields.io/badge/Platform-ESP32-red.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![Language: C/C++](https://img.shields.io/badge/Language-C%2FC%2B%2B-orange.svg)]()
 [![Spec Kit](https://img.shields.io/badge/Spec%20Kit-v0.13.2-green.svg)]()
-[![Constitution](https://img.shields.io/badge/Constitution-v0.7.0-purple.svg)](.specify/memory/constitution.md)
+[![Constitution](https://img.shields.io/badge/Constitution-v0.8.0-purple.svg)](.specify/memory/constitution.md)
 
 ## 📋 Sobre o Projeto
 
@@ -207,18 +207,19 @@
 
 ### 005 - Catálogo de Testes Automatizados (`specs/005-automated-flow-testing/`)
 
-**Objetivo**: Única especificação onde concentram-se todas as tasks de teste automatizado (jornadas/flow) do Philarmony.
+**Objetivo**: Única especificação para tasks de **teste automatizado** (jornadas/flow). Automação continua a ser implementada aqui.
 
-#### Diretriz (Constituição v0.7.0)
-- Specs de produto (001–004) mantêm jornadas e critérios de aceitação
-- Novas tasks de implementação de testes MUST nascer em `005-automated-flow-testing`
-- CI falha o PR se qualquer flow test mandatório falhar
-- Cobertura: firmware P1, instalador desktop P1; app (003) e touch (004) quando implementados
+#### Diretriz (Constituição v0.8.0)
+- Specs de produto (001–004): jornadas + critérios de aceitação; tasks abertas de teste limitadas a **manual** (smoke/checklist)
+- Tasks de implementação **automatizada** MUST nascer em `005-automated-flow-testing`
+- Histórico `[x]` de automação nas specs de produto permanece; sem resquícios abertos de automação fora de 005 (audit 2026-08-04)
+- Únicos abertos manuais fora de 005: `002` T031 / T062
+- CI falha o PR se qualquer flow test automatizado mandatório falhar
 
 #### Escopo da Spec
 | Área | Detalhes |
 |------|----------|
-| **Catálogo único** | Inventário e tracking de todo trabalho de teste automatizado |
+| **Catálogo único (automação)** | Inventário e tracking de trabalho de teste automatizado |
 | **Firmware flows** | Hotspot, WS start/stop/status, fault abort, bounds de timing/segurança |
 | **Installer flows** | Wizard, flash mockado, soft network-verify, redaction de senha |
 | **App/Touch flows** | Slots de cobertura P1 quando 003/004 forem shipados |
@@ -305,7 +306,7 @@ philarmony/
 
 ## 🧪 Testes
 
-Flow tests de jornada completa são o gate mandatório (Constituição: Teste Automatizado e Qualidade). **Todas as tasks de teste automatizado concentram-se em** [`specs/005-automated-flow-testing`](specs/005-automated-flow-testing/spec.md) — specs de produto não acumulam novas tasks de implementação de testes.
+Flow tests automatizados de jornada completa são o gate mandatório de CI (Constituição: Teste Automatizado e Qualidade). **Tasks de automação concentram-se em** [`specs/005-automated-flow-testing`](specs/005-automated-flow-testing/spec.md) e **continuam a ser implementadas**. Specs de produto só mantêm tasks abertas de **teste manual** (smoke/checklist); histórico `[x]` de automação permanece.
 
 ---
 
