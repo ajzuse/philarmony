@@ -11,7 +11,7 @@ import '../../device/session_providers.dart';
 /// Connects to the last-used or auto-connect flagged device on app launch.
 final discoverBootstrapProvider = FutureProvider<void>((ref) async {
   final repo = await ref.watch(knownDeviceRepositoryProvider.future);
-  final candidate = repo.autoConnectCandidate();
+  final candidate = await repo.autoConnectCandidate();
   if (candidate == null) return;
-  await ref.read(deviceSessionProvider.notifier).connect(candidate);
+  await ref.read(deviceSessionActionsProvider).connect(candidate);
 });

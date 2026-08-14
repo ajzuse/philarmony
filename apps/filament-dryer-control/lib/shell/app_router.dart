@@ -5,23 +5,29 @@
  */
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/cycle/cycle_result_page.dart';
+import '../features/cycle/cycle_navigation.dart';
 import '../features/cycle/start_cycle_page.dart';
 import '../features/config/config_page.dart';
 import '../features/dashboard/dashboard_page.dart';
-import '../features/discover/discover_page.dart';
+import '../features/devices/devices_registry_page.dart';
 import '../features/history/cycle_detail_page.dart';
 import '../features/history/history_controller.dart';
 import '../features/history/history_page.dart';
 import '../features/profiles/profiles_page.dart';
 import '../features/devices/device_settings_page.dart';
 import '../features/settings/settings_page.dart';
-import '../l10n/app_localizations.dart';
+import '../device/device_interfaces.dart';
+import '../device/session_providers.dart';
 import '../shell/adaptive_scaffold.dart';
 import '../shell/device_switcher.dart';
+import '../shell/pending_commands_badge.dart';
+import '../features/devices/firmware_guard.dart';
+import '../l10n/app_localizations.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -55,7 +61,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/devices',
-                builder: (_, __) => const DiscoverPage(),
+                builder: (_, __) => const DevicesRegistryPage(),
               ),
             ],
           ),
@@ -107,13 +113,43 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class AppShellScaffold extends ConsumerWidget {
+class AppShellScaffold extends ConsumerStatefulWidget {
   const AppShellScaffold({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShellScaffold> createState() => _AppShellScaffoldState();
+}
+
+class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
+  String? _firmwareCheckedDeviceId;
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<Map<String, dynamic>?>(cycleNavigationProvider, (prev, next) {
+      if (next != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          context.push('/cycle-result', extra: next);
+          ref.read(cycleNavigationProvider.notifier).clear();
+        });
+      }
+    });
+
+    final device = ref.watch(deviceSessionProvider).activeDevice;
+    final connection = ref.watch(deviceSessionProvider).connectionState;
+    if (device != null &&
+        connection == DeviceConnectionState.connected &&
+        _firmwareCheckedDeviceId != device.id &&
+        isFirmwareMismatch(device.firmwareVersion)) {
+      _firmwareCheckedDeviceId = device.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showFirmwareMismatchDialog(context, device: device);
+      });
+    }
+
     final l10n = AppLocalizations.of(context)!;
     final destinations = [
       NavigationDestination(
@@ -137,21 +173,54 @@ class AppShellScaffold extends ConsumerWidget {
         label: l10n.navSettings,
       ),
     ];
-    final detail = switch (navigationShell.currentIndex) {
+    final detail = switch (widget.navigationShell.currentIndex) {
       0 => const DashboardChartsPane(),
       1 => HistoryDetailPane(cycle: ref.watch(selectedCycleProvider)),
+      2 => DeviceSettingsDetailPane(
+          deviceId: ref.watch(selectedDeviceIdProvider),
+        ),
       _ => null,
     };
-    return AdaptiveScaffold(
-      selectedIndex: navigationShell.currentIndex,
-      onDestinationSelected: navigationShell.goBranch,
-      destinations: destinations,
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.digit1, control: true): _NavIntent(0),
+        SingleActivator(LogicalKeyboardKey.digit2, control: true): _NavIntent(1),
+        SingleActivator(LogicalKeyboardKey.digit3, control: true): _NavIntent(2),
+        SingleActivator(LogicalKeyboardKey.digit4, control: true): _NavIntent(3),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _NavIntent: CallbackAction<_NavIntent>(
+            onInvoke: (intent) {
+              widget.navigationShell.goBranch(intent.index);
+              return null;
+            },
+          ),
+        },
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: AdaptiveScaffold(
+            selectedIndex: widget.navigationShell.currentIndex,
+            onDestinationSelected: widget.navigationShell.goBranch,
+            destinations: destinations,
       appBar: AppBar(
         title: Text(l10n.appTitle),
-        actions: const [DeviceSwitcher()],
+        actions: const [
+          PendingCommandsBadge(),
+          DeviceSwitcher(),
+        ],
       ),
-      body: navigationShell,
-      detail: detail,
+            body: widget.navigationShell,
+            detail: detail,
+          ),
+        ),
+      ),
     );
   }
+}
+
+class _NavIntent extends Intent {
+  const _NavIntent(this.index);
+
+  final int index;
 }

@@ -10,7 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 
 import '../../l10n/app_localizations.dart';
-import 'cycle_csv_export.dart';
+import '../../platform/cycle_file_export.dart';
 import 'cycle_pdf_export.dart';
 import 'history_stats.dart';
 
@@ -47,7 +47,7 @@ class CycleDetailPage extends ConsumerWidget {
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: () async {
-            final path = await exportCycleCsv(cycle);
+            final path = await saveCycleCsv(cycle);
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('CSV: $path')),
@@ -60,7 +60,8 @@ class CycleDetailPage extends ConsumerWidget {
         const SizedBox(height: 8),
         FilledButton.icon(
           onPressed: () async {
-            final bytes = await exportCyclePdf(cycle);
+            final locale = Localizations.localeOf(context);
+            final bytes = await exportCyclePdf(cycle, locale: locale);
             await Printing.sharePdf(bytes: bytes, filename: 'cycle.pdf');
           },
           icon: const Icon(Icons.picture_as_pdf_outlined),

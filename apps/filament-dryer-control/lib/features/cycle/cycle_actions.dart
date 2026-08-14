@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/cycle/cycle_controller.dart';
+import 'cycle_controller.dart';
 import '../../l10n/app_localizations.dart';
 
 Future<void> confirmAndStopCycle(BuildContext context, WidgetRef ref) async {
@@ -25,9 +25,6 @@ Future<void> confirmAndStopCycle(BuildContext context, WidgetRef ref) async {
     ),
   );
   if (ok == true && context.mounted) {
-    final cycle = await ref.read(cycleControllerProvider).stop();
-    if (context.mounted && cycle != null) {
-      context.push('/cycle-result', extra: cycle);
-    }
+    await ref.read(cycleControllerProvider).stop();
   }
 }

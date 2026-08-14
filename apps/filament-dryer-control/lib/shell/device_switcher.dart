@@ -29,7 +29,7 @@ class DeviceSwitcher extends ConsumerWidget {
     return PopupMenuButton<String>(
       tooltip: l10n.switchDevice,
       onSelected: (deviceId) {
-        ref.read(deviceSessionProvider.notifier).setActive(deviceId);
+        ref.read(deviceSessionActionsProvider).setActive(deviceId);
       },
       itemBuilder: (context) {
         return [

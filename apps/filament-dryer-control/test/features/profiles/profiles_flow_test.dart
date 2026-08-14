@@ -29,13 +29,13 @@ void main() {
       final container = newContainer();
       addTearDown(() async {
         try {
-          await container.read(deviceSessionProvider.notifier).disconnect();
+          await container.read(deviceSessionActionsProvider).disconnect();
         } catch (_) {}
         container.dispose();
       });
 
       final device = KnownDevice(id: 'd1', nickname: 'Dryer', host: '127.0.0.1');
-      await container.read(deviceSessionProvider.notifier).connect(device);
+      await container.read(deviceSessionActionsProvider).connect(device);
 
       final profiles = await container.read(profilesListProvider.future);
       expect(profiles.length, FilamentProfile.builtins().length);
@@ -48,13 +48,13 @@ void main() {
       final container = newContainer();
       addTearDown(() async {
         try {
-          await container.read(deviceSessionProvider.notifier).disconnect();
+          await container.read(deviceSessionActionsProvider).disconnect();
         } catch (_) {}
         container.dispose();
       });
 
       final device = KnownDevice(id: 'd1', nickname: 'Dryer', host: '127.0.0.1');
-      await container.read(deviceSessionProvider.notifier).connect(device);
+      await container.read(deviceSessionActionsProvider).connect(device);
 
       final svc = await container.read(profileSyncServiceProvider.future);
       await svc.createProfile(
@@ -77,7 +77,7 @@ void main() {
       final container = newContainer();
       addTearDown(() async {
         try {
-          await container.read(deviceSessionProvider.notifier).disconnect();
+          await container.read(deviceSessionActionsProvider).disconnect();
         } catch (_) {}
         container.dispose();
       });
@@ -96,12 +96,12 @@ void main() {
         },
       );
 
-      expect(pending.listQueued(device.id), hasLength(1));
+      expect(await pending.listQueued(device.id), hasLength(1));
 
-      await container.read(deviceSessionProvider.notifier).connect(device);
+      await container.read(deviceSessionActionsProvider).connect(device);
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
-      expect(pending.listQueued(device.id), isEmpty);
+      expect(await pending.listQueued(device.id), isEmpty);
     });
 
     test('start cycle with profile_id only when using preset unchanged', () async {
@@ -109,21 +109,22 @@ void main() {
       final container = newContainer();
       addTearDown(() async {
         try {
-          await container.read(deviceSessionProvider.notifier).disconnect();
+          await container.read(deviceSessionActionsProvider).disconnect();
         } catch (_) {}
         container.dispose();
       });
 
       final device = KnownDevice(id: 'd1', nickname: 'Dryer', host: '127.0.0.1');
-      await container.read(deviceSessionProvider.notifier).connect(device);
+      await container.read(deviceSessionActionsProvider).connect(device);
 
       const request = StartCycleRequest(profileId: 'pla');
       expect(CycleCommandValidator.validateStart(request), isEmpty);
 
-      await container.read(deviceSessionProvider.notifier).startCycle(request);
+      await container.read(deviceSessionActionsProvider).startCycle(request);
 
       final repo = await container.read(dryingCycleRepositoryProvider.future);
-      final cycle = repo.list().first;
+      final cycles = await repo.list();
+      final cycle = cycles.first;
       expect(cycle['profile_id'], 'pla');
     });
 
@@ -132,13 +133,13 @@ void main() {
       final container = newContainer();
       addTearDown(() async {
         try {
-          await container.read(deviceSessionProvider.notifier).disconnect();
+          await container.read(deviceSessionActionsProvider).disconnect();
         } catch (_) {}
         container.dispose();
       });
 
       final device = KnownDevice(id: 'd1', nickname: 'Dryer', host: '127.0.0.1');
-      await container.read(deviceSessionProvider.notifier).connect(device);
+      await container.read(deviceSessionActionsProvider).connect(device);
 
       final svc = await container.read(profileSyncServiceProvider.future);
       expect(

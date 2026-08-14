@@ -23,35 +23,15 @@ final wsClientProvider = Provider<PhilarmonyWsClient>((ref) {
   return ref.read(wsClientFactoryProvider)();
 });
 
-class DeviceSessionNotifier extends Notifier<DeviceSessionState> {
-  @override
-  DeviceSessionState build() {
-    ref.listen(sessionManagerProvider, (_, next) {
-      state = next.activeDeviceSessionState;
-    }, fireImmediately: true);
-    return ref.read(sessionManagerProvider).activeDeviceSessionState;
-  }
+/// Read-only view of the active device session (mirrors [sessionManagerProvider]).
+final deviceSessionProvider = Provider<DeviceSessionState>((ref) {
+  return ref.watch(sessionManagerProvider).activeDeviceSessionState;
+});
 
-  Future<void> connect(KnownDevice device) =>
-      ref.read(sessionManagerProvider.notifier).connect(device);
-
-  Future<void> disconnect([String? deviceId]) =>
-      ref.read(sessionManagerProvider.notifier).disconnect(deviceId);
-
-  Future<void> setActive(String deviceId) =>
-      ref.read(sessionManagerProvider.notifier).setActive(deviceId);
-
-  Future<void> startCycle(StartCycleRequest request) =>
-      ref.read(sessionManagerProvider.notifier).startCycle(request);
-
-  Future<void> stopCycle() =>
-      ref.read(sessionManagerProvider.notifier).stopCycle();
-}
-
-final deviceSessionProvider =
-    NotifierProvider<DeviceSessionNotifier, DeviceSessionState>(
-  DeviceSessionNotifier.new,
-);
+/// Session actions (connect, disconnect, cycle control).
+final deviceSessionActionsProvider = Provider<SessionManagerNotifier>((ref) {
+  return ref.read(sessionManagerProvider.notifier);
+});
 
 final knownDevicesProvider = FutureProvider<List<KnownDevice>>((ref) async {
   final repo = await ref.read(knownDeviceRepositoryProvider.future);

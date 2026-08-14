@@ -1,3 +1,9 @@
+/*
+ * Philarmony Filament Dryer Control App
+ * Copyright (C) 2026 Philarmony Contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 package com.philarmony.filament_dryer_control
 
 import android.app.Notification
@@ -12,7 +18,7 @@ import androidx.core.app.NotificationCompat
 /**
  * Minimal dataSync foreground service so the OS keeps the process alive during
  * an active drying cycle WebSocket session. Started/stopped from Dart via
- * [AndroidBackgroundSession] lifecycle (channel may bind later).
+ * `philarmony/background` MethodChannel in [MainActivity].
  */
 class CycleForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null

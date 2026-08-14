@@ -8,8 +8,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'platform/local_notifications.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final container = ProviderContainer();
+  await container.read(localNotificationsProvider).init();
+  container.dispose();
   runApp(const ProviderScope(child: PhilarmonyControlApp()));
 }

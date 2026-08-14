@@ -18,7 +18,7 @@ void main() {
     );
     addTearDown(() async {
       try {
-        await container.read(deviceSessionProvider.notifier).disconnect();
+        await container.read(deviceSessionActionsProvider).disconnect();
       } catch (_) {}
       container.dispose();
     });
@@ -26,8 +26,8 @@ void main() {
     await container.read(localStoreProvider.future);
 
     final device = KnownDevice(id: 'd1', nickname: 'Dryer', host: '127.0.0.1');
-    await container.read(deviceSessionProvider.notifier).connect(device);
-    await container.read(deviceSessionProvider.notifier).startCycle(
+    await container.read(deviceSessionActionsProvider).connect(device);
+    await container.read(deviceSessionActionsProvider).startCycle(
           const StartCycleRequest(targetTempC: 50, maxDurationMin: 60),
         );
 

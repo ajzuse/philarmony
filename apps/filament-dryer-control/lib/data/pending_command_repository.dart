@@ -6,10 +6,11 @@
 
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:philarmony_core/philarmony_core.dart';
 import 'package:uuid/uuid.dart';
 
-import 'app_preferences.dart';
+import 'app_database.dart' as drift;
 
 enum PendingCommandStatus { queued, sending, acked, failed }
 
@@ -71,23 +72,31 @@ class PendingCommand {
 }
 
 class PendingCommandRepository {
-  PendingCommandRepository(this._store);
+  PendingCommandRepository(this._db);
 
-  final LocalStore _store;
+  final drift.AppDatabase _db;
   static const _uuid = Uuid();
 
-  List<PendingCommand> list({String? deviceId}) {
-    final all = _store
-        .loadPendingCommands()
-        .map(PendingCommand.fromJson)
-        .toList();
-    if (deviceId == null) return all;
-    return all.where((c) => c.knownDeviceId == deviceId).toList();
+  Future<List<PendingCommand>> list({String? deviceId}) async {
+    final query = _db.select(_db.pendingCommands)
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
+    if (deviceId != null) {
+      query.where((t) => t.knownDeviceId.equals(deviceId));
+    }
+    final rows = await query.get();
+    return rows.map(_fromRow).toList();
   }
 
-  List<PendingCommand> listQueued(String deviceId) => list(deviceId: deviceId)
-      .where((c) => c.status == PendingCommandStatus.queued)
-      .toList();
+  Future<List<PendingCommand>> listQueued(String deviceId) async {
+    final rows = await (_db.select(_db.pendingCommands)
+          ..where(
+            (t) =>
+                t.knownDeviceId.equals(deviceId) & t.status.equals('queued'),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .get();
+    return rows.map(_fromRow).toList();
+  }
 
   Future<PendingCommand> enqueue({
     required String deviceId,
@@ -101,29 +110,30 @@ class PendingCommandRepository {
       payloadJson: jsonEncode(payload),
       createdAt: DateTime.now().toUtc(),
     );
-    final all = list();
-    all.add(cmd);
-    await _save(all);
+    await _db.into(_db.pendingCommands).insert(
+          drift.PendingCommandsCompanion.insert(
+            id: cmd.id,
+            knownDeviceId: cmd.knownDeviceId,
+            topic: cmd.topic,
+            payloadJson: cmd.payloadJson,
+            createdAt: cmd.createdAt,
+            status: cmd.status.name,
+          ),
+        );
     return cmd;
   }
 
   Future<void> markAcked(String id) async {
-    final all = list();
-    final idx = all.indexWhere((c) => c.id == id);
-    if (idx < 0) return;
-    all.removeAt(idx);
-    await _save(all);
+    await (_db.delete(_db.pendingCommands)..where((t) => t.id.equals(id))).go();
   }
 
   Future<void> markFailed(String id, String error) async {
-    final all = list();
-    final idx = all.indexWhere((c) => c.id == id);
-    if (idx < 0) return;
-    all[idx] = all[idx].copyWith(
-      status: PendingCommandStatus.failed,
-      lastError: error,
+    await (_db.update(_db.pendingCommands)..where((t) => t.id.equals(id))).write(
+      drift.PendingCommandsCompanion(
+        status: const Value('failed'),
+        lastError: Value(error),
+      ),
     );
-    await _save(all);
   }
 
   Future<int> flush(
@@ -131,7 +141,7 @@ class PendingCommandRepository {
     Future<void> Function(PendingCommand command) send,
   ) async {
     var sent = 0;
-    for (final cmd in listQueued(deviceId)) {
+    for (final cmd in await listQueued(deviceId)) {
       try {
         await send(cmd);
         await markAcked(cmd.id);
@@ -143,7 +153,13 @@ class PendingCommandRepository {
     return sent;
   }
 
-  Future<void> _save(List<PendingCommand> commands) async {
-    await _store.savePendingCommands(commands.map((c) => c.toJson()).toList());
-  }
+  PendingCommand _fromRow(drift.PendingCommand row) => PendingCommand(
+        id: row.id,
+        knownDeviceId: row.knownDeviceId,
+        topic: row.topic,
+        payloadJson: row.payloadJson,
+        createdAt: row.createdAt,
+        status: PendingCommandStatus.values.byName(row.status),
+        lastError: row.lastError,
+      );
 }

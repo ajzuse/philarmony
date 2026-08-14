@@ -5,18 +5,10 @@
  */
 
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
-
-/// Exports cycle metadata + sample rows in one UTF-8 CSV file.
+/// Builds UTF-8 CSV content for a cycle.
 /// Sample rows use section=sample; metadata rows use section=meta.
-Future<String> exportCycleCsv(
-  Map<String, dynamic> cycle, {
-  String? directory,
-}) async {
-  final dirPath = directory ?? (await getApplicationDocumentsDirectory()).path;
-  final file = File('$dirPath/cycle_${cycle['id'] ?? 'export'}.csv');
+String buildCycleCsv(Map<String, dynamic> cycle) {
   final buffer = StringBuffer('section,field,value\n');
 
   for (final e in cycle.entries) {
@@ -35,8 +27,7 @@ Future<String> exportCycleCsv(
     }
   }
 
-  await file.writeAsString(buffer.toString());
-  return file.path;
+  return buffer.toString();
 }
 
 String _csvCell(Object? value) {

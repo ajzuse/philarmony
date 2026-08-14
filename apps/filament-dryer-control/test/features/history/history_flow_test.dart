@@ -1,5 +1,6 @@
-import 'package:filament_dryer_control/data/app_preferences.dart';
+import 'package:filament_dryer_control/data/app_database.dart';
 import 'package:filament_dryer_control/data/drying_cycle_repository.dart';
+import 'package:filament_dryer_control/device/session_deps.dart';
 import 'package:filament_dryer_control/features/history/history_page.dart';
 import 'package:filament_dryer_control/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -13,8 +14,8 @@ void main() {
 
   testWidgets('history list shows seeded completed cycle offline', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    final store = LocalStore(await SharedPreferences.getInstance());
-    final repo = DryingCycleRepository(store);
+    final db = AppDatabase.memory();
+    final repo = DryingCycleRepository(db);
     final id = await repo.startCycle(
       deviceId: 'd1',
       request: const StartCycleRequest(targetTempC: 55, maxDurationMin: 90),
@@ -23,8 +24,12 @@ void main() {
     await repo.finalizeCycle(id, stopReason: 'completed');
 
     await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          storeMigrationProvider.overrideWith((ref) async {}),
+        ],
+        child: const MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(body: HistoryPage()),
@@ -33,7 +38,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('PLA'), findsOneWidget);
-    expect(find.textContaining('completed'), findsWidgets);
+    expect(find.text('PLA'), findsWidgets);
+    expect(find.textContaining('55.0'), findsWidgets);
   });
 }

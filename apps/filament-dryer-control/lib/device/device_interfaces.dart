@@ -8,6 +8,8 @@ import 'dart:async';
 
 import 'package:philarmony_core/philarmony_core.dart';
 
+import 'device_runtime_info.dart';
+
 enum DeviceConnectionState {
   idle,
   connecting,
@@ -43,6 +45,8 @@ abstract class PhilarmonyWsClient {
   DeviceConnectionState get state;
   StatusSnapshot? get lastStatus;
   HardwareConfig? get lastHardwareConfig;
+  DeviceRuntimeInfo? get deviceRuntimeInfo;
+  DateTime? get hardwareConfigUpdatedAt;
 
   Future<void> connect(KnownDevice device);
   Future<void> disconnect();

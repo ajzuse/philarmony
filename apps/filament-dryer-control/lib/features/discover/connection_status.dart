@@ -19,8 +19,8 @@ class ConnectionStatusChip extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final (label, color) = switch (state) {
       DeviceConnectionState.connected => (l10n.connected, Colors.green),
-      DeviceConnectionState.connecting || DeviceConnectionState.reconnecting =>
-        (l10n.connecting, Colors.orange),
+      DeviceConnectionState.connecting => (l10n.connecting, Colors.orange),
+      DeviceConnectionState.reconnecting => (l10n.reconnecting, Colors.orange),
       DeviceConnectionState.error => ('Error', Colors.red),
       _ => (l10n.disconnected, Colors.grey),
     };

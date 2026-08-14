@@ -7,6 +7,7 @@
 import 'package:philarmony_core/philarmony_core.dart';
 
 import 'device_interfaces.dart';
+import 'device_runtime_info.dart';
 
 class DeviceSessionState {
   const DeviceSessionState({
@@ -16,6 +17,8 @@ class DeviceSessionState {
     this.fault,
     this.backgroundAllowed = true,
     this.activeCycleId,
+    this.deviceRuntimeInfo,
+    this.hardwareCache,
   });
 
   final KnownDevice? activeDevice;
@@ -24,6 +27,8 @@ class DeviceSessionState {
   final FaultEvent? fault;
   final bool backgroundAllowed;
   final String? activeCycleId;
+  final DeviceRuntimeInfo? deviceRuntimeInfo;
+  final HardwareConfig? hardwareCache;
 
   DeviceSessionState copyWith({
     KnownDevice? activeDevice,
@@ -33,6 +38,8 @@ class DeviceSessionState {
     bool? backgroundAllowed,
     String? activeCycleId,
     bool clearActiveCycleId = false,
+    DeviceRuntimeInfo? deviceRuntimeInfo,
+    HardwareConfig? hardwareCache,
   }) {
     return DeviceSessionState(
       activeDevice: activeDevice ?? this.activeDevice,
@@ -41,6 +48,8 @@ class DeviceSessionState {
       fault: fault ?? this.fault,
       backgroundAllowed: backgroundAllowed ?? this.backgroundAllowed,
       activeCycleId: clearActiveCycleId ? null : (activeCycleId ?? this.activeCycleId),
+      deviceRuntimeInfo: deviceRuntimeInfo ?? this.deviceRuntimeInfo,
+      hardwareCache: hardwareCache ?? this.hardwareCache,
     );
   }
 }

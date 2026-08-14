@@ -31,6 +31,7 @@ dependencies:
   pdf: ^3.11.1
   printing: ^5.13.4
   uuid: ^4.5.1
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
@@ -38,6 +39,14 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   drift_dev: ^2.22.1
   build_runner: ^2.4.13
+  msix: ^3.16.0
+
+msix_config:
+  display_name: Philarmony Control
+  publisher_display_name: Philarmony
+  identity_name: local.philarmony.control
+  msix_version: 0.1.0.0
+  capabilities: internetClient,privateNetworkClientServer
 
 flutter:
   generate: true

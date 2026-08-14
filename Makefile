@@ -181,17 +181,23 @@ package-control-linux:
 	  if [ -n "$$bundle" ]; then cp -a "$$bundle/." dist/control-linux/; \
 	  echo "Packed → dist/control-linux/"; else echo "Linux bundle not found"; exit 1; fi
 
+package-control-linux-appimage: package-control-linux
+	@chmod +x $(CONTROL_APP)/packaging/build-appimage.sh
+	$(CONTROL_APP)/packaging/build-appimage.sh
+
 package-control-macos:
 	$(call require_flutter)
 	@mkdir -p dist/control-macos
 	cd $(CONTROL_APP) && $(FLUTTER) build macos --release
-	@echo "macOS release under $(CONTROL_APP)/build/macos/Build/Products/Release/ (copy to dist/control-macos as needed)"
+	@chmod +x $(CONTROL_APP)/packaging/build-dmg.sh
+	$(CONTROL_APP)/packaging/build-dmg.sh
 
 package-control-windows:
 	$(call require_flutter)
 	@mkdir -p dist/control-windows
 	cd $(CONTROL_APP) && $(FLUTTER) build windows --release
-	@echo "Windows release under $(CONTROL_APP)/build/windows/x64/runner/Release/"
+	@chmod +x $(CONTROL_APP)/packaging/build-msix.sh
+	cd $(CONTROL_APP) && $(DART) pub get && bash packaging/build-msix.sh
 
 package-control: package-control-linux
 

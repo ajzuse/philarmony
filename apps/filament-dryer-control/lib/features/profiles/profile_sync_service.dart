@@ -138,6 +138,66 @@ class ProfileSyncService {
     return profile;
   }
 
+  Future<FilamentProfile> getProfile(String profileId) async {
+    final deviceId = _deviceId;
+    if (deviceId == null) throw StateError('No active device');
+
+    if (_isOnline) {
+      try {
+        final response = await _getClient().request(
+          WsEnvelope(
+            topic: 'config/profiles/get',
+            payload: {'profile_id': profileId},
+          ),
+        );
+        final profileJson = response?.payload['profile'];
+        if (profileJson is Map) {
+          final profile =
+              _profileFromJson(Map<String, dynamic>.from(profileJson));
+          await _upsertLocal(deviceId, profile);
+          return profile;
+        }
+      } catch (_) {}
+    }
+
+    final cached = _loadCache(deviceId).where((p) => p.id == profileId).firstOrNull;
+    if (cached != null) return cached;
+    final builtin =
+        FilamentProfile.builtins().where((p) => p.id == profileId).firstOrNull;
+    if (builtin != null) return builtin;
+    throw StateError('Profile $profileId not found');
+  }
+
+  Future<List<FilamentProfile>> resetDefaults() async {
+    final deviceId = _deviceId;
+    if (deviceId == null) throw StateError('No active device');
+
+    if (_isOnline) {
+      try {
+        final response = await _getClient().request(
+          const WsEnvelope(topic: 'config/profiles/reset_defaults', payload: {}),
+        );
+        final profiles = response?.payload['profiles'];
+        if (profiles is List) {
+          final parsed = profiles
+              .map((e) => _profileFromJson(Map<String, dynamic>.from(e as Map)))
+              .toList();
+          await _saveCache(deviceId, parsed);
+          return visibleProfiles(parsed);
+        }
+      } catch (_) {}
+    }
+
+    await _pending.enqueue(
+      deviceId: deviceId,
+      topic: 'config/profiles/reset_defaults',
+      payload: const {},
+    );
+    final defaults = FilamentProfile.builtins();
+    await _saveCache(deviceId, defaults);
+    return visibleProfiles(defaults);
+  }
+
   Future<void> deleteProfile(String profileId) async {
     final deviceId = _deviceId;
     if (deviceId == null) throw StateError('No active device');

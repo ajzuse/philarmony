@@ -152,6 +152,12 @@ abstract class AppLocalizations {
   /// **'Connecting'**
   String get connecting;
 
+  /// No description provided for @reconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting'**
+  String get reconnecting;
+
   /// No description provided for @disconnected.
   ///
   /// In en, this message translates to:
@@ -409,6 +415,504 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Advanced (read-only)'**
   String get advancedSettings;
+
+  /// No description provided for @backgroundNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Background monitoring unavailable. Keep the app open during drying.'**
+  String get backgroundNotAllowed;
+
+  /// No description provided for @dismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get dismiss;
+
+  /// No description provided for @sensorError.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor Error'**
+  String get sensorError;
+
+  /// No description provided for @statusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get statusLabel;
+
+  /// No description provided for @chamberTemp.
+  ///
+  /// In en, this message translates to:
+  /// **'Chamber temp'**
+  String get chamberTemp;
+
+  /// No description provided for @targetTemp.
+  ///
+  /// In en, this message translates to:
+  /// **'Target temp'**
+  String get targetTemp;
+
+  /// No description provided for @humidity.
+  ///
+  /// In en, this message translates to:
+  /// **'Humidity'**
+  String get humidity;
+
+  /// No description provided for @targetHumidity.
+  ///
+  /// In en, this message translates to:
+  /// **'Target humidity'**
+  String get targetHumidity;
+
+  /// No description provided for @heater.
+  ///
+  /// In en, this message translates to:
+  /// **'Heater'**
+  String get heater;
+
+  /// No description provided for @exhaustFan.
+  ///
+  /// In en, this message translates to:
+  /// **'Exhaust fan'**
+  String get exhaustFan;
+
+  /// No description provided for @elapsedTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Elapsed'**
+  String get elapsedTime;
+
+  /// No description provided for @remainingTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get remainingTime;
+
+  /// No description provided for @cpuUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'CPU usage'**
+  String get cpuUsage;
+
+  /// No description provided for @memoryFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free memory'**
+  String get memoryFree;
+
+  /// No description provided for @uptime.
+  ///
+  /// In en, this message translates to:
+  /// **'Uptime'**
+  String get uptime;
+
+  /// No description provided for @heatingBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Heating'**
+  String get heatingBadge;
+
+  /// No description provided for @coolingBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooling'**
+  String get coolingBadge;
+
+  /// No description provided for @idleBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Idle'**
+  String get idleBadge;
+
+  /// No description provided for @startWithProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with profile'**
+  String get startWithProfile;
+
+  /// No description provided for @useCelsius.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Celsius'**
+  String get useCelsius;
+
+  /// No description provided for @useCelsiusSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Off shows Fahrenheit on dashboard'**
+  String get useCelsiusSubtitle;
+
+  /// No description provided for @timeFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Time format'**
+  String get timeFormat;
+
+  /// No description provided for @timeFormat24h.
+  ///
+  /// In en, this message translates to:
+  /// **'24-hour'**
+  String get timeFormat24h;
+
+  /// No description provided for @timeFormat12h.
+  ///
+  /// In en, this message translates to:
+  /// **'12-hour'**
+  String get timeFormat12h;
+
+  /// No description provided for @chartWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart window'**
+  String get chartWindow;
+
+  /// No description provided for @chartWindowSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Telemetry history shown on dashboard charts'**
+  String get chartWindowSubtitle;
+
+  /// No description provided for @maxConcurrentSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'Max concurrent sessions'**
+  String get maxConcurrentSessions;
+
+  /// No description provided for @pinLock.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN lock'**
+  String get pinLock;
+
+  /// No description provided for @pinLockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional — stub for MVP'**
+  String get pinLockSubtitle;
+
+  /// No description provided for @deviceConfigSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensors, pins, display, WiFi'**
+  String get deviceConfigSubtitle;
+
+  /// No description provided for @testNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Test notification'**
+  String get testNotification;
+
+  /// No description provided for @testNotificationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local notifications adapter stub'**
+  String get testNotificationSubtitle;
+
+  /// No description provided for @systemDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'System default'**
+  String get systemDefault;
+
+  /// No description provided for @languageEnUs.
+  ///
+  /// In en, this message translates to:
+  /// **'English (US)'**
+  String get languageEnUs;
+
+  /// No description provided for @languagePtBr.
+  ///
+  /// In en, this message translates to:
+  /// **'Portuguese (Brazil)'**
+  String get languagePtBr;
+
+  /// No description provided for @highContrast.
+  ///
+  /// In en, this message translates to:
+  /// **'High contrast'**
+  String get highContrast;
+
+  /// No description provided for @highContrastSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stronger colors for readability'**
+  String get highContrastSubtitle;
+
+  /// No description provided for @configReloadTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload from device'**
+  String get configReloadTooltip;
+
+  /// No description provided for @configSavedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration saved on device.'**
+  String get configSavedBanner;
+
+  /// No description provided for @configSaveButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save hardware configuration'**
+  String get configSaveButton;
+
+  /// No description provided for @configSensorsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensors'**
+  String get configSensorsTitle;
+
+  /// No description provided for @configTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get configTypeLabel;
+
+  /// No description provided for @configGpioLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'GPIO'**
+  String get configGpioLabel;
+
+  /// No description provided for @configActuatorsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pins / actuators'**
+  String get configActuatorsTitle;
+
+  /// No description provided for @configPwmGpioLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'PWM GPIO'**
+  String get configPwmGpioLabel;
+
+  /// No description provided for @configDisplayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Display'**
+  String get configDisplayTitle;
+
+  /// No description provided for @configDisplayEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get configDisplayEnabled;
+
+  /// No description provided for @configDriverLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver'**
+  String get configDriverLabel;
+
+  /// No description provided for @configWidthLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get configWidthLabel;
+
+  /// No description provided for @configHeightLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get configHeightLabel;
+
+  /// No description provided for @wifiSsidLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SSID'**
+  String get wifiSsidLabel;
+
+  /// No description provided for @notConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected'**
+  String get notConnected;
+
+  /// No description provided for @wifiSignalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal'**
+  String get wifiSignalLabel;
+
+  /// No description provided for @notReportedMvp.
+  ///
+  /// In en, this message translates to:
+  /// **'Not reported by device (MVP)'**
+  String get notReportedMvp;
+
+  /// No description provided for @wifiReconfigureButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconfigure WiFi (hotspot mode)'**
+  String get wifiReconfigureButton;
+
+  /// No description provided for @wifiReconfigureNote.
+  ///
+  /// In en, this message translates to:
+  /// **'WiFi reconfiguration triggers hotspot mode on the device. Use the desktop installer for full WiFi setup in v1.'**
+  String get wifiReconfigureNote;
+
+  /// No description provided for @advancedDeviceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Device name'**
+  String get advancedDeviceName;
+
+  /// No description provided for @advancedFirmwareVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Firmware version'**
+  String get advancedFirmwareVersion;
+
+  /// No description provided for @advancedNtpTimezone.
+  ///
+  /// In en, this message translates to:
+  /// **'NTP timezone'**
+  String get advancedNtpTimezone;
+
+  /// No description provided for @advancedHardTempLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Hard temp limit (°C)'**
+  String get advancedHardTempLimit;
+
+  /// No description provided for @advancedUptimeSec.
+  ///
+  /// In en, this message translates to:
+  /// **'Uptime (sec)'**
+  String get advancedUptimeSec;
+
+  /// No description provided for @advancedCpuUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'CPU usage (%)'**
+  String get advancedCpuUsage;
+
+  /// No description provided for @advancedFreeMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Free memory (bytes)'**
+  String get advancedFreeMemory;
+
+  /// No description provided for @historyFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get historyFilterAll;
+
+  /// No description provided for @historyFilterCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get historyFilterCompleted;
+
+  /// No description provided for @historyFilterInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get historyFilterInProgress;
+
+  /// No description provided for @historyCycleDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Cycle'**
+  String get historyCycleDefault;
+
+  /// No description provided for @historyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No cycles yet'**
+  String get historyEmpty;
+
+  /// No description provided for @selectDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a device'**
+  String get selectDevice;
+
+  /// No description provided for @chartWindowMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String chartWindowMinutes(int minutes);
+
+  /// No description provided for @wifiHotspotModeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Device is in hotspot mode. Join WiFi network \"{ssid}\" to configure.'**
+  String wifiHotspotModeBody(String ssid);
+
+  /// No description provided for @wifiReconfigureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconfigure WiFi'**
+  String get wifiReconfigureTitle;
+
+  /// No description provided for @wifiReconfigureSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'1. Connect your phone or PC to WiFi \"{ssid}\".\n2. Open http://{host}/ in a browser.\n3. Enter your home WiFi credentials.\n4. Reconnect the control app on the new IP.'**
+  String wifiReconfigureSteps(String ssid, String host);
+
+  /// No description provided for @pendingCommandsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 pending change} other{{count} pending changes}}'**
+  String pendingCommandsTooltip(int count);
+
+  /// No description provided for @resetProfilesDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset defaults'**
+  String get resetProfilesDefaults;
+
+  /// No description provided for @resetProfilesDefaultsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset profile defaults?'**
+  String get resetProfilesDefaultsTitle;
+
+  /// No description provided for @resetProfilesDefaultsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore built-in material profiles from the device. Custom profiles are removed.'**
+  String get resetProfilesDefaultsBody;
+
+  /// No description provided for @maxConcurrentSessionsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum simultaneous device connections'**
+  String get maxConcurrentSessionsSubtitle;
+
+  /// No description provided for @autoConnectLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-connect'**
+  String get autoConnectLabel;
+
+  /// No description provided for @autoConnectSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prefer this device on app launch'**
+  String get autoConnectSubtitle;
+
+  /// No description provided for @lastSeenLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Last seen'**
+  String get lastSeenLabel;
+
+  /// No description provided for @firmwareVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Firmware version'**
+  String get firmwareVersionLabel;
+
+  /// No description provided for @notReported.
+  ///
+  /// In en, this message translates to:
+  /// **'Not reported'**
+  String get notReported;
 }
 
 class _AppLocalizationsDelegate

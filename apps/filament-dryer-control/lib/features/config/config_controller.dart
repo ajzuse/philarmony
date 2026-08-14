@@ -9,9 +9,12 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:philarmony_core/philarmony_core.dart';
 
+import '../../device/device_interfaces.dart';
 import '../../device/session_providers.dart';
+import '../../shell/pending_commands_count.dart';
+import 'config_merge_policy.dart';
 
-enum ConfigSaveState { idle, saving, saved, validationFailed, deviceError }
+enum ConfigSaveState { idle, saving, saved, queued, validationFailed, deviceError }
 
 class ConfigUiState {
   const ConfigUiState({
@@ -20,6 +23,7 @@ class ConfigUiState {
     this.saveState = ConfigSaveState.idle,
     this.validationErrors = const [],
     this.deviceError,
+    this.localEditedAt,
   });
 
   final HardwareConfig draft;
@@ -27,6 +31,7 @@ class ConfigUiState {
   final ConfigSaveState saveState;
   final List<String> validationErrors;
   final String? deviceError;
+  final DateTime? localEditedAt;
 
   ConfigUiState copyWith({
     HardwareConfig? draft,
@@ -35,6 +40,7 @@ class ConfigUiState {
     List<String>? validationErrors,
     String? deviceError,
     bool clearDeviceError = false,
+    DateTime? localEditedAt,
   }) {
     return ConfigUiState(
       draft: draft ?? this.draft,
@@ -42,6 +48,7 @@ class ConfigUiState {
       saveState: saveState ?? this.saveState,
       validationErrors: validationErrors ?? this.validationErrors,
       deviceError: clearDeviceError ? null : (deviceError ?? this.deviceError),
+      localEditedAt: localEditedAt ?? this.localEditedAt,
     );
   }
 }
@@ -71,8 +78,12 @@ class ConfigController extends Notifier<ConfigUiState> {
       _errorSub?.cancel();
     });
 
-    final cached = client.lastHardwareConfig ?? HardwareConfig.defaults();
-    return ConfigUiState(draft: cached.copyWith());
+    final session = ref.read(deviceSessionProvider);
+    final cached = session.hardwareCache ??
+        client.lastHardwareConfig ??
+        HardwareConfig.defaults();
+    final model = session.activeDevice?.deviceModel ?? 'ESP32';
+    return ConfigUiState(draft: cached.copyWith(), deviceModel: model);
   }
 
   void updateSensorType(int index, String type) {
@@ -95,6 +106,22 @@ class ConfigController extends Notifier<ConfigUiState> {
     _setDraft(state.draft.copyWith(sensors: sensors));
   }
 
+  void updateI2cPins({required int sda, required int scl}) {
+    final sensors = List<Map<String, dynamic>>.from(state.draft.sensors);
+    for (var i = 0; i < sensors.length; i++) {
+      final sensor = Map<String, dynamic>.from(sensors[i]);
+      final bus = sensor['bus'] as Map<String, dynamic>?;
+      if (bus?['type'] == 'i2c') {
+        final nextBus = Map<String, dynamic>.from(bus!);
+        nextBus['sda_pin'] = sda;
+        nextBus['scl_pin'] = scl;
+        sensor['bus'] = nextBus;
+        sensors[i] = sensor;
+      }
+    }
+    _setDraft(state.draft.copyWith(sensors: sensors));
+  }
+
   void updateActuatorPin(int index, int pin) {
     final actuators = List<Map<String, dynamic>>.from(state.draft.actuators);
     if (index < 0 || index >= actuators.length) return;
@@ -106,6 +133,16 @@ class ConfigController extends Notifier<ConfigUiState> {
     actuator['pins'] = pins;
     actuators[index] = actuator;
     _setDraft(state.draft.copyWith(actuators: actuators));
+  }
+
+  void updateHeaterPin(int pin) {
+    final index = state.draft.actuators.indexWhere((a) => a['role'] == 'heater');
+    if (index >= 0) updateActuatorPin(index, pin);
+  }
+
+  void updateFanPin(int pin) {
+    final index = state.draft.actuators.indexWhere((a) => a['role'] == 'fan');
+    if (index >= 0) updateActuatorPin(index, pin);
   }
 
   void updateDisplayEnabled(bool enabled) {
@@ -138,6 +175,34 @@ class ConfigController extends Notifier<ConfigUiState> {
     _setDraft(state.draft.copyWith(display: display));
   }
 
+  void updateDisplayField(String field, bool enabled) {
+    final display = Map<String, dynamic>.from(state.draft.display);
+    final layout = Map<String, dynamic>.from(
+      (display['layout'] as Map<String, dynamic>?) ?? {},
+    );
+    final fields = List<String>.from(
+      (layout['fields'] as List?)?.map((e) => e.toString()) ?? const [],
+    );
+    if (enabled && !fields.contains(field)) {
+      fields.add(field);
+    } else if (!enabled) {
+      fields.remove(field);
+    }
+    layout['fields'] = fields;
+    display['layout'] = layout;
+    _setDraft(state.draft.copyWith(display: display));
+  }
+
+  void updateSpiBusPin(String key, int pin) {
+    final display = Map<String, dynamic>.from(state.draft.display);
+    final bus = Map<String, dynamic>.from(
+      (display['bus'] as Map<String, dynamic>?) ?? {'type': 'spi'},
+    );
+    bus[key] = pin;
+    display['bus'] = bus;
+    _setDraft(state.draft.copyWith(display: display));
+  }
+
   Future<void> save() async {
     final validation = PinValidator().validateHardwareConfig(
       state.draft,
@@ -152,17 +217,54 @@ class ConfigController extends Notifier<ConfigUiState> {
       return;
     }
 
+    final session = ref.read(deviceSessionProvider);
+    final deviceId = session.activeDevice?.id;
+    if (deviceId == null) return;
+
     state = state.copyWith(
       saveState: ConfigSaveState.saving,
       validationErrors: const [],
       clearDeviceError: true,
     );
+
+    if (session.connectionState != DeviceConnectionState.connected) {
+      final pending = await ref.read(pendingCommandRepositoryProvider.future);
+      await pending.enqueue(
+        deviceId: deviceId,
+        topic: 'config/hardware',
+        payload: state.draft.toPayload(),
+      );
+      ref.read(pendingCommandsCountProvider.notifier).scheduleRefresh();
+      state = state.copyWith(saveState: ConfigSaveState.queued);
+      return;
+    }
+
     await ref.read(wsClientProvider).sendHardwareConfig(state.draft);
   }
 
   void resetDraftFromDevice() {
-    final cached = ref.read(wsClientProvider).lastHardwareConfig ?? HardwareConfig.defaults();
-    state = ConfigUiState(draft: cached.copyWith());
+    final client = ref.read(wsClientProvider);
+    final session = ref.read(deviceSessionProvider);
+    final deviceConfig = session.hardwareCache ?? client.lastHardwareConfig;
+    final localEditedAt = state.localEditedAt;
+    final deviceUpdatedAt = client.hardwareConfigUpdatedAt;
+    if (deviceConfig != null) {
+      final resolved = ConfigMergePolicy.resolveHardwareConflict(
+        local: state.draft,
+        device: deviceConfig,
+        deviceUpdatedAt: deviceUpdatedAt,
+        localEditedAt: localEditedAt,
+      );
+      state = ConfigUiState(
+        draft: resolved.copyWith(),
+        deviceModel: session.activeDevice?.deviceModel ?? state.deviceModel,
+      );
+      return;
+    }
+    state = ConfigUiState(
+      draft: (client.lastHardwareConfig ?? HardwareConfig.defaults()).copyWith(),
+      deviceModel: session.activeDevice?.deviceModel ?? state.deviceModel,
+    );
   }
 
   void _setDraft(HardwareConfig draft) {
@@ -171,6 +273,7 @@ class ConfigController extends Notifier<ConfigUiState> {
       saveState: ConfigSaveState.idle,
       validationErrors: const [],
       clearDeviceError: true,
+      localEditedAt: DateTime.now().toUtc(),
     );
   }
 }

@@ -6,13 +6,25 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:philarmony_core/philarmony_core.dart';
 
 import 'advanced_section.dart';
 import 'config_controller.dart';
+import 'pinout_board.dart';
 import 'wifi_section.dart';
 
 const _sensorTypes = ['sht3x', 'bme280', 'dht22', 'ds18b20', 'ntc'];
 const _displayDrivers = ['st7789', 'ssd1306', 'sh1106', 'none'];
+const _statusFieldOptions = [
+  'status',
+  'chamber_temp_c',
+  'target_temp_c',
+  'humidity_pct',
+  'target_humidity_pct',
+  'heater_power_pct',
+  'elapsed_time_sec',
+  'remaining_time_sec',
+];
 
 class ConfigPage extends ConsumerWidget {
   const ConfigPage({super.key});
@@ -42,6 +54,11 @@ class ConfigPage extends ConsumerWidget {
               color: Colors.green,
               message: 'Configuration saved on device.',
             ),
+          if (state.saveState == ConfigSaveState.queued)
+            const _BannerMessage(
+              color: Colors.amber,
+              message: 'Configuration queued — will sync when device reconnects.',
+            ),
           if (state.saveState == ConfigSaveState.validationFailed)
             _BannerMessage(
               color: theme.colorScheme.errorContainer,
@@ -52,6 +69,21 @@ class ConfigPage extends ConsumerWidget {
               color: theme.colorScheme.errorContainer,
               message: state.deviceError!,
             ),
+          PinoutBoard(
+            config: state.draft,
+            deviceModel: state.deviceModel,
+            onHeaterPinChanged: controller.updateHeaterPin,
+            onFanPinChanged: controller.updateFanPin,
+            onI2cSdaChanged: (pin) {
+              final scl = _i2cScl(state.draft) ?? 22;
+              controller.updateI2cPins(sda: pin, scl: scl);
+            },
+            onI2cSclChanged: (pin) {
+              final sda = _i2cSda(state.draft) ?? 21;
+              controller.updateI2cPins(sda: sda, scl: pin);
+            },
+          ),
+          const SizedBox(height: 12),
           _SensorsSection(
             sensors: state.draft.sensors,
             onTypeChanged: controller.updateSensorType,
@@ -69,7 +101,11 @@ class ConfigPage extends ConsumerWidget {
             onDriverChanged: controller.updateDisplayDriver,
             onWidthChanged: controller.updateDisplayWidth,
             onHeightChanged: controller.updateDisplayHeight,
+            onFieldToggled: controller.updateDisplayField,
+            onSpiPinChanged: controller.updateSpiBusPin,
           ),
+          const SizedBox(height: 12),
+          _SafetyLimitsSection(control: state.draft.control),
           const SizedBox(height: 12),
           const WifiSection(),
           const SizedBox(height: 12),
@@ -91,6 +127,26 @@ class ConfigPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  static int? _i2cSda(HardwareConfig config) {
+    for (final sensor in config.sensors) {
+      final bus = sensor['bus'] as Map<String, dynamic>?;
+      if (bus?['type'] == 'i2c') {
+        return (bus?['sda_pin'] as int?) ?? (bus?['pin'] as int?);
+      }
+    }
+    return null;
+  }
+
+  static int? _i2cScl(HardwareConfig config) {
+    for (final sensor in config.sensors) {
+      final bus = sensor['bus'] as Map<String, dynamic>?;
+      if (bus?['type'] == 'i2c') {
+        return bus?['scl_pin'] as int?;
+      }
+    }
+    return null;
   }
 }
 
@@ -244,6 +300,8 @@ class _DisplaySection extends StatelessWidget {
     required this.onDriverChanged,
     required this.onWidthChanged,
     required this.onHeightChanged,
+    required this.onFieldToggled,
+    required this.onSpiPinChanged,
   });
 
   final Map<String, dynamic> display;
@@ -251,12 +309,20 @@ class _DisplaySection extends StatelessWidget {
   final ValueChanged<String> onDriverChanged;
   final ValueChanged<int> onWidthChanged;
   final ValueChanged<int> onHeightChanged;
+  final void Function(String field, bool enabled) onFieldToggled;
+  final void Function(String key, int pin) onSpiPinChanged;
 
   @override
   Widget build(BuildContext context) {
     final geometry = display['geometry'] as Map<String, dynamic>? ?? {};
+    final layout = display['layout'] as Map<String, dynamic>? ?? {};
+    final bus = display['bus'] as Map<String, dynamic>? ?? {};
     final enabled = display['enabled'] as bool? ?? false;
     final driver = display['driver'] as String? ?? _displayDrivers.first;
+    final selectedFields = (layout['fields'] as List?)
+            ?.map((e) => e.toString())
+            .toSet() ??
+        {};
 
     return Card(
       child: Padding(
@@ -309,6 +375,74 @@ class _DisplaySection extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Text('Status fields', style: Theme.of(context).textTheme.titleSmall),
+            for (final field in _statusFieldOptions)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(field),
+                value: selectedFields.contains(field),
+                onChanged: (v) => onFieldToggled(field, v ?? false),
+              ),
+            const SizedBox(height: 8),
+            Text('SPI bus pins', style: Theme.of(context).textTheme.titleSmall),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final entry in const [
+                  ('mosi', 'MOSI'),
+                  ('sclk', 'SCLK'),
+                  ('cs', 'CS'),
+                  ('dc', 'DC'),
+                  ('rst', 'RST'),
+                  ('bl', 'Backlight'),
+                ])
+                  SizedBox(
+                    width: 120,
+                    child: TextFormField(
+                      initialValue: (bus[entry.$1] as int? ?? 0).toString(),
+                      decoration: InputDecoration(labelText: entry.$2),
+                      keyboardType: TextInputType.number,
+                      onFieldSubmitted: (v) {
+                        final pin = int.tryParse(v);
+                        if (pin != null) onSpiPinChanged(entry.$1, pin);
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SafetyLimitsSection extends StatelessWidget {
+  const _SafetyLimitsSection({required this.control});
+
+  final Map<String, dynamic> control;
+
+  @override
+  Widget build(BuildContext context) {
+    final safety = control['safety_limits'] as Map<String, dynamic>? ?? {};
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Safety limits (read-only)', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            for (final entry in safety.entries)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(entry.key),
+                trailing: Text('${entry.value}'),
+              ),
+            if (safety.isEmpty)
+              const Text('No safety limits reported by device.'),
           ],
         ),
       ),

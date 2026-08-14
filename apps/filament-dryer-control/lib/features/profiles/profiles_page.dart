@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:philarmony_core/philarmony_core.dart';
 
 import '../../l10n/app_localizations.dart';
+import 'profile_display.dart';
 import 'profiles_providers.dart';
 
 class ProfilesPage extends ConsumerWidget {
@@ -20,7 +21,16 @@ class ProfilesPage extends ConsumerWidget {
     final profilesAsync = ref.watch(profilesListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.materialProfiles)),
+      appBar: AppBar(
+        title: Text(l10n.materialProfiles),
+        actions: [
+          IconButton(
+            tooltip: l10n.resetProfilesDefaults,
+            onPressed: () => resetProfilesDefaults(context, ref),
+            icon: const Icon(Icons.restore),
+          ),
+        ],
+      ),
       body: profilesAsync.when(
         data: (profiles) => _ProfilesBody(profiles: profiles),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -162,12 +172,13 @@ class _ProfilesBody extends ConsumerWidget {
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final profile = profiles[index];
+        final displayName = profileDisplayName(profile, Localizations.localeOf(context));
         final subtitle =
             '${profile.targetTempC.toStringAsFixed(0)}°C · '
             '${profile.defaultDurationMin} min · '
             '${profile.targetHumidityPct.toStringAsFixed(0)}%';
         return ListTile(
-          title: Text(profile.nameEn),
+          title: Text(displayName),
           subtitle: Text(
             profile.isBuiltin ? '$subtitle · ${l10n.builtinProfile}' : subtitle,
           ),
@@ -202,7 +213,7 @@ Future<void> deleteProfile(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(l10n.deleteProfileTitle),
-      content: Text(l10n.deleteProfileBody(profile.nameEn)),
+      content: Text(l10n.deleteProfileBody(profileDisplayName(profile, Localizations.localeOf(context)))),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
@@ -218,5 +229,30 @@ Future<void> deleteProfile(
   if (ok != true) return;
   final svc = await ref.read(profileSyncServiceProvider.future);
   await svc.deleteProfile(profile.id);
+  ref.invalidate(profilesListProvider);
+}
+
+Future<void> resetProfilesDefaults(BuildContext context, WidgetRef ref) async {
+  final l10n = AppLocalizations.of(context)!;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(l10n.resetProfilesDefaultsTitle),
+      content: Text(l10n.resetProfilesDefaultsBody),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text(l10n.confirm),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  final svc = await ref.read(profileSyncServiceProvider.future);
+  await svc.resetDefaults();
   ref.invalidate(profilesListProvider);
 }

@@ -5,12 +5,19 @@
  */
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:philarmony_core/philarmony_core.dart';
 
 import '../platform/background_session.dart';
+import '../platform/notification_service.dart';
+import '../features/cycle/cycle_navigation.dart';
+import '../features/history/history_controller.dart';
+import '../shell/pending_commands_count.dart';
+import '../features/config/config_merge_policy.dart';
 import '../features/profiles/profile_sync_service.dart';
+import 'device_runtime_info.dart';
 import 'device_interfaces.dart';
 import 'fake_philarmony_ws_client.dart';
 import 'session_deps.dart';
@@ -35,7 +42,10 @@ class DeviceSessionEntry {
     this.connectionState = DeviceConnectionState.idle,
     this.status,
     this.fault,
+    this.backgroundAllowed = true,
     this.activeCycleId,
+    this.deviceRuntimeInfo,
+    this.hardwareCache,
   });
 
   final KnownDevice device;
@@ -43,9 +53,12 @@ class DeviceSessionEntry {
   DeviceConnectionState connectionState;
   StatusSnapshot? status;
   FaultEvent? fault;
+  bool backgroundAllowed;
   String? activeCycleId;
+  DeviceRuntimeInfo? deviceRuntimeInfo;
+  HardwareConfig? hardwareCache;
 
-  DeviceSessionState toDeviceSessionState({bool backgroundAllowed = true}) {
+  DeviceSessionState toDeviceSessionState() {
     return DeviceSessionState(
       activeDevice: device,
       connectionState: connectionState,
@@ -53,6 +66,8 @@ class DeviceSessionEntry {
       fault: fault,
       backgroundAllowed: backgroundAllowed,
       activeCycleId: activeCycleId,
+      deviceRuntimeInfo: deviceRuntimeInfo,
+      hardwareCache: hardwareCache,
     );
   }
 
@@ -60,16 +75,23 @@ class DeviceSessionEntry {
     DeviceConnectionState? connectionState,
     StatusSnapshot? status,
     FaultEvent? fault,
+    bool? backgroundAllowed,
     String? activeCycleId,
     bool clearActiveCycleId = false,
+    DeviceRuntimeInfo? deviceRuntimeInfo,
+    HardwareConfig? hardwareCache,
+    KnownDevice? device,
   }) {
     return DeviceSessionEntry(
-      device: device,
+      device: device ?? this.device,
       client: client,
       connectionState: connectionState ?? this.connectionState,
       status: status ?? this.status,
       fault: fault ?? this.fault,
+      backgroundAllowed: backgroundAllowed ?? this.backgroundAllowed,
       activeCycleId: clearActiveCycleId ? null : (activeCycleId ?? this.activeCycleId),
+      deviceRuntimeInfo: deviceRuntimeInfo ?? this.deviceRuntimeInfo,
+      hardwareCache: hardwareCache ?? this.hardwareCache,
     );
   }
 }
@@ -146,7 +168,9 @@ class SessionManagerNotifier extends Notifier<SessionManagerState> {
       if (existing.connectionState != DeviceConnectionState.connected) {
         await existing.client.connect(device);
       }
-      await _flushPendingProfiles();
+      _syncEntryConnectionState(device.id, existing.client);
+      await _syncDeviceMetadata(_entryFor(device.id));
+      await _flushPendingCommands();
       return;
     }
 
@@ -156,19 +180,48 @@ class SessionManagerNotifier extends Notifier<SessionManagerState> {
 
     final client = ref.read(wsClientFactoryProvider)();
     final entry = DeviceSessionEntry(device: device, client: client);
-    _wireEntry(entry);
 
     final sessions = Map<String, DeviceSessionEntry>.from(state.sessions)
       ..[device.id] = entry;
     state = state.copyWith(sessions: sessions, activeDeviceId: device.id);
+    _wireEntry(entry);
 
     await client.connect(device);
-    final repo = await ref.read(knownDeviceRepositoryProvider.future);
-    await repo.upsert(device.copyWith(lastConnected: DateTime.now().toUtc()));
-    await _flushPendingProfiles();
+    _syncEntryConnectionState(device.id, client);
+    await _syncDeviceMetadata(_entryFor(device.id));
+    await _flushPendingCommands();
   }
 
-  Future<void> _flushPendingProfiles() async {
+  void _syncEntryConnectionState(String deviceId, PhilarmonyWsClient client) {
+    _updateEntry(
+      deviceId,
+      _entryFor(deviceId).copyWith(connectionState: client.state),
+    );
+  }
+
+  Future<void> _syncDeviceMetadata(DeviceSessionEntry entry) async {
+    final runtime = entry.client.deviceRuntimeInfo;
+    final hardware = entry.client.lastHardwareConfig;
+    final now = DateTime.now().toUtc();
+    final updatedDevice = entry.device.copyWith(
+      lastSeen: now,
+      lastConnected: now,
+      firmwareVersion: runtime?.firmwareVersion ?? entry.device.firmwareVersion,
+      deviceModel: runtime?.deviceModel ?? entry.device.deviceModel,
+    );
+    final repo = await ref.read(knownDeviceRepositoryProvider.future);
+    await repo.upsert(updatedDevice);
+    _updateEntry(
+      entry.device.id,
+      entry.copyWith(
+        device: updatedDevice,
+        deviceRuntimeInfo: runtime,
+        hardwareCache: hardware,
+      ),
+    );
+  }
+
+  Future<void> _flushPendingCommands() async {
     final deviceId = state.activeDeviceId;
     final entry = deviceId != null ? state.sessions[deviceId] : null;
     if (entry == null ||
@@ -178,6 +231,21 @@ class SessionManagerNotifier extends Notifier<SessionManagerState> {
     try {
       final store = await ref.read(localStoreProvider.future);
       final pending = await ref.read(pendingCommandRepositoryProvider.future);
+      await pending.flush(deviceId!, (cmd) async {
+        if (cmd.topic == 'config/hardware' &&
+            ConfigMergePolicy.shouldSkipPendingConfig(
+              pendingCreatedAt: cmd.createdAt,
+              deviceUpdatedAt: entry.client.hardwareConfigUpdatedAt,
+            )) {
+          return;
+        }
+        final payload = Map<String, dynamic>.from(
+          jsonDecode(cmd.payloadJson) as Map,
+        );
+        await entry.client.request(
+          WsEnvelope(topic: cmd.topic, payload: payload),
+        );
+      });
       final sync = ProfileSyncService(
         store: store,
         pending: pending,
@@ -185,7 +253,8 @@ class SessionManagerNotifier extends Notifier<SessionManagerState> {
         getActiveDeviceId: () => deviceId,
         getConnectionState: () => entry.connectionState,
       );
-      await sync.flushPending();
+      await sync.refreshFromDevice();
+      ref.read(pendingCommandsCountProvider.notifier).scheduleRefresh();
     } on StateError {
       // Provider container disposed during async flush (tests).
     }
@@ -241,23 +310,25 @@ class SessionManagerNotifier extends Notifier<SessionManagerState> {
     final entry = state.activeSession;
     if (entry == null) throw StateError('No active device');
 
-    final cycleId = entry.activeCycleId;
     await entry.client.stopCycle();
-    if (cycleId != null) {
-      final repo = await ref.read(dryingCycleRepositoryProvider.future);
-      await repo.finalizeCycle(cycleId, stopReason: 'user_stop');
-      _updateEntry(entry.device.id, entry.copyWith(clearActiveCycleId: true));
-    }
+    await _finalizeActiveCycle(entry.device.id, 'user_requested');
   }
 
   void _wireEntry(DeviceSessionEntry entry) {
     final deviceId = entry.device.id;
     _subscriptions[deviceId] = [
       entry.client.connectionStates.listen((connectionState) {
-        _updateEntry(
-          deviceId,
-          _entryFor(deviceId).copyWith(connectionState: connectionState),
+        final prev = _entryFor(deviceId).connectionState;
+        final updated = _entryFor(deviceId).copyWith(
+          connectionState: connectionState,
         );
+        _updateEntry(deviceId, updated);
+        unawaited(_notifySession(updated));
+        if (connectionState == DeviceConnectionState.connected &&
+            prev != DeviceConnectionState.connected) {
+          unawaited(_flushPendingCommands());
+          _syncRuntimeFromClient(deviceId);
+        }
       }),
       entry.client.statusStream.listen((status) {
         _onStatus(deviceId, status);
@@ -266,6 +337,17 @@ class SessionManagerNotifier extends Notifier<SessionManagerState> {
         _updateEntry(deviceId, _entryFor(deviceId).copyWith(fault: fault));
       }),
     ];
+  }
+
+  void _syncRuntimeFromClient(String deviceId) {
+    final entry = _entryFor(deviceId);
+    _updateEntry(
+      deviceId,
+      entry.copyWith(
+        deviceRuntimeInfo: entry.client.deviceRuntimeInfo,
+        hardwareCache: entry.client.lastHardwareConfig,
+      ),
+    );
   }
 
   DeviceSessionEntry _entryFor(String deviceId) {
@@ -283,9 +365,11 @@ class SessionManagerNotifier extends Notifier<SessionManagerState> {
   void _onStatus(String deviceId, StatusSnapshot status) {
     final entry = _entryFor(deviceId);
     _updateEntry(deviceId, entry.copyWith(status: status));
+    _syncRuntimeFromClient(deviceId);
 
     if (deviceId == state.activeDeviceId) {
       ref.read(telemetryBufferProvider).add(status);
+      ref.read(lastValidReadingsProvider).update(status);
     }
     unawaited(_handleStatusSideEffects(deviceId, status));
   }
@@ -308,18 +392,43 @@ class SessionManagerNotifier extends Notifier<SessionManagerState> {
 
       final bg = ref.read(backgroundSessionProvider);
       if (status.status == DryerStatus.drying && !bg.isActive) {
-        await bg.start(reason: 'active_cycle');
+        final allowed = await bg.start(reason: 'active_cycle');
+        if (!allowed) {
+          _updateEntry(
+            deviceId,
+            _entryFor(deviceId).copyWith(backgroundAllowed: false),
+          );
+        }
       } else if (status.status != DryerStatus.drying && bg.isActive) {
         await bg.stop();
       }
 
       if (status.status == DryerStatus.stopped && cycleId != null) {
-        final repo = await ref.read(dryingCycleRepositoryProvider.future);
-        await repo.finalizeCycle(cycleId, stopReason: 'device_stopped');
-        _updateEntry(deviceId, entry.copyWith(clearActiveCycleId: true));
+        await _finalizeActiveCycle(deviceId, 'device_stopped');
+      } else if (status.status == DryerStatus.error && cycleId != null) {
+        await _finalizeActiveCycle(deviceId, 'safety_cutoff');
       }
     } on StateError {
       // Provider container disposed during async side effects (tests).
+    }
+  }
+
+  Future<void> _finalizeActiveCycle(String deviceId, String stopReason) async {
+    final entry = state.sessions[deviceId];
+    if (entry == null) return;
+    final cycleId = entry.activeCycleId;
+    if (cycleId == null) return;
+
+    final repo = await ref.read(dryingCycleRepositoryProvider.future);
+    await repo.finalizeCycle(cycleId, stopReason: stopReason);
+    final cycle = await repo.byId(cycleId);
+    _updateEntry(deviceId, entry.copyWith(clearActiveCycleId: true));
+
+    if (deviceId == state.activeDeviceId) {
+      ref.invalidate(historyCyclesProvider);
+      if (cycle != null) {
+        ref.read(cycleNavigationProvider.notifier).setPending(cycle);
+      }
     }
   }
 
@@ -327,10 +436,25 @@ class SessionManagerNotifier extends Notifier<SessionManagerState> {
     final status = state.activeSession?.status;
     if (status != null) {
       ref.read(telemetryBufferProvider).add(status);
+      ref.read(lastValidReadingsProvider).update(status);
+    }
+  }
+
+  Future<void> _notifySession(DeviceSessionEntry entry) async {
+    try {
+      await ref.read(notificationServiceProvider).handleUpdate(
+            device: entry.device,
+            connectionState: entry.connectionState,
+            status: entry.status,
+            fault: entry.fault,
+          );
+    } catch (_) {
+      // Notifications optional in tests / when plugin unavailable.
     }
   }
 
   Future<void> _tearDownSession(String deviceId, DeviceSessionEntry entry) async {
+    ref.read(notificationServiceProvider).resetDevice(deviceId);
     final subs = _subscriptions.remove(deviceId);
     if (subs != null) {
       for (final sub in subs) {

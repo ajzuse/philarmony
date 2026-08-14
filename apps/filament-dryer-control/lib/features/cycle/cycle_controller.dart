@@ -18,16 +18,16 @@ class CycleController {
   Future<void> start(StartCycleRequest request) async {
     final errors = CycleCommandValidator.validateStart(request);
     if (errors.isNotEmpty) throw ArgumentError(errors.join('; '));
-    await _ref.read(deviceSessionProvider.notifier).startCycle(request);
+    await _ref.read(deviceSessionActionsProvider).startCycle(request);
   }
 
   Future<Map<String, dynamic>?> stop({String stopReason = 'user_stop'}) async {
     final cycleId = _ref.read(deviceSessionProvider).activeCycleId;
-    await _ref.read(deviceSessionProvider.notifier).stopCycle();
+    await _ref.read(deviceSessionActionsProvider).stopCycle();
     _ref.invalidate(historyCyclesProvider);
     if (cycleId == null) return null;
     final repo = await _ref.read(dryingCycleRepositoryProvider.future);
-    return repo.byId(cycleId);
+    return await repo.byId(cycleId);
   }
 }
 

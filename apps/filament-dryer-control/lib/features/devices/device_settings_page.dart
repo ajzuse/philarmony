@@ -34,61 +34,95 @@ class DeviceSettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    final knownAsync = ref.watch(knownDevicesProvider);
-
     return Scaffold(
       appBar: AppBar(title: Text(l10n.deviceSettings)),
-      body: knownAsync.when(
-        data: (devices) {
-          KnownDevice? device;
-          for (final d in devices) {
-            if (d.id == deviceId) {
-              device = d;
-              break;
-            }
+      body: DeviceSettingsBody(deviceId: deviceId),
+    );
+  }
+}
+
+class DeviceSettingsBody extends ConsumerWidget {
+  const DeviceSettingsBody({super.key, required this.deviceId});
+
+  final String deviceId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final knownAsync = ref.watch(knownDevicesProvider);
+
+    return knownAsync.when(
+      data: (devices) {
+        KnownDevice? device;
+        for (final d in devices) {
+          if (d.id == deviceId) {
+            device = d;
+            break;
           }
-          if (device == null) {
-            return Center(child: Text(l10n.deviceNotFound));
-          }
-          final knownDevice = device;
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              ListTile(
-                title: Text(knownDevice.nickname),
-                subtitle: Text(knownDevice.wsUri),
+        }
+        if (device == null) {
+          return Center(child: Text(l10n.deviceNotFound));
+        }
+        final knownDevice = device;
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            ListTile(
+              title: Text(knownDevice.nickname),
+              subtitle: Text(knownDevice.wsUri),
+            ),
+            ListTile(
+              title: Text(l10n.firmwareVersionLabel),
+              subtitle: Text(knownDevice.firmwareVersion ?? l10n.notReported),
+            ),
+            ListTile(
+              title: Text(l10n.lastSeenLabel),
+              subtitle: Text(
+                knownDevice.lastSeen?.toLocal().toString() ?? l10n.notReported,
               ),
-              const Divider(),
-              Text(
-                l10n.notificationSettings,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              ...DeviceNotificationEvents.all.map((eventKey) {
-                final enabled =
-                    knownDevice.notificationSettings[eventKey] ?? true;
-                return SwitchListTile(
-                  title: Text(_labelForEvent(l10n, eventKey)),
-                  value: enabled,
-                  onChanged: (value) async {
-                    final updated = Map<String, bool>.from(
-                      knownDevice.notificationSettings,
-                    )..[eventKey] = value;
-                    final next = knownDevice.copyWith(
-                      notificationSettings: updated,
-                    );
-                    final repo =
-                        await ref.read(knownDeviceRepositoryProvider.future);
-                    await repo.upsert(next);
-                    ref.invalidate(knownDevicesProvider);
-                  },
-                );
-              }),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
-      ),
+            ),
+            SwitchListTile(
+              title: Text(l10n.autoConnectLabel),
+              subtitle: Text(l10n.autoConnectSubtitle),
+              value: knownDevice.autoConnect,
+              onChanged: (value) async {
+                final next = knownDevice.copyWith(autoConnect: value);
+                final repo =
+                    await ref.read(knownDeviceRepositoryProvider.future);
+                await repo.upsert(next);
+                ref.invalidate(knownDevicesProvider);
+              },
+            ),
+            const Divider(),
+            Text(
+              l10n.notificationSettings,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            ...DeviceNotificationEvents.all.map((eventKey) {
+              final enabled =
+                  knownDevice.notificationSettings[eventKey] ?? true;
+              return SwitchListTile(
+                title: Text(_labelForEvent(l10n, eventKey)),
+                value: enabled,
+                onChanged: (value) async {
+                  final updated = Map<String, bool>.from(
+                    knownDevice.notificationSettings,
+                  )..[eventKey] = value;
+                  final next = knownDevice.copyWith(
+                    notificationSettings: updated,
+                  );
+                  final repo =
+                      await ref.read(knownDeviceRepositoryProvider.future);
+                  await repo.upsert(next);
+                  ref.invalidate(knownDevicesProvider);
+                },
+              );
+            }),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('$e')),
     );
   }
 

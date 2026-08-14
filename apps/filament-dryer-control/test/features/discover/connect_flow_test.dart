@@ -19,13 +19,13 @@ void main() {
     );
     addTearDown(() async {
       try {
-        await container.read(deviceSessionProvider.notifier).disconnect();
+        await container.read(deviceSessionActionsProvider).disconnect();
       } catch (_) {}
       container.dispose();
     });
 
     await container.read(localStoreProvider.future);
-    await container.read(deviceSessionProvider.notifier).connect(
+    await container.read(deviceSessionActionsProvider).connect(
           KnownDevice(id: '1', nickname: 'Manual', host: '192.168.1.50'),
         );
 

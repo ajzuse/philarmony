@@ -13,7 +13,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final fake = FakePhilarmonyWsClient();
     final container = ProviderContainer(
-      overrides: [wsClientProvider.overrideWithValue(fake)],
+      overrides: [wsClientFactoryProvider.overrideWithValue(() => fake)],
     );
     addTearDown(() {
       fake.dispose();
@@ -21,7 +21,7 @@ void main() {
     });
 
     await container.read(localStoreProvider.future);
-    await container.read(deviceSessionProvider.notifier).connect(
+    await container.read(deviceSessionActionsProvider).connect(
           KnownDevice(id: 'd1', nickname: 'Dryer', host: '127.0.0.1'),
         );
 
@@ -40,7 +40,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final fake = FakePhilarmonyWsClient();
     final container = ProviderContainer(
-      overrides: [wsClientProvider.overrideWithValue(fake)],
+      overrides: [wsClientFactoryProvider.overrideWithValue(() => fake)],
     );
     addTearDown(() {
       fake.dispose();
@@ -48,7 +48,7 @@ void main() {
     });
 
     await container.read(localStoreProvider.future);
-    await container.read(deviceSessionProvider.notifier).connect(
+    await container.read(deviceSessionActionsProvider).connect(
           KnownDevice(id: 'd1', nickname: 'Dryer', host: '127.0.0.1'),
         );
 

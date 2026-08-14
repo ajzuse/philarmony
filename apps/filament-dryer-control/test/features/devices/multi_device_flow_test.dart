@@ -62,7 +62,7 @@ void main() {
       await repo.upsert(device1);
       await repo.upsert(device2);
 
-      final session = container.read(deviceSessionProvider.notifier);
+      final session = container.read(deviceSessionActionsProvider);
       await session.connect(device1);
       await session.connect(device2);
 
@@ -96,7 +96,7 @@ void main() {
       });
 
       await container.read(localStoreProvider.future);
-      final session = container.read(deviceSessionProvider.notifier);
+      final session = container.read(deviceSessionActionsProvider);
       await session.connect(device1);
       await session.connect(device2);
 
@@ -128,7 +128,7 @@ void main() {
       });
 
       await container.read(localStoreProvider.future);
-      final session = container.read(deviceSessionProvider.notifier);
+      final session = container.read(deviceSessionActionsProvider);
       await session.connect(device1);
 
       final manager = container.read(sessionManagerProvider);
@@ -156,7 +156,7 @@ void main() {
       });
 
       await container.read(localStoreProvider.future);
-      final session = container.read(deviceSessionProvider.notifier);
+      final session = container.read(deviceSessionActionsProvider);
       await session.connect(device1);
       await session.connect(device2);
 
@@ -185,7 +185,7 @@ void main() {
       });
 
       await container.read(localStoreProvider.future);
-      final session = container.read(deviceSessionProvider.notifier);
+      final session = container.read(deviceSessionActionsProvider);
       await session.connect(device1);
       await session.connect(device2);
       await session.connect(device3);

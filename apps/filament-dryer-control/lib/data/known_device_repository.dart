@@ -4,35 +4,61 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import 'package:philarmony_core/philarmony_core.dart';
+import 'dart:convert';
 
-import 'app_preferences.dart';
+import 'package:drift/drift.dart';
+import 'package:philarmony_core/philarmony_core.dart' as core;
+
+import 'app_database.dart' as drift;
 
 class KnownDeviceRepository {
-  KnownDeviceRepository(this._store);
+  KnownDeviceRepository(this._db);
 
-  final LocalStore _store;
+  final drift.AppDatabase _db;
 
-  List<KnownDevice> list() => _store.loadDevices();
+  Future<List<core.KnownDevice>> list() async {
+    final rows = await _db.select(_db.knownDevices).get();
+    return rows.map(_fromRow).toList();
+  }
 
-  Future<void> upsert(KnownDevice device) async {
-    final devices = list();
-    final idx = devices.indexWhere((d) => d.id == device.id);
-    if (idx >= 0) {
-      devices[idx] = device;
-    } else {
-      devices.add(device);
-    }
-    await _store.saveDevices(devices);
+  Future<core.KnownDevice?> findByHostPort(String host, int port) async {
+    final row = await (_db.select(_db.knownDevices)
+          ..where((t) => t.host.equals(host) & t.port.equals(port)))
+        .getSingleOrNull();
+    return row == null ? null : _fromRow(row);
+  }
+
+  Future<void> upsert(core.KnownDevice device) async {
+    final existing = await findByHostPort(device.host, device.port);
+    final id = existing?.id ?? device.id;
+    final toSave = existing != null && existing.id != device.id
+        ? _withId(device, existing.id)
+        : (device.id == id ? device : _withId(device, id));
+
+    await _db.into(_db.knownDevices).insertOnConflictUpdate(
+          drift.KnownDevicesCompanion(
+            id: Value(id),
+            nickname: Value(toSave.nickname),
+            host: Value(toSave.host),
+            port: Value(toSave.port),
+            path: Value(toSave.path),
+            deviceModel: Value(toSave.deviceModel),
+            firmwareVersion: Value(toSave.firmwareVersion),
+            lastSeen: Value(toSave.lastSeen),
+            lastConnected: Value(toSave.lastConnected),
+            autoConnect: Value(toSave.autoConnect),
+            notificationSettingsJson:
+                Value(jsonEncode(toSave.notificationSettings)),
+          ),
+        );
   }
 
   Future<void> remove(String id) async {
-    final devices = list()..removeWhere((d) => d.id == id);
-    await _store.saveDevices(devices);
+    await (_db.delete(_db.knownDevices)..where((t) => t.id.equals(id))).go();
   }
 
-  KnownDevice? autoConnectCandidate() {
-    final devices = list();
+  Future<core.KnownDevice?> autoConnectCandidate() async {
+    final devices = await list();
     final flagged = devices.where((d) => d.autoConnect).toList();
     if (flagged.isNotEmpty) {
       flagged.sort((a, b) =>
@@ -45,5 +71,47 @@ class KnownDeviceRepository {
         (b.lastConnected ?? DateTime.fromMillisecondsSinceEpoch(0))
             .compareTo(a.lastConnected ?? DateTime.fromMillisecondsSinceEpoch(0)));
     return devices.first;
+  }
+
+  core.KnownDevice _withId(core.KnownDevice device, String id) {
+    return core.KnownDevice(
+      id: id,
+      nickname: device.nickname,
+      host: device.host,
+      port: device.port,
+      path: device.path,
+      deviceModel: device.deviceModel,
+      firmwareVersion: device.firmwareVersion,
+      lastSeen: device.lastSeen,
+      lastConnected: device.lastConnected,
+      autoConnect: device.autoConnect,
+      notificationSettings: device.notificationSettings,
+    );
+  }
+
+  core.KnownDevice _fromRow(drift.KnownDevice row) {
+    Map<String, bool> notificationSettings = {};
+    try {
+      final decoded = jsonDecode(row.notificationSettingsJson);
+      if (decoded is Map) {
+        notificationSettings = decoded.map(
+          (k, v) => MapEntry(k.toString(), v == true),
+        );
+      }
+    } catch (_) {}
+
+    return core.KnownDevice(
+      id: row.id,
+      nickname: row.nickname,
+      host: row.host,
+      port: row.port,
+      path: row.path,
+      deviceModel: row.deviceModel,
+      firmwareVersion: row.firmwareVersion,
+      lastSeen: row.lastSeen,
+      lastConnected: row.lastConnected,
+      autoConnect: row.autoConnect,
+      notificationSettings: notificationSettings,
+    );
   }
 }

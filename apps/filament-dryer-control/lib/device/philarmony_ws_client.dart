@@ -9,6 +9,7 @@ import 'package:philarmony_core/philarmony_core.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'device_interfaces.dart';
+import 'device_runtime_info.dart';
 
 class PhilarmonyWsClientImpl implements PhilarmonyWsClient {
   PhilarmonyWsClientImpl();
@@ -25,9 +26,12 @@ class PhilarmonyWsClientImpl implements PhilarmonyWsClient {
   DeviceConnectionState _state = DeviceConnectionState.idle;
   StatusSnapshot? _lastStatus;
   HardwareConfig? _lastHardwareConfig;
+  DeviceRuntimeInfo? _deviceRuntimeInfo;
+  DateTime? _hardwareConfigUpdatedAt;
   KnownDevice? _device;
   int _reconnectAttempt = 0;
   Timer? _reconnectTimer;
+  final List<WsEnvelope> _outboundQueue = [];
 
   @override
   Stream<DeviceConnectionState> get connectionStates => _stateCtrl.stream;
@@ -55,6 +59,12 @@ class PhilarmonyWsClientImpl implements PhilarmonyWsClient {
   HardwareConfig? get lastHardwareConfig => _lastHardwareConfig;
 
   @override
+  DeviceRuntimeInfo? get deviceRuntimeInfo => _deviceRuntimeInfo;
+
+  @override
+  DateTime? get hardwareConfigUpdatedAt => _hardwareConfigUpdatedAt;
+
+  @override
   Future<void> connect(KnownDevice device) async {
     _device = device;
     await _openSocket();
@@ -76,6 +86,7 @@ class PhilarmonyWsClientImpl implements PhilarmonyWsClient {
       _reconnectAttempt = 0;
       _setState(DeviceConnectionState.connected);
       await subscribeStatus();
+      await _flushOutboundQueue();
     } catch (_) {
       _setState(DeviceConnectionState.error);
       _scheduleReconnect();
@@ -86,6 +97,7 @@ class PhilarmonyWsClientImpl implements PhilarmonyWsClient {
     final envelope = WsCodec.decode(raw as String);
     if (envelope == null) return;
     _envelopeCtrl.add(envelope);
+    _ingestRuntime(envelope.payload);
     final status = WsCodec.parseStatusUpdate(envelope);
     if (status != null) {
       _lastStatus = status;
@@ -94,7 +106,10 @@ class PhilarmonyWsClientImpl implements PhilarmonyWsClient {
     final fault = WsCodec.parseFault(envelope);
     if (fault != null) _faultCtrl.add(fault);
     final hwResponse = WsCodec.parseHardwareConfigResponse(envelope);
-    if (hwResponse != null) _hwResponseCtrl.add(hwResponse);
+    if (hwResponse != null) {
+      _hardwareConfigUpdatedAt = DateTime.now().toUtc();
+      _hwResponseCtrl.add(hwResponse);
+    }
     final hwError = WsCodec.parseHardwareConfigError(envelope);
     if (hwError != null) _hwErrorCtrl.add(hwError);
   }
@@ -114,6 +129,7 @@ class PhilarmonyWsClientImpl implements PhilarmonyWsClient {
   Future<void> disconnect() async {
     _reconnectTimer?.cancel();
     _device = null;
+    _outboundQueue.clear();
     await _sub?.cancel();
     await _channel?.sink.close();
     _setState(DeviceConnectionState.disconnected);
@@ -121,9 +137,26 @@ class PhilarmonyWsClientImpl implements PhilarmonyWsClient {
 
   @override
   Future<void> send(WsEnvelope envelope) async {
+    if (_state != DeviceConnectionState.connected || _channel == null) {
+      _outboundQueue.add(envelope);
+      return;
+    }
+    _sendNow(envelope);
+  }
+
+  void _sendNow(WsEnvelope envelope) {
     final ch = _channel;
     if (ch == null) throw StateError('not connected');
     ch.sink.add(WsCodec.encode(envelope));
+  }
+
+  Future<void> _flushOutboundQueue() async {
+    if (_state != DeviceConnectionState.connected || _channel == null) return;
+    final pending = List<WsEnvelope>.from(_outboundQueue);
+    _outboundQueue.clear();
+    for (final envelope in pending) {
+      _sendNow(envelope);
+    }
   }
 
   @override
@@ -166,7 +199,19 @@ class PhilarmonyWsClientImpl implements PhilarmonyWsClient {
   @override
   Future<void> sendHardwareConfig(HardwareConfig config) async {
     _lastHardwareConfig = config;
+    _hardwareConfigUpdatedAt = DateTime.now().toUtc();
     await send(WsCodec.hardwareConfig(config.toPayload()));
+  }
+
+  void _ingestRuntime(Map<String, dynamic> payload) {
+    final parsed = DeviceRuntimeInfo.fromPayload(payload);
+    if (parsed != null) {
+      _deviceRuntimeInfo = (_deviceRuntimeInfo ?? const DeviceRuntimeInfo()).merge(parsed);
+    }
+    if (payload.containsKey('sensors') || payload.containsKey('actuators')) {
+      _lastHardwareConfig = HardwareConfig.fromPayload(payload);
+      _hardwareConfigUpdatedAt = DateTime.now().toUtc();
+    }
   }
 
   void _setState(DeviceConnectionState next) {

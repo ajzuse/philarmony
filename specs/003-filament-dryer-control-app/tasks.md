@@ -341,3 +341,41 @@ Ship demo can stop after US3; **acceptance “MVP”** = Core UX + bg WS + expor
 - Commit only with explicit user authorization
 
 **Constitution compliance:** Philarmony; automated tests on 003; open manuals in 005; bilingual; GPLv3
+
+---
+
+## Phase 11: Convergence
+
+**Purpose**: Close gaps between spec/plan/constitution and the current control-app implementation (deep converge 2026-08-14). No existing task IDs changed.
+
+- [x] T090 CRITICAL Start Android `CycleForegroundService` (`dataSync`) and iOS background networking from Dart `BackgroundSession`; set `backgroundAllowed=false` and surface OS denial in UI per FR-007a (Constitution Failsafe) (partial)
+- [x] T091 CRITICAL Show "Reconnecting..." on `DeviceConnectionState.reconnecting`, queue outbound control/config while disconnected, and flush on resume per Edge:network / FR-001 / FR-010 (Constitution Failsafe) (missing)
+- [x] T092 CRITICAL Add PT-BR control-app documentation (README entitlements/store notes bilingual) per Constitution Language Support (missing)
+- [x] T093 CRITICAL Add GPLv3 license headers to native sources (`MainActivity.kt`, `CycleForegroundService.kt`, `AppDelegate.swift`, `SceneDelegate.swift`) per Constitution GPLv3 (missing)
+- [x] T094 CRITICAL Migrate `KnownDevice` / `DryingCycle` / `CycleSample` / `PendingCommand` repositories from `LocalStore` JSON onto Drift SQLite per FR-005 / plan: storage (partial)
+- [x] T095 CRITICAL Render all FR-002 dashboard fields (`target_humidity_pct`, heater/fan on+power, elapsed/remaining, cpu/memory/uptime) plus heating/cooling/idle badges and cycle progress ring per FR-002 (missing)
+- [x] T096 CRITICAL Expand telemetry ring to 60 minutes @ 1 Hz (incl. heater power), plot temp/humidity/heater charts, and show charts on compact/medium layouts per FR-002 / research R6 (partial)
+- [x] T097 CRITICAL Auto-navigate to cycle results when status becomes completed/stopped/safety (not only after manual Stop) per FR-003 (missing)
+- [x] T098 Wire local + desktop notifications and in-app banners for cycle complete, safety cutoff, sensor error, and connection lost; honor per-device/event toggles per FR-007 (partial)
+- [x] T099 Render PDF temperature/humidity/heater charts and locale strings (PT-BR/EN-US) in `cycle_pdf_export.dart` per FR-005 / contracts/history-export.md (partial)
+- [x] T100 Add history date-range/material/device filters, list metrics (date, target/avg temp, duration), aggregate stats, and multi-cycle trend charts per FR-005 / US5 (missing)
+- [x] T101 Detect device hotspot mode, show real SSID/signal, and enable WiFi reconfigure (hotspot join) per FR-004 / Edge:hotspot (missing)
+- [x] T102 Warn on firmware version mismatch and offer to open the desktop installer per Edge:firmware mismatch (missing)
+- [x] T103 Add visual ESP32 pinout (dropdown or drag-drop) with PinValidator before send per FR-004 (missing)
+- [x] T104 Queue offline hardware/settings edits, show a pending-command indicator, and apply device-wins config / timestamp history merge per FR-010 (missing)
+- [x] T105 Add one-tap "Start with Profile" from the dashboard (`control/start` + `profile_id`) per FR-008 (missing)
+- [x] T106 Keep last valid sensor readings on the dashboard and show Sensor Error badge for invalid/NaN values per Edge:sensor error (partial)
+- [x] T107 Complete display/hardware editor (status fields, buses/I2C/SPI pins, `config/display` if required by 001) per FR-004 (partial)
+- [x] T108 Populate Advanced firmware version, device name, and NTP timezone from device (read-only) per FR-004 (partial)
+- [x] T109 Wire `AppPreferences` locale into `MaterialApp`, use `pt_BR`/`en_US`, and replace hardcoded English UI strings with ARB per FR-009 (partial)
+- [x] T110 Add high-contrast theme, RTL-ready direction, dynamic text scaling, TalkBack/VoiceOver labels, and desktop keyboard focus per FR-009 / SC:WCAG (missing)
+- [x] T111 Add DEC-011 desktop packaging (MSIX / DMG / AppImage+deb+rpm) for `package-control*` per plan: packaging (partial)
+- [x] T112 Deduplicate `KnownDevice` by host:port, persist `lastSeen`/`firmwareVersion`, and expose `autoConnect` in device settings per FR-006 (partial)
+- [x] T113 Persist cycle `stop_reason` as `user_requested` (not `user_stop`) to match FR-003 / `001` (contradicts)
+- [x] T114 Implement `config/profiles/get` and `config/profiles/reset_defaults`; show `namePt`/`nameEn` by locale per FR-008 (partial)
+- [x] T115 Allow configuring max concurrent sessions in Settings (default 3) per FR-006 (partial)
+- [x] T116 Default production WS client to real (`USE_FAKE_WS=false`); give Fake client reconnect + full `status/update` parity per FR-001 / AC:manual connect (partial)
+- [x] T117 Persist time-format and chart-window preferences (data-model AppPreferences) and format humidity as %RH per FR-002 (partial)
+- [x] T118 Use mDNS TXT/friendly display name (not PTR FQDN) in the scan list per FR-001 / US1/AC (partial)
+- [x] T119 Move `dart:io` file export out of `lib/features/` per contracts/package-structure.md (contradicts)
+- [x] T120 Add expanded Devices master–detail (registry list + settings form) per contracts/adaptive-layout.md (partial)
