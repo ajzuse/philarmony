@@ -129,6 +129,10 @@
 
 ### 003 - Control App Multi-Plataforma (`specs/003-filament-dryer-control-app/`)
 
+**Código**: `apps/filament-dryer-control/` · core compartilhado `packages/philarmony_core/` · packaging `apps/filament-dryer-control/packaging/`  
+**Make**: `run-control`, `test-control`, `package-control-linux|macos|windows`  
+**Manuais**: `specs/005-manual-validation` stages **VS-CTRL-1…VS-CTRL-9**
+
 **Objetivo**: App unificado Desktop + Mobile para monitoramento, configuração e controle remoto.
 
 #### Plataformas Suportadas
@@ -345,4 +349,4 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 ---
 
 *README auto-gerado e sincronizado pela Constituição Philarmony v1.0.0*
-*Última atualização: 2026-08-10 | Trigger: tasks*
+*Última atualização: 2026-08-11 | Trigger: tasks*

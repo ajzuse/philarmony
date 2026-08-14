@@ -1,0 +1,36 @@
+name: control-app-ci
+
+on:
+  push:
+    paths:
+      - 'apps/filament-dryer-control/**'
+      - 'packages/philarmony_core/**'
+      - '.github/workflows/control-app-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/filament-dryer-control/**'
+      - 'packages/philarmony_core/**'
+      - '.github/workflows/control-app-ci.yml'
+
+jobs:
+  analyze-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Core package tests
+        run: |
+          cd packages/philarmony_core
+          dart pub get
+          dart test
+      - name: Control app analyze + test
+        run: |
+          cd apps/filament-dryer-control
+          flutter pub get
+          flutter gen-l10n
+          dart run build_runner build --delete-conflicting-outputs
+          flutter analyze --no-fatal-infos
+          flutter test

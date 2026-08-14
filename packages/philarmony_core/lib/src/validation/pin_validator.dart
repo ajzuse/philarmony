@@ -17,6 +17,7 @@
  */
 
 import '../models/device_profile.dart';
+import '../models/hardware_config.dart';
 
 class PinValidationResult {
   PinValidationResult({required this.ok, List<String>? errors})
@@ -217,4 +218,83 @@ class PinValidator {
       name.startsWith('i2c_');
 
   bool _isPwm(String name) => name.contains('pwm');
+
+  /// Validates GPIO assignments from a live `config/hardware` payload.
+  PinValidationResult validateHardwareConfig(
+    HardwareConfig config, {
+    String deviceModel = 'ESP32',
+  }) {
+    final errors = <String>[];
+    final map = EspGpioMap.forModel(deviceModel);
+    final seen = <int, String>{};
+
+    void checkPin(int pin, String label, {bool output = false, bool pwm = false}) {
+      if (seen.containsKey(pin)) {
+        errors.add('Pin conflict: GPIO $pin already used by ${seen[pin]} ($label)');
+      } else {
+        seen[pin] = label;
+      }
+
+      if (!map.usableGpios.contains(pin)) {
+        errors.add('GPIO $pin is not usable on ${map.model} ($label)');
+      }
+      if (map.flashReserved.contains(pin) || map.psramReserved.contains(pin)) {
+        errors.add('GPIO $pin is reserved on ${map.model} ($label)');
+      }
+      if (output && map.inputOnly.contains(pin)) {
+        errors.add('GPIO $pin is input-only on ${map.model} ($label)');
+      }
+      if (output && map.strapping.contains(pin)) {
+        errors.add('GPIO $pin is a strapping pin ($label)');
+      }
+      if (pwm && !map.pwmCapable.contains(pin)) {
+        errors.add('GPIO $pin is not PWM-capable on ${map.model} ($label)');
+      }
+    }
+
+    for (final sensor in config.sensors) {
+      final id = sensor['id'] as String? ?? 'sensor';
+      final bus = sensor['bus'] as Map<String, dynamic>?;
+      if (bus == null) continue;
+      final type = bus['type'] as String? ?? '';
+      if (type == 'i2c') {
+        final sda = bus['sda_pin'] as int?;
+        final scl = bus['scl_pin'] as int?;
+        if (sda != null) checkPin(sda, 'sensor:$id:sda');
+        if (scl != null) checkPin(scl, 'sensor:$id:scl');
+      } else if (bus['pin'] is int) {
+        checkPin(bus['pin'] as int, 'sensor:$id:pin');
+      }
+    }
+
+    for (final actuator in config.actuators) {
+      final id = actuator['id'] as String? ?? 'actuator';
+      final pins = actuator['pins'] as Map<String, dynamic>?;
+      if (pins == null) continue;
+      final isPwmActuator = (actuator['type'] as String? ?? '').contains('pwm');
+      for (final entry in pins.entries) {
+        final pin = entry.value;
+        if (pin is! int) continue;
+        checkPin(
+          pin,
+          'actuator:$id:${entry.key}',
+          output: true,
+          pwm: isPwmActuator || entry.key.toString().contains('pwm'),
+        );
+      }
+    }
+
+    final displayBus = config.display['bus'] as Map<String, dynamic>?;
+    if (displayBus != null) {
+      const displayPinKeys = ['mosi', 'sclk', 'cs', 'dc', 'rst', 'bl', 'sda_pin', 'scl_pin'];
+      for (final key in displayPinKeys) {
+        final pin = displayBus[key];
+        if (pin is int) {
+          checkPin(pin, 'display:$key', output: true);
+        }
+      }
+    }
+
+    return PinValidationResult(ok: errors.isEmpty, errors: errors);
+  }
 }

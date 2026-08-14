@@ -36,17 +36,24 @@ Product feature specs keep user journeys, Independent Test descriptions, accepta
 - Q: What about former 002 T031/T062? → A: Moved here and renamed to VS-1 / VS-4 / VS-5 stage tasks.
 - Q: What about completed `[x]` automated tasks on 001/002? → A: Remain historical on those product specs.
 
-### Audit results (2026-08-04, post-move)
+### Audit results (2026-08-11, control-app manuals migrated)
 
 | Spec | Open automated-test tasks | Open manual test tasks | Notes |
 |------|---------------------------|------------------------|-------|
 | `001-filament-dryer-esp32` | Historical `[x]` only | None | Automation stays on product spec |
 | `002-esp32-desktop-installer` | Historical `[x]` only | None (moved) | T031/T062 → 005 VS-1/VS-4/VS-5 |
-| `003-filament-dryer-control-app` | None yet (no `tasks.md`) | None | Future automation on 003; future manual → 005 |
-| `004-esp32-touchscreen-ui` | None yet (no `tasks.md`) | None | Future automation on 004; future manual → 005 |
-| `005-manual-validation` | N/A | **VS-1, VS-4, VS-5** (from 002) | Sole home for open manual work |
+| `003-filament-dryer-control-app` | Open automation on product `tasks.md` | None (moved) | quickstart VS-1…VS-9 → 005 **VS-CTRL-1…VS-CTRL-9**; ledger `003/.../checklists/quickstart-validation.md` |
+| `004-esp32-touchscreen-ui` | Per product tasks | None | Future manual → 005 VS-UI-* |
+| `005-manual-validation` | N/A | Installer VS-1/4/5 + **VS-CTRL-*** + VS-UI-1 | Sole home for open manual work |
 
-**Verdict**: No open manual tasks remain on product specs. Manual stages for desktop installer live here.
+**Verdict**: No open manual tasks remain on product specs. Control-app stages live here as VS-CTRL-*.
+
+### Session 2026-08-11 — Control-app manuals from 003
+
+- Q: Where do 003 quickstart VS-1…VS-9 open manuals live? → A: Only under `005` as **VS-CTRL-1…VS-CTRL-9** (prefix avoids collision with installer VS-1/4/5).
+- Q: Where are results recorded? → A: `specs/003-filament-dryer-control-app/checklists/quickstart-validation.md`.
+- Q: What about 003 T087? → A: Closed after registration; product tasks keep automation only.
+
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -83,18 +90,19 @@ Release confidence for the desktop installer requires completing named manual st
 
 ---
 
-### User Story 3 - Future Product Manual Stages (Priority: P2)
+### User Story 3 - Control-app & Touchscreen Manual Stages (Priority: P2)
 
-As control-app and touchscreen features gain implementation, their device/UI manual smokes are catalogued here as stage-named tasks before release sign-off.
+As control-app and touchscreen features ship, their device/UI/packaging manual smokes are catalogued here as stage-named tasks before release sign-off.
 
 **Why this priority**: Keeps 003/004 task lists free of open manual work while preserving a single place for HW/UI gates.
 
-**Independent Test**: For each shipped product surface that requires manual sign-off, this catalog lists an open or completed stage task referencing the product checklist path.
+**Independent Test**: Control-app stages **VS-CTRL-1…VS-CTRL-9** appear in this catalog; results rows exist in `specs/003-filament-dryer-control-app/checklists/quickstart-validation.md`. Touchscreen uses **VS-UI-*** when 004 needs smoke.
 
 **Acceptance Scenarios**:
 
-1. **Given** a control-app device smoke is required, **When** tracked, **Then** the task lives under this catalog (not 003 open list).
-2. **Given** a touchscreen UI smoke is required, **When** tracked, **Then** the same catalog rule applies.
+1. **Given** control-app device/UI smoke is required, **When** tracked, **Then** tasks live under this catalog as VS-CTRL-* (not on 003 open list).
+2. **Given** a touchscreen UI smoke is required, **When** tracked, **Then** the same catalog rule applies (VS-UI-*).
+3. **Given** MVP gate for 003 (clarify locks), **When** manuals are planned, **Then** at least VS-CTRL-1, VS-CTRL-2, VS-CTRL-7, and VS-CTRL-8 are open here for sign-off.
 
 ---
 

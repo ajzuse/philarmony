@@ -6,7 +6,7 @@
 
 **Locks (clarify)**: WS=`001` only · registry=`KnownDevice` · export=CSV+PDF MVP · background WS required iOS+Android · Stop-only (no Pause)
 
-**Tests**: Automated widget/flow/CI on this feature. Open **manual** smoke (quickstart VS-*) → `specs/005-manual-validation` only — no open `[MANUAL]` here.
+**Tests**: Automated widget/flow/CI on this feature. Open **manual** smoke → `specs/005-manual-validation` as **VS-CTRL-1…VS-CTRL-9** only — no open `[MANUAL]` here.
 
 ## Format: `- [ ] [ID] [P?] [Story?] Description with file path`
 
@@ -25,14 +25,14 @@
 
 **Purpose**: Single Flutter app (all platforms) + monorepo wiring
 
-- [ ] T001 Create Flutter app skeleton in `apps/filament-dryer-control/pubspec.yaml` depending on `packages/philarmony_core` (path)
-- [ ] T002 [P] Enable platforms android/ios/windows/macos/linux under `apps/filament-dryer-control/`
-- [ ] T003 [P] Add module dirs `lib/{app,shell,platform,data,device,features,l10n,theme}/` per `contracts/package-structure.md`
-- [ ] T004 [P] Declare deps in `apps/filament-dryer-control/pubspec.yaml`: `web_socket_channel`, `multicast_dns`, `flutter_riverpod`, `go_router`, `fl_chart`, `drift`, `drift_flutter`, `sqlite3_flutter_libs`, `flutter_local_notifications`, `shared_preferences`, `flutter_localizations`, `pdf`, `printing` (or equivalent PDF stack)
-- [ ] T005 [P] Extend `.gitignore` for control-app `build/`, `.dart_tool/`, `dist/` if missing
-- [ ] T006 [P] Document control-app run targets in `.vscode/workspace.json`
-- [ ] T007 Add Make targets `run-control`, `test-control`, `package-control-linux` in root `Makefile`
-- [ ] T008 [P] Add GPLv3 stubs + overview in `apps/filament-dryer-control/README.md` (WS port 80, entitlements note)
+- [x] T001 Create Flutter app skeleton in `apps/filament-dryer-control/pubspec.yaml` depending on `packages/philarmony_core` (path)
+- [x] T002 [P] Enable platforms android/ios/windows/macos/linux under `apps/filament-dryer-control/`
+- [x] T003 [P] Add module dirs `lib/{app,shell,platform,data,device,features,l10n,theme}/` per `contracts/package-structure.md`
+- [x] T004 [P] Declare deps in `apps/filament-dryer-control/pubspec.yaml`: `web_socket_channel`, `multicast_dns`, `flutter_riverpod`, `go_router`, `fl_chart`, `drift`, `drift_flutter`, `sqlite3_flutter_libs`, `flutter_local_notifications`, `shared_preferences`, `flutter_localizations`, `pdf`, `printing` (or equivalent PDF stack)
+- [x] T005 [P] Extend `.gitignore` for control-app `build/`, `.dart_tool/`, `dist/` if missing
+- [x] T006 [P] Document control-app run targets in `.vscode/workspace.json`
+- [x] T007 Add Make targets `run-control`, `test-control`, `package-control-linux` in root `Makefile`
+- [x] T008 [P] Add GPLv3 stubs + overview in `apps/filament-dryer-control/README.md` (WS port 80, entitlements note)
 
 **Checkpoint**: `flutter pub get` + `flutter analyze` OK in control app
 
@@ -44,23 +44,23 @@
 
 **⚠️ CRITICAL**: No user story work until this phase completes
 
-- [ ] T009 [P] Add WS envelope + `StatusSnapshot` + `FaultEvent` in `packages/philarmony_core/lib/src/models/ws_models.dart`
-- [ ] T010 [P] Add `KnownDevice` model in `packages/philarmony_core/lib/src/models/known_device.dart` (not installer `DeviceProfile`)
-- [ ] T011 [P] Add `StartCycleRequest` / `StopCycleRequest` + validator in `packages/philarmony_core/lib/src/validation/cycle_command_validator.dart`
-- [ ] T012 [P] Add WS codecs matching `specs/001-filament-dryer-esp32/contracts/websocket-api.md` in `packages/philarmony_core/lib/src/ws/ws_codec.dart` (`max_duration_min`, `config/hardware`)
-- [ ] T013 Export new APIs from `packages/philarmony_core/lib/philarmony_core.dart`
-- [ ] T014 Unit tests codecs + cycle validator in `packages/philarmony_core/test/ws_codec_test.dart` and `packages/philarmony_core/test/cycle_command_validator_test.dart`
-- [ ] T015 Define `PhilarmonyWsClient` + `DeviceDiscovery` + `BackgroundSession` interfaces in `apps/filament-dryer-control/lib/device/device_interfaces.dart`
-- [ ] T016 Implement reconnecting WS client (`ws://host/ws`, backoff ≤60s) in `apps/filament-dryer-control/lib/device/philarmony_ws_client.dart`
-- [ ] T017 Implement `FakePhilarmonyWsClient` in `apps/filament-dryer-control/lib/device/fake_philarmony_ws_client.dart`
-- [ ] T018 Drift DB (`KnownDevice`, `DryingCycle`, `CycleSample`, `PendingCommand`) in `apps/filament-dryer-control/lib/data/app_database.dart`
-- [ ] T019 [P] App preferences in `apps/filament-dryer-control/lib/data/app_preferences.dart`
-- [ ] T020 [P] `AppBreakpoint` + `AdaptiveScaffold` in `apps/filament-dryer-control/lib/shell/` per `contracts/adaptive-layout.md`
-- [ ] T021 go_router shell + placeholders in `apps/filament-dryer-control/lib/app.dart` and `apps/filament-dryer-control/lib/shell/app_router.dart`
-- [ ] T022 [P] ARB PT-BR/EN-US stubs in `apps/filament-dryer-control/lib/l10n/`
-- [ ] T023 [P] Theme in `apps/filament-dryer-control/lib/theme/app_theme.dart`
-- [ ] T024 Riverpod `ProviderScope` + session registry stub in `apps/filament-dryer-control/lib/device/session_providers.dart`
-- [ ] T025 Smoke widget test adaptive shell in `apps/filament-dryer-control/test/shell/adaptive_scaffold_test.dart`
+- [x] T009 [P] Add WS envelope + `StatusSnapshot` + `FaultEvent` in `packages/philarmony_core/lib/src/models/ws_models.dart`
+- [x] T010 [P] Add `KnownDevice` model in `packages/philarmony_core/lib/src/models/known_device.dart` (not installer `DeviceProfile`)
+- [x] T011 [P] Add `StartCycleRequest` / `StopCycleRequest` + validator in `packages/philarmony_core/lib/src/validation/cycle_command_validator.dart`
+- [x] T012 [P] Add WS codecs matching `specs/001-filament-dryer-esp32/contracts/websocket-api.md` in `packages/philarmony_core/lib/src/ws/ws_codec.dart` (`max_duration_min`, `config/hardware`)
+- [x] T013 Export new APIs from `packages/philarmony_core/lib/philarmony_core.dart`
+- [x] T014 Unit tests codecs + cycle validator in `packages/philarmony_core/test/ws_codec_test.dart` and `packages/philarmony_core/test/cycle_command_validator_test.dart`
+- [x] T015 Define `PhilarmonyWsClient` + `DeviceDiscovery` + `BackgroundSession` interfaces in `apps/filament-dryer-control/lib/device/device_interfaces.dart`
+- [x] T016 Implement reconnecting WS client (`ws://host/ws`, backoff ≤60s) in `apps/filament-dryer-control/lib/device/philarmony_ws_client.dart`
+- [x] T017 Implement `FakePhilarmonyWsClient` in `apps/filament-dryer-control/lib/device/fake_philarmony_ws_client.dart`
+- [x] T018 Drift DB (`KnownDevice`, `DryingCycle`, `CycleSample`, `PendingCommand`) in `apps/filament-dryer-control/lib/data/app_database.dart`
+- [x] T019 [P] App preferences in `apps/filament-dryer-control/lib/data/app_preferences.dart`
+- [x] T020 [P] `AppBreakpoint` + `AdaptiveScaffold` in `apps/filament-dryer-control/lib/shell/` per `contracts/adaptive-layout.md`
+- [x] T021 go_router shell + placeholders in `apps/filament-dryer-control/lib/app.dart` and `apps/filament-dryer-control/lib/shell/app_router.dart`
+- [x] T022 [P] ARB PT-BR/EN-US stubs in `apps/filament-dryer-control/lib/l10n/`
+- [x] T023 [P] Theme in `apps/filament-dryer-control/lib/theme/app_theme.dart`
+- [x] T024 Riverpod `ProviderScope` + session registry stub in `apps/filament-dryer-control/lib/device/session_providers.dart`
+- [x] T025 Smoke widget test adaptive shell in `apps/filament-dryer-control/test/shell/adaptive_scaffold_test.dart`
 
 **Checkpoint**: `make test-core` + shell tests pass with fake WS
 
@@ -74,17 +74,17 @@
 
 ### Tests
 
-- [ ] T026 [P] [US1] Flow test manual connect in `apps/filament-dryer-control/test/features/discover/connect_flow_test.dart`
-- [ ] T027 [P] [US1] WS subscribe-on-connect test in `apps/filament-dryer-control/test/device/ws_client_test.dart`
+- [x] T026 [P] [US1] Flow test manual connect in `apps/filament-dryer-control/test/features/discover/connect_flow_test.dart`
+- [x] T027 [P] [US1] WS subscribe-on-connect test in `apps/filament-dryer-control/test/device/ws_client_test.dart`
 
 ### Implementation
 
-- [ ] T028 [P] [US1] mDNS adapter `_philarmony._tcp` in `apps/filament-dryer-control/lib/platform/mdns_discovery.dart`
-- [ ] T029 [P] [US1] `KnownDevice` repository in `apps/filament-dryer-control/lib/data/known_device_repository.dart`
-- [ ] T030 [US1] Discover UI (scan + manual form) in `apps/filament-dryer-control/lib/features/discover/discover_page.dart`
-- [ ] T031 [US1] Connection status chip in `apps/filament-dryer-control/lib/features/discover/connection_status.dart`
-- [ ] T032 [US1] Last-connected + auto-connect in `apps/filament-dryer-control/lib/features/discover/discover_controller.dart`
-- [ ] T033 [US1] iOS Local Network / Android Wi‑Fi permissions in `apps/filament-dryer-control/ios/` and `apps/filament-dryer-control/android/`
+- [x] T028 [P] [US1] mDNS adapter `_philarmony._tcp` in `apps/filament-dryer-control/lib/platform/mdns_discovery.dart`
+- [x] T029 [P] [US1] `KnownDevice` repository in `apps/filament-dryer-control/lib/data/known_device_repository.dart`
+- [x] T030 [US1] Discover UI (scan + manual form) in `apps/filament-dryer-control/lib/features/discover/discover_page.dart`
+- [x] T031 [US1] Connection status chip in `apps/filament-dryer-control/lib/features/discover/connection_status.dart`
+- [x] T032 [US1] Last-connected + auto-connect in `apps/filament-dryer-control/lib/features/discover/discover_controller.dart`
+- [x] T033 [US1] iOS Local Network / Android Wi‑Fi permissions in `apps/filament-dryer-control/ios/` and `apps/filament-dryer-control/android/`
 
 **Checkpoint**: US1 green with FakePhilarmonyWsClient
 
@@ -98,16 +98,16 @@
 
 ### Tests
 
-- [ ] T034 [P] [US2] Dashboard flow test in `apps/filament-dryer-control/test/features/dashboard/dashboard_flow_test.dart`
+- [x] T034 [P] [US2] Dashboard flow test in `apps/filament-dryer-control/test/features/dashboard/dashboard_flow_test.dart`
 
 ### Implementation
 
-- [ ] T035 [P] [US2] Telemetry ring buffer in `apps/filament-dryer-control/lib/device/telemetry_buffer.dart`
-- [ ] T036 [US2] Dashboard cards + progress ring in `apps/filament-dryer-control/lib/features/dashboard/dashboard_page.dart`
-- [ ] T037 [P] [US2] Live charts (`fl_chart`) in `apps/filament-dryer-control/lib/features/dashboard/live_charts.dart`
-- [ ] T038 [P] [US2] Unit format helpers in `apps/filament-dryer-control/lib/features/settings/unit_format.dart`
-- [ ] T039 [US2] Fault banner (`status/fault`) in `apps/filament-dryer-control/lib/features/dashboard/fault_banner.dart`
-- [ ] T040 [US2] Expanded master–detail layout in `apps/filament-dryer-control/lib/features/dashboard/dashboard_page.dart`
+- [x] T035 [P] [US2] Telemetry ring buffer in `apps/filament-dryer-control/lib/device/telemetry_buffer.dart`
+- [x] T036 [US2] Dashboard cards + progress ring in `apps/filament-dryer-control/lib/features/dashboard/dashboard_page.dart`
+- [x] T037 [P] [US2] Live charts (`fl_chart`) in `apps/filament-dryer-control/lib/features/dashboard/live_charts.dart`
+- [x] T038 [P] [US2] Unit format helpers in `apps/filament-dryer-control/lib/features/settings/unit_format.dart`
+- [x] T039 [US2] Fault banner (`status/fault`) in `apps/filament-dryer-control/lib/features/dashboard/fault_banner.dart`
+- [x] T040 [US2] Expanded master–detail layout in `apps/filament-dryer-control/lib/features/dashboard/dashboard_page.dart`
 
 **Checkpoint**: Dashboard works compact + expanded with fake telemetry
 
@@ -121,15 +121,15 @@
 
 ### Tests
 
-- [ ] T041 [P] [US3] Start/stop flow test (assert no pause affordance) in `apps/filament-dryer-control/test/features/cycle/cycle_control_flow_test.dart`
+- [x] T041 [P] [US3] Start/stop flow test (assert no pause affordance) in `apps/filament-dryer-control/test/features/cycle/cycle_control_flow_test.dart`
 
 ### Implementation
 
-- [ ] T042 [US3] Start cycle form in `apps/filament-dryer-control/lib/features/cycle/start_cycle_page.dart`
-- [ ] T043 [US3] Stop confirmation + actions only (no pause) in `apps/filament-dryer-control/lib/features/cycle/cycle_actions.dart`
-- [ ] T044 [US3] Wire core validators before send in `apps/filament-dryer-control/lib/features/cycle/cycle_controller.dart`
-- [ ] T045 [US3] Cycle result screen on completion in `apps/filament-dryer-control/lib/features/cycle/cycle_result_page.dart`
-- [ ] T046 [US3] Persist in-progress `DryingCycle` on start in `apps/filament-dryer-control/lib/data/drying_cycle_repository.dart`
+- [x] T042 [US3] Start cycle form in `apps/filament-dryer-control/lib/features/cycle/start_cycle_page.dart`
+- [x] T043 [US3] Stop confirmation + actions only (no pause) in `apps/filament-dryer-control/lib/features/cycle/cycle_actions.dart`
+- [x] T044 [US3] Wire core validators before send in `apps/filament-dryer-control/lib/features/cycle/cycle_controller.dart`
+- [x] T045 [US3] Cycle result screen on completion in `apps/filament-dryer-control/lib/features/cycle/cycle_result_page.dart`
+- [x] T046 [US3] Persist in-progress `DryingCycle` on start in `apps/filament-dryer-control/lib/data/drying_cycle_repository.dart`
 
 **Checkpoint**: Start/stop journey green; Pause absent from UI
 
@@ -143,16 +143,16 @@
 
 ### Tests
 
-- [ ] T047 [P] [US4] Config flow test in `apps/filament-dryer-control/test/features/config/config_flow_test.dart`
+- [x] T047 [P] [US4] Config flow test in `apps/filament-dryer-control/test/features/config/config_flow_test.dart`
 
 ### Implementation
 
-- [ ] T048 [P] [US4] HardwareConfig helpers in `packages/philarmony_core/lib/src/models/hardware_config.dart` + export
-- [ ] T049 [US4] Config UI (sensors/pins/display) in `apps/filament-dryer-control/lib/features/config/`
-- [ ] T050 [US4] PinValidator before send in `apps/filament-dryer-control/lib/features/config/config_controller.dart`
-- [ ] T051 [US4] Handle `config/hardware/response` + `error` in `apps/filament-dryer-control/lib/device/philarmony_ws_client.dart`
-- [ ] T052 [P] [US4] WiFi section in `apps/filament-dryer-control/lib/features/config/wifi_section.dart`
-- [ ] T053 [P] [US4] Advanced read-only in `apps/filament-dryer-control/lib/features/config/advanced_section.dart`
+- [x] T048 [P] [US4] HardwareConfig helpers in `packages/philarmony_core/lib/src/models/hardware_config.dart` + export
+- [x] T049 [US4] Config UI (sensors/pins/display) in `apps/filament-dryer-control/lib/features/config/`
+- [x] T050 [US4] PinValidator before send in `apps/filament-dryer-control/lib/features/config/config_controller.dart`
+- [x] T051 [US4] Handle `config/hardware/response` + `error` in `apps/filament-dryer-control/lib/device/philarmony_ws_client.dart`
+- [x] T052 [P] [US4] WiFi section in `apps/filament-dryer-control/lib/features/config/wifi_section.dart`
+- [x] T053 [P] [US4] Advanced read-only in `apps/filament-dryer-control/lib/features/config/advanced_section.dart`
 
 **Checkpoint**: Config journey independent with mock ack/error
 
@@ -166,15 +166,15 @@
 
 ### Tests
 
-- [ ] T054 [P] [US5] Profiles flow test in `apps/filament-dryer-control/test/features/profiles/profiles_flow_test.dart`
+- [x] T054 [P] [US5] Profiles flow test in `apps/filament-dryer-control/test/features/profiles/profiles_flow_test.dart`
 
 ### Implementation
 
-- [ ] T055 [US5] Profile sync service in `apps/filament-dryer-control/lib/features/profiles/profile_sync_service.dart`
-- [ ] T056 [US5] Profiles UI in `apps/filament-dryer-control/lib/features/profiles/profiles_page.dart`
-- [ ] T057 [US5] Profile picker on start in `apps/filament-dryer-control/lib/features/cycle/start_cycle_page.dart`
-- [ ] T058 [US5] Offline edits → `PendingCommand` in `apps/filament-dryer-control/lib/data/pending_command_repository.dart`
-- [ ] T059 [US5] Flush pending on reconnect in `apps/filament-dryer-control/lib/device/session_providers.dart`
+- [x] T055 [US5] Profile sync service in `apps/filament-dryer-control/lib/features/profiles/profile_sync_service.dart`
+- [x] T056 [US5] Profiles UI in `apps/filament-dryer-control/lib/features/profiles/profiles_page.dart`
+- [x] T057 [US5] Profile picker on start in `apps/filament-dryer-control/lib/features/cycle/start_cycle_page.dart`
+- [x] T058 [US5] Offline edits → `PendingCommand` in `apps/filament-dryer-control/lib/data/pending_command_repository.dart`
+- [x] T059 [US5] Flush pending on reconnect in `apps/filament-dryer-control/lib/device/session_providers.dart`
 
 **Checkpoint**: Profiles online + queue offline
 
@@ -188,19 +188,19 @@
 
 ### Tests
 
-- [ ] T060 [P] [US6] History list offline flow in `apps/filament-dryer-control/test/features/history/history_flow_test.dart`
-- [ ] T061 [P] [US6] Export CSV+PDF unit/flow test in `apps/filament-dryer-control/test/features/history/cycle_export_test.dart`
+- [x] T060 [P] [US6] History list offline flow in `apps/filament-dryer-control/test/features/history/history_flow_test.dart`
+- [x] T061 [P] [US6] Export CSV+PDF unit/flow test in `apps/filament-dryer-control/test/features/history/cycle_export_test.dart`
 
 ### Implementation
 
-- [ ] T062 [US6] Finalize cycle + downsample samples in `apps/filament-dryer-control/lib/data/drying_cycle_repository.dart`
-- [ ] T063 [US6] History list + filters in `apps/filament-dryer-control/lib/features/history/history_page.dart`
-- [ ] T064 [P] [US6] Cycle detail charts in `apps/filament-dryer-control/lib/features/history/cycle_detail_page.dart`
-- [ ] T065 [US6] CSV exporter in `apps/filament-dryer-control/lib/features/history/cycle_csv_export.dart`
-- [ ] T066 [US6] PDF exporter (summary + charts) in `apps/filament-dryer-control/lib/features/history/cycle_pdf_export.dart` per `contracts/history-export.md`
-- [ ] T067 [P] [US6] Stats widgets in `apps/filament-dryer-control/lib/features/history/history_stats.dart`
-- [ ] T068 [US6] Expanded master–detail history in `apps/filament-dryer-control/lib/features/history/history_page.dart`
-- [ ] T069 [US6] Export actions wired in UI (CSV + PDF) in `apps/filament-dryer-control/lib/features/history/cycle_detail_page.dart`
+- [x] T062 [US6] Finalize cycle + downsample samples in `apps/filament-dryer-control/lib/data/drying_cycle_repository.dart`
+- [x] T063 [US6] History list + filters in `apps/filament-dryer-control/lib/features/history/history_page.dart`
+- [x] T064 [P] [US6] Cycle detail charts in `apps/filament-dryer-control/lib/features/history/cycle_detail_page.dart`
+- [x] T065 [US6] CSV exporter in `apps/filament-dryer-control/lib/features/history/cycle_csv_export.dart`
+- [x] T066 [US6] PDF exporter (summary + charts) in `apps/filament-dryer-control/lib/features/history/cycle_pdf_export.dart` per `contracts/history-export.md`
+- [x] T067 [P] [US6] Stats widgets in `apps/filament-dryer-control/lib/features/history/history_stats.dart`
+- [x] T068 [US6] Expanded master–detail history in `apps/filament-dryer-control/lib/features/history/history_page.dart`
+- [x] T069 [US6] Export actions wired in UI (CSV + PDF) in `apps/filament-dryer-control/lib/features/history/cycle_detail_page.dart`
 
 **Checkpoint**: Both export formats succeed in automated test with fixtures
 
@@ -214,14 +214,14 @@
 
 ### Tests
 
-- [ ] T070 [P] [US7] Multi-session flow in `apps/filament-dryer-control/test/features/devices/multi_device_flow_test.dart`
+- [x] T070 [P] [US7] Multi-session flow in `apps/filament-dryer-control/test/features/devices/multi_device_flow_test.dart`
 
 ### Implementation
 
-- [ ] T071 [US7] Session manager (default max 3) in `apps/filament-dryer-control/lib/device/session_manager.dart`
-- [ ] T072 [US7] Device switcher in `apps/filament-dryer-control/lib/shell/device_switcher.dart`
-- [ ] T073 [US7] Per-device notification toggles in `apps/filament-dryer-control/lib/features/devices/device_settings_page.dart`
-- [ ] T074 [US7] Online/offline indicators in `apps/filament-dryer-control/lib/features/discover/discover_page.dart`
+- [x] T071 [US7] Session manager (default max 3) in `apps/filament-dryer-control/lib/device/session_manager.dart`
+- [x] T072 [US7] Device switcher in `apps/filament-dryer-control/lib/shell/device_switcher.dart`
+- [x] T073 [US7] Per-device notification toggles in `apps/filament-dryer-control/lib/features/devices/device_settings_page.dart`
+- [x] T074 [US7] Online/offline indicators in `apps/filament-dryer-control/lib/features/discover/discover_page.dart`
 
 **Checkpoint**: Multi-device does not break US1–US6
 
@@ -231,21 +231,21 @@
 
 **Purpose**: Required mobile background WS (clarify), local notifications, packaging, CI, a11y, handoff to 005
 
-- [ ] T075 Implement Android foreground service (`dataSync`) background WS in `apps/filament-dryer-control/lib/platform/background_session_android.dart` + `android/` manifests
-- [ ] T076 Implement iOS background session/entitlements for sustained WS in `apps/filament-dryer-control/lib/platform/background_session_ios.dart` + `ios/Runner/*`
-- [ ] T077 Wire `BackgroundSession` start/stop with active cycle in `apps/filament-dryer-control/lib/device/session_providers.dart` (surface OS denial errors)
-- [ ] T078 [P] Widget/integration test for background policy hooks (mocked) in `apps/filament-dryer-control/test/platform/background_session_test.dart`
-- [ ] T079 [P] Local notifications adapter in `apps/filament-dryer-control/lib/platform/local_notifications.dart`
-- [ ] T080 [P] Settings page (locale, units, PIN stub, notification prefs) in `apps/filament-dryer-control/lib/features/settings/settings_page.dart`
-- [ ] T081 [P] Accessibility labels pass on primary screens under `apps/filament-dryer-control/lib/features/`
-- [ ] T082 Complete ARB PT-BR/EN-US in `apps/filament-dryer-control/lib/l10n/`
-- [ ] T083 [P] Desktop packaging tree `apps/filament-dryer-control/packaging/` (DEC-011 patterns)
-- [ ] T084 Wire `make package-control*` in root `Makefile`
-- [ ] T085 [P] CI `flutter analyze` + `flutter test` in `.github/workflows/control-app-ci.yml`
-- [ ] T086 Document iOS/Android background entitlements + store notes in `apps/filament-dryer-control/README.md`
-- [ ] T087 Register open manual stages VS-1…VS-9 from `quickstart.md` into `specs/005-manual-validation/` (no open manuals left on 003)
-- [ ] T088 [P] Ensure root `README.md` lists control-app paths
-- [ ] T089 Dashboard rebuild performance pass in `apps/filament-dryer-control/lib/features/dashboard/`
+- [x] T075 Implement Android foreground service (`dataSync`) background WS in `apps/filament-dryer-control/lib/platform/background_session_android.dart` + `android/` manifests
+- [x] T076 Implement iOS background session/entitlements for sustained WS in `apps/filament-dryer-control/lib/platform/background_session_ios.dart` + `ios/Runner/*`
+- [x] T077 Wire `BackgroundSession` start/stop with active cycle in `apps/filament-dryer-control/lib/device/session_providers.dart` (surface OS denial errors)
+- [x] T078 [P] Widget/integration test for background policy hooks (mocked) in `apps/filament-dryer-control/test/platform/background_session_test.dart`
+- [x] T079 [P] Local notifications adapter in `apps/filament-dryer-control/lib/platform/local_notifications.dart`
+- [x] T080 [P] Settings page (locale, units, PIN stub, notification prefs) in `apps/filament-dryer-control/lib/features/settings/settings_page.dart`
+- [x] T081 [P] Accessibility labels pass on primary screens under `apps/filament-dryer-control/lib/features/`
+- [x] T082 Complete ARB PT-BR/EN-US in `apps/filament-dryer-control/lib/l10n/`
+- [x] T083 [P] Desktop packaging tree `apps/filament-dryer-control/packaging/` (DEC-011 patterns)
+- [x] T084 Wire `make package-control*` in root `Makefile`
+- [x] T085 [P] CI `flutter analyze` + `flutter test` in `.github/workflows/control-app-ci.yml`
+- [x] T086 Document iOS/Android background entitlements + store notes in `apps/filament-dryer-control/README.md`
+- [x] T087 Register open manual stages VS-1…VS-9 from `quickstart.md` into `specs/005-manual-validation/` as **VS-CTRL-1…VS-CTRL-9** (no open manuals left on 003)
+- [x] T088 [P] Ensure root `README.md` lists control-app paths
+- [x] T089 Dashboard rebuild performance pass in `apps/filament-dryer-control/lib/features/dashboard/`
 
 **Checkpoint**: CI green; bg WS implementations present both platforms; manuals only under 005
 
@@ -310,7 +310,7 @@ Task: "cycle_export_test.dart"
 1. Phase 1–2  
 2. US1–US3 (discover, dashboard, start/stop)  
 3. Complete **T075–T078** (bg WS iOS+Android) and **T060–T069** (CSV+PDF; at least T061, T065, T066, T069) before MVP sign-off  
-4. Manual VS-1/2/7/8 → `005` via T087  
+4. Manual **VS-CTRL-1/2/7/8** → already registered in `005` (was T087)  
 
 Demo can stop after US3; **acceptance “MVP”** = Core UX + bg WS + exports.
 
