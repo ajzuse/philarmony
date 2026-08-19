@@ -20,17 +20,19 @@ READY ──start──► DRYING ◄──resume── PAUSED
 |-------|--------|-----------|---------------|-----|
 | READY | off | off | n/a | Home |
 | DRYING | control loop | as control | running | Monitoring |
-| **PAUSED** | **off** | **off** | **frozen** | Monitoring (paused) |
+| PAUSED | **off** | **off** | **frozen** | Monitoring (paused); auto-stop after **30 min** |
 | COOLDOWN | off | cooldown policy | session ended | Monitoring/Cooldown |
 | STOPPED / FAULT_STOPPED | off | off | stopped | Home / fault |
+
+**Power loss**: Persist DRYING or PAUSED session; boot **auto-resumes** prior state (no prompt); SafetyEngine gates heat.
 
 **New transitions** (must update `StateMachine` validity matrix):
 - DRYING → PAUSED (user pause)
 - PAUSED → DRYING (user resume)
-- PAUSED → STOPPED / COOLDOWN (user stop — same stop path as from DRYING)
+- PAUSED → STOPPED / COOLDOWN (user stop or **pause_timeout** after 30 min)
 - PAUSED → FAULT_STOPPED (safety)
 
-`DryingStopReason`: unchanged for stop; pause is **not** a stop reason (session still active).
+`DryingStopReason`: add `pause_timeout`; pause itself is **not** a stop reason while still paused.
 
 ---
 
@@ -60,8 +62,8 @@ READY ──start──► DRYING ◄──resume── PAUSED
 | `language` | enum | `pt_br`, `en_us` |
 | `touch_sensitivity` | enum | mirrors TouchConfig.sensitivity |
 | `high_contrast` | bool | |
-| `pin_lock_enabled` | bool | P2 |
-| `pin_hash` | string | optional; P2 |
+| `pin_lock_enabled` | bool | optional polish |
+| `pin_hash` | string | optional |
 
 ### 2.3 UIScreen (runtime FSM)
 
@@ -71,8 +73,8 @@ READY ──start──► DRYING ◄──resume── PAUSED
 | `previous` | enum | back navigation |
 | `params` | object | e.g. selected `profile_id`, dialog callback |
 
-**P1 screens**: `home`, `start_material`, `start_custom`, `dialog_confirm`, `monitoring`, `dialog_message`  
-**P2 screens**: settings_*, history_*, dialog_keypad, etc.
+**P1 screens (v0.1 required)**: `home`, `start_material`, `start_custom`, `dialog_confirm`, `monitoring`, `dialog_message`, `settings_*`, `history_list`, `history_detail`, `dialog_keypad`  
+**Optional polish**: PIN lock screens if enabled
 
 ### 2.4 FilamentProfile (reuse 001)
 
@@ -87,9 +89,9 @@ Canonical entity in ConfigManager/ProfileManager. UI **MUST NOT** duplicate pres
 | nylon | Nylon | 70 | 360 | 10 |
 | custom | Personalizado | user | user | user |
 
-### 2.5 CycleRecord (on-device history, P2)
+### 2.5 CycleRecord (on-device history)
 
-Circular buffer ≤50 in LittleFS/NVS. Fields per spec Key Entities. Prefer deriving summary from existing drying logs when possible to avoid dual writers.
+Circular buffer ≤**50** in LittleFS/NVS. List UI shows newest **10**, then Mais loads older. Prefer deriving summary from existing drying logs when possible to avoid dual writers.
 
 ### 2.6 Status broadcast extensions
 
@@ -109,9 +111,10 @@ Circular buffer ≤50 in LittleFS/NVS. Fields per spec Key Entities. Prefer deri
 |--------|-------|
 | Start (profile) | Profile exists; temp/humidity/duration within ProfileManager ranges; state READY (or STOPPED→READY) |
 | Start (custom) | Same ranges; SafetyEngine hard limit still applies |
-| Pause | State == DRYING; heater cutoff ≤500ms |
-| Resume | State == PAUSED; SafetyEngine healthy |
+| Pause | State == DRYING; heater cutoff ≤500ms; pause clock starts (30 min max) |
+| Resume | State == PAUSED; SafetyEngine healthy; pause age &lt; 30 min |
 | Stop | State ∈ {DRYING, PAUSED, COOLDOWN}; confirm dialog required on UI |
+| Mid-cycle targets | Apply to session + broadcast `status/update` with `ui_source=touch` |
 
 ---
 

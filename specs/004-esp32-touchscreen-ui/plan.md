@@ -9,7 +9,9 @@
 
 ## Summary
 
-Add a touch-capable on-device UI to the ESP32 filament dryer so operators can run a drying cycle standalone: pick a built-in/custom filament profile, start, monitor, **pause/resume**, or stop with confirmation. Touch commands reuse the same control path as WebSocket (`ProfileManager` + `StateMachine` + SafetyEngine). Stack: **LVGL v8+** flushed through existing **LovyanGFX** display drivers; new `ITouchDriver` + probe for resistive/capacitive controllers; FreeRTOS UI task on Core 1 alongside display/control. Pause requires a new firmware state `PAUSED` and WS topics `control/pause` / `control/resume` (app 003 stays Stop-only until it opts in).
+Add a touch-capable on-device UI to the ESP32 filament dryer so operators can run a drying cycle standalone: pick a built-in/custom filament profile, start, monitor, **pause/resume** (30 min max then auto-stop), or stop with confirmation; adjust mid-cycle targets (broadcast to WS); configure device settings; view history (50 stored, list shows 10 + Mais). Touch commands reuse the same control path as WebSocket (`ProfileManager` + `StateMachine` + SafetyEngine). Stack: **LVGL v8+** flushed through existing **LovyanGFX** display drivers; new `ITouchDriver` + probe; FreeRTOS UI task. Pause requires `SystemState::PAUSED` and WS `control/pause` / `control/resume`. Power loss: **auto-resume** interrupted drying/paused session (no prompt). App 003 stays Stop-only until it opts in.
+
+**Clarify session 2026-08-19** locked full v0.1 acceptance (Settings/History/mid-cycle required).
 
 ## Technical Context
 
@@ -48,8 +50,7 @@ Add a touch-capable on-device UI to the ESP32 filament dryer so operators can ru
 - GPLv3 headers on new sources; new deps in `platformio.ini` + `.vscode/workspace.json`
 
 **Scale/Scope**:
-- **P1**: Home, Start (presets + custom), Monitoring, Pause/Resume, Stop+confirm, WS sync for those actions
-- **P2**: Settings (WiFi/display/units/language/touch/advanced), History list/detail, PIN lock, mid-cycle target adjust
+- **v0.1 acceptance (clarify 2026-08-19):** Home, Start (presets + custom), Monitoring, Pause/Resume (30 min max), Stop+confirm, mid-cycle target adjust (WS broadcast), Settings (all categories), History (50 stored / list 10 + Mais), power-loss **auto-resume**
 - Out of scope: multi-touch, full soft keyboard, OTA from UI, remote mirror
 
 ## Constitution Check

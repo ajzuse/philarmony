@@ -16,6 +16,7 @@ Touch UI and WebSocket clients share one control authority: `ProfileManager` + `
 | Pause | `pauseDrying()` | `control/pause` |
 | Resume | `resumeDrying()` | `control/resume` |
 | Stop (confirmed) | `stopDrying(USER_STOPPED)` / cooldown path | `control/stop` |
+| Mid-cycle targets | update session targets + SafetyEngine validate | `status/update` broadcast (`ui_source=touch`) |
 
 ## Broadcast
 

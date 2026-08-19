@@ -23,6 +23,7 @@
 - Heater power 0% within 500ms
 - Fan off (MVP)
 - Freeze elapsed timer accrual
+- Start 30-minute pause timeout → auto `control/stop`-equivalent with reason `pause_timeout` if still paused
 - Ack + `status/update` with `status: "paused"`, `paused: true`
 
 **Errors**: `invalid_state`, `fault_active`

@@ -32,14 +32,17 @@
 
 ## R4 — Pause / Resume (elevated to MVP)
 
-**Decision**: Add `SystemState::PAUSED` between DRYING↔PAUSED. On pause: heater **off** immediately; exhaust fan policy = **hold last safe cooldown-friendly duty or off** (default **off** for MVP, configurable later); **freeze** `elapsed_sec` accrual; keep session targets/profile. Resume → DRYING, restore control loop. Stop from PAUSED allowed (confirm). Expose WS `control/pause` and `control/resume` so apps can sync later. Feature **003 remains Stop-only** until it adopts these topics (DEC-012 unchanged).
+**Decision**: Add `SystemState::PAUSED` between DRYING↔PAUSED. On pause: heater **off** immediately; exhaust fan **off** (MVP); **freeze** `elapsed_sec` accrual; keep session targets/profile. Resume → DRYING, restore control loop. Stop from PAUSED allowed (confirm). **Max pause: 30 minutes** → auto-stop with `pause_timeout`. Expose WS `control/pause` and `control/resume`. Feature **003 remains Stop-only** until it adopts these topics (DEC-012 unchanged).
 
-**Rationale**: Explicit user plan request; UI placeholder without firmware state would lie about heater/timer.
+**Rationale**: Explicit user plan request + clarify 2026-08-19 (Option B).
 
-**Alternatives considered**:
-- Keep pause as “future” (spec FR-004 old text) — **rejected** by plan input
-- Soft-pause (UI only, heater still on) — unsafe/misleading
-- Require 003 to ship pause simultaneously — out of scope; document contract for later
+**Alternatives considered**: Unlimited pause — rejected (clarify); 60/120 min caps — not chosen.
+
+## R4b — Power-loss resume
+
+**Decision**: Persist interrupted drying/paused session; on boot **auto-resume** without prompt (SafetyEngine still gates heat). Clarify 2026-08-19 Option A.
+
+**Alternatives considered**: Prompt Continue/Discard; never resume — rejected.
 
 ## R5 — Filament presets on Start flow
 
@@ -49,13 +52,11 @@
 
 **Alternatives considered**: Hardcoded UI presets diverging from NVS profiles — sync bugs with app.
 
-## R6 — Screen set & MVP cut
+## R6 — Screen set & v0.1 cut (clarify amend)
 
-**Decision**:
-- **P1**: Splash → Home → StartPresets → (optional Custom) → Confirm → Monitoring (Pause/Resume + Stop) + confirm dialogs
-- **P2**: Settings categories, History, mid-cycle target adjust, PIN lock, high-contrast polish
+**Decision**: **Full v0.1 acceptance** — Start/Pause/Stop + mid-cycle adjust + Settings + History all required (clarify Option A). History: store 50, list newest 10 + Mais (Option C). Mid-cycle targets broadcast to WS (Option A). PIN lock remains optional polish within Settings/Advanced if time permits but not a separate deferral of core Settings/History.
 
-**Rationale**: Plan input prioritizes start/stop/pause; settings/history remain in spec but not blocking P1.
+**Rationale**: Clarify 2026-08-19 superseded earlier P1/P2 research split.
 
 ## R7 — Memory & tasking
 
