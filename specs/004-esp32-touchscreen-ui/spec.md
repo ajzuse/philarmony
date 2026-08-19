@@ -33,6 +33,13 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 3. User taps "Parar" → confirmation dialog appears ("Tem certeza?")
 4. User confirms → heater/fan stop, status returns to idle, cycle saved to history
 
+**Scenario 2b: Pause and Resume Drying Cycle**
+1. Drying cycle in progress, monitoring screen displayed
+2. User taps "Pausar" (Pause) — no confirmation required
+3. Heater cuts off within 500ms, elapsed timer freezes, status shows paused
+4. User taps "Retomar" (Resume) → control loop resumes with same profile/targets
+5. Stop remains available while paused (with confirmation)
+
 **Scenario 3: Adjust Target Temperature/Humidity Mid-Cycle**
 1. Drying cycle running
 2. User taps temperature/humidity value on monitoring screen
@@ -56,7 +63,9 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
 | Start cycle | Device idle, touchscreen active | User completes start flow | Drying begins, monitoring screen shows live data |
-| Stop cycle | Drying in progress | User taps Stop, confirms | Heater/fan off within 500ms, status "stopped" |
+| Stop cycle | Drying in progress or paused | User taps Stop, confirms | Heater/fan off within 500ms, status "stopped" |
+| Pause cycle | Drying in progress | User taps Pause | Heater off within 500ms, status "paused", timer frozen |
+| Resume cycle | Cycle paused | User taps Resume | Status "drying", same targets, timer resumes |
 | Adjust targets | Drying in progress | User changes temp/humidity targets | Control loop receives new targets within 1s |
 | Configure settings | In settings menu | User changes brightness/unit/language | Change applied immediately, persists reboot |
 | View history | At least 1 completed cycle | User opens History | List shows cycles with key metrics |
@@ -99,11 +108,11 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 - Screen timeout: Configurable (30s-10min, default 2min), dims to 10% brightness
 
 ### FR-004: Drying Cycle Control via Touch
-- **Start**: Validate targets (temp 30-80°C, humidity 5-50%, time 1-1440min), send internal start command
-- **Stop**: Immediate heater/fan cutoff, show confirmation dialog, log stop_reason="user_stopped"
+- **Start**: Validate targets (temp 30-80°C, humidity 5-50%, time 1-1440min), send internal start command via ProfileManager (preset `profile_id` or custom params)
+- **Stop**: Immediate heater/fan cutoff, show confirmation dialog, log stop_reason="user_stopped" (allowed from drying or paused)
 - **Adjust Targets**: Increment/decrement (±1°C, ±1%RH, ±5min) or numeric keypad, apply to running control loop
-- **Pause/Resume**: If firmware supports (future), placeholder in UI
-- Material Presets: PLA(50°C/4h/15%), PETG(65°C/4h/15%), ABS(80°C/2h/10%), TPU(45°C/4h/20%), Nylon(70°C/6h/10%), Custom
+- **Pause/Resume**: MVP — `PAUSED` state cuts heater within 500ms, freezes elapsed timer; Resume returns to DRYING with same session; expose `control/pause` / `control/resume` for WS sync (control app 003 may remain Stop-only until it adopts)
+- Material Presets: PLA(50°C/4h/15%), PETG(65°C/4h/15%), ABS(80°C/2h/10%), TPU(45°C/4h/20%), Nylon(70°C/6h/10%), Custom — sourced from ProfileManager / NVS, not a duplicate UI table
 
 ### FR-005: On-Device Configuration
 - **WiFi**: Show current SSID, signal (RSSI bars), "Reconfigurar" → triggers hotspot mode
@@ -268,6 +277,8 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
       ↓
 [Monitoring] ←←←←←←←←←←←←←←
       ↓
+   [Pause] ⇄ [Paused]
+      ↓
     [Stop] → [Confirm] → [Home]
 ```
 
@@ -277,6 +288,8 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 |--------------|------------------|---------------------|
 | Tap "Iniciar" → Preset → Confirm | `dryer_start(preset)` | `control/start` |
 | Tap "Personalizado" → Set values → Confirm | `dryer_start(custom)` | `control/start` |
+| Tap "Pausar" | `dryer_pause(user)` | `control/pause` |
+| Tap "Retomar" | `dryer_resume()` | `control/resume` |
 | Tap "Parar" → Confirm | `dryer_stop(user)` | `control/stop` |
 | Tap temp value → Adjust → Apply | `dryer_set_target(temp)` | N/A (local only) |
 | Tap humidity value → Adjust → Apply | `dryer_set_target(humidity)` | N/A (local only) |

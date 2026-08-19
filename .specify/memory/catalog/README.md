@@ -19,5 +19,6 @@ Source seed: `specs/001-filament-dryer-esp32/research.md` (T100).
 | DEC-010 | Desktop installer Flutter + esptool (shared w/ 003) | desktop, installer, flutter | 2026-07-28 |
 | DEC-011 | Host installers MSIX/DMG + Linux Make/AppImage/deb/rpm | packaging, windows, macos, linux, rpm | 2026-07-28 |
 | DEC-012 | Control app Flutter adaptive multi-platform (CSV+PDF, bg WS iOS+Android, Stop-only) | flutter, control-app, adaptive, websocket | 2026-08-10 |
+| DEC-013 | On-device touch UI (LVGL+LovyanGFX) + PAUSED state / pause-resume API | touchscreen, lvgl, pause, ui, esp32 | 2026-08-19 |
 
 See individual entry files under `entries/`.

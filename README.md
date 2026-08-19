@@ -63,7 +63,7 @@
 | 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | ⚙️ Tasks Geradas | 2026-07-23   |
-| 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
+| 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📋 Planejado | 2026-07-23   |
 | 5 | `005-manual-validation` | Manual Validation Catalog   | ⚙️ Tasks Geradas | 2026-08-04 |
 | 6 | `006-ambient-humidity-sensor` | Ambient Temperature & Humidity Sensor   | 📝 Especificado | 2026-08-19 |
 
@@ -183,15 +183,20 @@
       ↓
  [Monitoring] ←←←←←←←←←←←←←←←←←←
       ↓
+   [Pause] ⇄ [Paused]
+      ↓
     [Stop] → [Confirm] → [Home]
 ```
+
+**Plano**: `specs/004-esp32-touchscreen-ui/plan.md` (+ research, data-model, contracts, quickstart). Stack: **LVGL v8+** + LovyanGFX flush; DEC-013.
 
 #### Funcionalidades Touch
 
 | Feature | Detalhes |
 |---------|----------|
-| **Start Flow** | 3 taps: Home → Material → Confirm (preset) ou Home → Custom → Params → Confirm |
-| **Monitoring** | Valores grandes, progress ring, Stop button, tap values para ajustar mid-cycle |
+| **Start Flow** | 3 taps: Home → Perfil filamento → Confirm (ProfileManager) ou Custom → Params → Confirm |
+| **Pause/Resume** | MVP: estado `PAUSED` (heater off, timer frozen); WS `control/pause` / `control/resume` |
+| **Monitoring** | Valores grandes, progress ring, Pausar/Retomar + Parar, tap values para ajustar mid-cycle (P2) |
 | **Settings** | WiFi (reconfig→hotspot), Display (brightness, timeout, orientation), Units (°C/°F), Language, Touch (sensibilidade, calibração 4-pontos), Advanced (device name, firmware, reset) |
 | **History** | 50 ciclos circular buffer NVS/SPIFFS, list + detail com sparklines, export via WS/CSV |
 | **Sync WS** | Estado compartilhado, `ui_source` no status, config ack broadcast, last-write-wins |
@@ -200,7 +205,7 @@
 #### Entidades
 - `TouchConfig` - controller_type, pins, calibration, sensitivity, swap/invert axes
 - `UIScreen` - state machine enum + params
-- `MaterialPreset` - 5 built-in + custom (mesmo schema FilamentProfile)
+- `FilamentProfile` - presets via ProfileManager (sem tabela duplicada na UI)
 - `CycleRecord` - 50 entries circular buffer
 - `UISettings` - brightness, timeout, orientation, units, language, touch, contrast, pin_lock
 
@@ -213,7 +218,7 @@
 │ FASE                       │ STATUS     │ ENTREGÁVEIS            │  %   │
 ├────────────────────────────┼────────────┼────────────────────────┼──────┤
 │ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 6 Specs completas    │ 100% │
-│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 4/6  │
+│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 5/6  │
 │ 3. Firmware Core           │ ⏳ AGUARDANDO │ ESP32 Base + WS + NVS   │ 0%   │
 │ 4. Touch UI                │ ⏳ AGUARDANDO │ LVGL + Touch Driver     │ 0%   │
 │ 5. Desktop Installer       │ ⏳ AGUARDANDO │ Tauri/Flutter + esptool │ 0%   │
@@ -346,4 +351,4 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 ---
 
 *README auto-gerado e sincronizado pela Constituição Philarmony v1.0.0*
-*Última atualização: 2026-08-19 | Trigger: specify*
+*Última atualização: 2026-08-19 | Trigger: plan*
