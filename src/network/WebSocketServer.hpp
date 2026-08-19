@@ -76,6 +76,8 @@ public:
     
     // Generic status payload builder (T019c) - reflects all configured sensors/actuators
     void buildStatusPayload(JsonObject& payload);
+    void setUiSource(const String& source) { ui_source_ = source; }
+    String getUiSource() const { return ui_source_; }
     
     // Direct access to AsyncWebSocket for external builders (display task, etc.)
     AsyncWebSocket* getWebSocket() { return ws_; }
@@ -101,6 +103,8 @@ private:
     PidAutotuneController::ProgressCallback pid_progress_cb_ = nullptr;
     PidAutotuneController::CompleteCallback pid_complete_cb_ = nullptr;
     
+    String ui_source_ = "auto";
+
     // Client management
     struct ClientInfo {
         uint32_t id;
@@ -118,6 +122,8 @@ private:
     // Command handlers
     void handleControlStart(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleControlStop(AsyncWebSocketClient* client, const JsonObject& payload);
+    void handleControlPause(AsyncWebSocketClient* client, const JsonObject& payload);
+    void handleControlResume(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleConfigHardware(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleConfigDisplay(AsyncWebSocketClient* client, const JsonObject& payload);
     void handleConfigProfiles(AsyncWebSocketClient* client, const JsonObject& payload,

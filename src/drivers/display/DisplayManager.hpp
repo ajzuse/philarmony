@@ -51,6 +51,12 @@ public:
     void clear();
     void showError(const String& message);
     void showBootScreen(const String& firmware_version);
+    IDisplayDriver* getActiveDriver() { return active_display_; }
+    const IDisplayDriver* getActiveDriver() const { return active_display_; }
+    void pushRgb565(int16_t x, int16_t y, uint16_t w, uint16_t h,
+                    const uint16_t* data);
+    void setBrightness(uint8_t brightness);
+    uint8_t getBrightness() const;
 
     bool         isAnyConnected()  const;
     String       getActiveType()   const { return active_type_; }

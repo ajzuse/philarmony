@@ -35,6 +35,22 @@
   }
 }
 ```
+- Allowed from `drying`, `paused`, or `cooldown`
+
+### 1.2b Pause / Resume (feature 004)
+**Topic**: `control/pause`
+```json
+{ "topic": "control/pause", "payload": { "reason": "user_requested" } }
+```
+- Requires `status == drying`; heater off; elapsed frozen; auto-stop after 30 minutes (`pause_timeout`)
+
+**Topic**: `control/resume`
+```json
+{ "topic": "control/resume", "payload": {} }
+```
+- Requires `status == paused`
+
+See also: `specs/004-esp32-touchscreen-ui/contracts/pause-resume-api.md`
 
 ### 1.3 Subscribe / Unsubscribe Telemetry
 **Topic**: `status/subscribe` / `status/unsubscribe`

@@ -33,7 +33,8 @@ enum class SystemState {
     DRYING,
     COOLDOWN,
     STOPPED,
-    FAULT_STOPPED
+    FAULT_STOPPED,
+    PAUSED
 };
 
 enum class DryingStopReason {
@@ -44,7 +45,9 @@ enum class DryingStopReason {
     MAX_TIME,
     SAFETY_CUTOFF,
     SENSOR_ERROR,
-    THERMAL_RUNAWAY
+    THERMAL_RUNAWAY,
+    PAUSE_TIMEOUT,
+    POWER_LOSS
 };
 
 struct DryingSession {
@@ -68,42 +71,55 @@ struct DryingSession {
 
 class StateMachine {
 public:
+    static constexpr uint32_t kPauseTimeoutMs = 30UL * 60UL * 1000UL;
+
     StateMachine();
     ~StateMachine();
-    
+
     bool begin();
-    
+
     SystemState getState() const { return current_state_; }
     String getStateName() const;
-    /** Lowercase status for status/update and display (boot, drying, cooldown, …). */
+    /** Lowercase status for status/update and display (boot, drying, paused, …). */
     String getStatusStreamName() const;
     static String stopReasonToString(DryingStopReason reason);
-    
+
     bool transitionTo(SystemState new_state);
     bool canTransition(SystemState from, SystemState to) const;
-    
+
     bool startDrying(const DryingSession& session);
+    bool pauseDrying();
+    bool resumeDrying();
     bool beginCooldown(DryingStopReason reason);
     bool completeCooldown();
     bool stopDrying(DryingStopReason reason);
-    bool updateDryingProgress(float current_temp, float current_humidity, 
+    bool updateDryingProgress(float current_temp, float current_humidity,
                                float heater_power_pct, bool heater_on,
                                float fan_power_pct, bool fan_on);
-    
+
+    /** Call from control/UI loop while paused; auto-stops after 30 min. */
+    bool tickPauseTimeout();
+
+    /** Persist interrupted DRYING/PAUSED session for power-loss auto-resume. */
+    bool captureInterruptedSession(DryingSession& out) const;
+    bool restoreInterruptedSession(const DryingSession& session, SystemState state);
+
     const DryingSession& getCurrentSession() const { return current_session_; }
     DryingSession& getCurrentSession() { return current_session_; }
-    
+
     bool isInFaultState() const { return current_state_ == SystemState::FAULT_STOPPED; }
     bool isDrying() const { return current_state_ == SystemState::DRYING; }
+    bool isPaused() const { return current_state_ == SystemState::PAUSED; }
     bool isCoolingDown() const { return current_state_ == SystemState::COOLDOWN; }
     bool isReady() const { return current_state_ == SystemState::READY; }
-    
+
     uint32_t getSessionUptime() const;
     float getProgressPercent() const;
-    
+    uint32_t getPauseElapsedMs() const;
+
     using StateChangeCallback = void(*)(SystemState old_state, SystemState new_state);
     using SessionUpdateCallback = void(*)(const DryingSession& session);
-    
+
     void setStateChangeCallback(StateChangeCallback cb) { state_change_cb_ = cb; }
     void setSessionUpdateCallback(SessionUpdateCallback cb) { session_update_cb_ = cb; }
 
@@ -113,20 +129,25 @@ private:
     DryingSession current_session_;
     DryingStopReason pending_cooldown_reason_ = DryingStopReason::COMPLETED;
     uint32_t state_enter_time_ = 0;
-    
+    uint32_t pause_enter_ms_ = 0;
+    bool pause_active_ = false;
+    uint32_t elapsed_at_pause_sec_ = 0;
+
     StateChangeCallback state_change_cb_ = nullptr;
     SessionUpdateCallback session_update_cb_ = nullptr;
-    
-    // BOOT, WIFI, HOTSPOT, READY, DRYING, COOLDOWN, STOPPED, FAULT
-    static constexpr bool valid_transitions[8][8] = {
-        {false, true,  true,  false, false, false, false, false}, // BOOT
-        {false, false, true,  true,  false, false, false, false}, // WIFI_CONNECT
-        {false, true,  false, true,  false, false, false, false}, // HOTSPOT
-        {false, false, true,  false, true,  false, false, false}, // READY
-        {false, false, false, false, true,  true,  true,  true},  // DRYING
-        {false, false, false, false, false, false, true,  true},  // COOLDOWN
-        {false, false, true,  true,  false, false, false, false}, // STOPPED
-        {false, false, true,  true,  false, false, false, false}  // FAULT_STOPPED
+
+    // BOOT, WIFI, HOTSPOT, READY, DRYING, COOLDOWN, STOPPED, FAULT, PAUSED
+    static constexpr bool valid_transitions[9][9] = {
+        // to: BOOT WIFI HOT READY DRY COOL STOP FAULT PAUSE
+        {false, true,  true,  false, false, false, false, false, false}, // BOOT
+        {false, false, true,  true,  false, false, false, false, false}, // WIFI
+        {false, true,  false, true,  false, false, false, false, false}, // HOTSPOT
+        {false, false, true,  false, true,  false, false, false, false}, // READY
+        {false, false, false, false, true,  true,  true,  true,  true},  // DRYING
+        {false, false, false, false, false, false, true,  true,  false}, // COOLDOWN
+        {false, false, true,  true,  false, false, false, false, false}, // STOPPED
+        {false, false, true,  true,  false, false, false, false, false}, // FAULT
+        {false, false, false, false, true,  true,  true,  true,  false}, // PAUSED
     };
 };
 

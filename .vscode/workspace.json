@@ -29,6 +29,7 @@
       "ESPAsyncWebServer",
       "ArduinoJson ^7",
       "LovyanGFX",
+      "LVGL ^8.3 (touch UI flush via LovyanGFX; DEC-013)",
       "OneWire",
       "Adafruit GFX / SSD1306 / SH110X",
       "LiquidCrystal_I2C",

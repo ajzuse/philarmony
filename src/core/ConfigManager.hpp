@@ -27,6 +27,7 @@
 #include <Preferences.h>
 #include <string>
 #include <vector>
+#include "StateMachine.hpp"
 
 namespace filament_dryer {
 
@@ -110,6 +111,41 @@ struct DisplayConfig {
     std::vector<String> fields = {"chamber_temp_c", "target_temp_c", "humidity_pct", "heater_power_pct", "status"};
 };
 
+struct TouchCalibrationConfig {
+    int16_t x_min = 200;
+    int16_t x_max = 3800;
+    int16_t y_min = 200;
+    int16_t y_max = 3800;
+    bool swapped_xy = false;
+};
+
+struct TouchConfig {
+    String controller_type = "auto";
+    uint8_t i2c_address = 0;
+    int8_t spi_cs = -1;
+    int8_t irq_pin = -1;
+    int8_t spi_mosi = -1;
+    int8_t spi_miso = -1;
+    int8_t spi_sclk = -1;
+    TouchCalibrationConfig calibration;
+    String sensitivity = "medium";
+    bool swap_xy = false;
+    bool invert_x = false;
+    bool invert_y = false;
+};
+
+struct UISettings {
+    uint8_t brightness_pct = 80;
+    uint16_t timeout_sec = 120;
+    uint16_t orientation = 0;
+    String temp_unit = "celsius";
+    String language = "pt_br";
+    String touch_sensitivity = "medium";
+    bool high_contrast = false;
+    bool pin_lock_enabled = false;
+    String pin_hash;
+};
+
 struct FilamentProfile {
     String id;
     String name_pt;
@@ -170,6 +206,17 @@ public:
     // Display Configuration
     DisplayConfig getDisplayConfig() const;
     void setDisplayConfig(const DisplayConfig& config);
+
+    // Touch and on-device UI Configuration
+    TouchConfig getTouchConfig() const;
+    bool setTouchConfig(const TouchConfig& config);
+    UISettings getUiSettings() const;
+    bool setUiSettings(const UISettings& settings);
+
+    // Power-loss recovery
+    bool saveInterruptedSession(const DryingSession& session, SystemState state);
+    bool loadInterruptedSession(DryingSession& session, SystemState& state);
+    void clearInterruptedSession();
     
     // PID Configuration
     PidConfig getPidConfig() const;
@@ -222,6 +269,9 @@ private:
     static constexpr const char* KEY_SENSOR = "sensor";
     static constexpr const char* KEY_ACTUATOR = "actuator";
     static constexpr const char* KEY_DISPLAY = "display";
+    static constexpr const char* KEY_TOUCH = "touch";
+    static constexpr const char* KEY_UI = "ui";
+    static constexpr const char* KEY_INTERRUPTED = "interrupted";
     static constexpr const char* KEY_PID = "pid";
     static constexpr const char* KEY_PROFILES = "profiles";
     static constexpr const char* KEY_OBJECTS = "objects";

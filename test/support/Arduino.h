@@ -1,3 +1,20 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 #pragma once
 
 #include <cmath>
@@ -24,6 +41,19 @@ public:
     size_t length() const { return data_.length(); }
     bool isEmpty() const { return data_.empty(); }
     void reserve(size_t n) { data_.reserve(n); }
+    size_t write(uint8_t value) {
+        data_.push_back(static_cast<char>(value));
+        return 1;
+    }
+    size_t write(const uint8_t* values, size_t length) {
+        if (!values) return 0;
+        data_.append(reinterpret_cast<const char*>(values), length);
+        return length;
+    }
+    int read() const {
+        if (read_pos_ >= data_.size()) return -1;
+        return static_cast<uint8_t>(data_[read_pos_++]);
+    }
 
     String& operator=(const char* s) {
         data_ = s ? s : "";
@@ -69,6 +99,7 @@ public:
 
 private:
     std::string data_;
+    mutable size_t read_pos_ = 0;
 };
 
 inline String operator+(const String& lhs, float rhs) {

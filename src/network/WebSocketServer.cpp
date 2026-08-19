@@ -142,6 +142,10 @@ void WebSocketServer::dispatchTopic(AsyncWebSocketClient* client, const JsonObje
         handleControlStart(client, payload);
     } else if (topic == "control/stop") {
         handleControlStop(client, payload);
+    } else if (topic == "control/pause") {
+        handleControlPause(client, payload);
+    } else if (topic == "control/resume") {
+        handleControlResume(client, payload);
     } else if (topic == "config/hardware") {
         handleConfigHardware(client, payload);
     } else if (topic == "config/display") {
@@ -206,11 +210,13 @@ void WebSocketServer::handleControlStop(AsyncWebSocketClient* client, const Json
         return;
     }
 
-    if (!state_machine_->isDrying() && !state_machine_->isCoolingDown()) {
+    if (!state_machine_->isDrying() && !state_machine_->isCoolingDown() &&
+        !state_machine_->isPaused()) {
         sendError(client, "control/stop", "No active drying session");
         return;
     }
 
+    ui_source_ = "websocket";
     state_machine_->stopDrying(DryingStopReason::USER_STOPPED);
     if (actuator_cutoff_cb_) {
         actuator_cutoff_cb_();
@@ -225,15 +231,71 @@ void WebSocketServer::handleControlStop(AsyncWebSocketClient* client, const Json
     sendResponse(client, "control/stop", body);
 }
 
+void WebSocketServer::handleControlPause(AsyncWebSocketClient* client, const JsonObject& payload) {
+    (void)payload;
+    if (!state_machine_) {
+        sendError(client, "control/pause", "System not ready");
+        return;
+    }
+    if (!state_machine_->isDrying()) {
+        sendError(client, "control/pause", "invalid_state");
+        return;
+    }
+    if (safety_ && safety_->getLastFault() != FaultCode::NONE) {
+        sendError(client, "control/pause", "fault_active");
+        return;
+    }
+    if (!state_machine_->pauseDrying()) {
+        sendError(client, "control/pause", "Failed to pause");
+        return;
+    }
+    ui_source_ = "websocket";
+    if (actuator_cutoff_cb_) {
+        actuator_cutoff_cb_();
+    }
+    JsonDocument response;
+    JsonObject body = response.to<JsonObject>();
+    body["status"] = "paused";
+    body["paused"] = true;
+    sendResponse(client, "control/pause", body);
+}
+
+void WebSocketServer::handleControlResume(AsyncWebSocketClient* client, const JsonObject& payload) {
+    (void)payload;
+    if (!state_machine_) {
+        sendError(client, "control/resume", "System not ready");
+        return;
+    }
+    if (!state_machine_->isPaused()) {
+        sendError(client, "control/resume", "invalid_state");
+        return;
+    }
+    if (safety_ && safety_->getLastFault() != FaultCode::NONE) {
+        sendError(client, "control/resume", "safety_block");
+        return;
+    }
+    if (!state_machine_->resumeDrying()) {
+        sendError(client, "control/resume", "Failed to resume");
+        return;
+    }
+    ui_source_ = "websocket";
+    JsonDocument response;
+    JsonObject body = response.to<JsonObject>();
+    body["status"] = "drying";
+    body["paused"] = false;
+    sendResponse(client, "control/resume", body);
+}
+
 void WebSocketServer::handleConfigHardware(AsyncWebSocketClient* client, const JsonObject& payload) {
     if (!config_mgr_ || !hw_parser_) {
         sendError(client, "config/hardware", "Hardware parser unavailable");
         return;
     }
 
-    if (state_machine_ && (state_machine_->isDrying() || state_machine_->isCoolingDown())) {
+    if (state_machine_ && (state_machine_->isDrying() || state_machine_->isCoolingDown() ||
+                            state_machine_->isPaused())) {
         sendError(client, "config/hardware",
-                  "Cannot reload hardware while drying or cooling down");
+                  "Cannot reload hardware while drying, paused, or cooling down");
         return;
     }
 
@@ -655,6 +717,8 @@ void WebSocketServer::buildStatusPayload(JsonObject& payload) {
 
     const DryingSession& session = state_machine_->getCurrentSession();
     payload["status"] = state_machine_->getStatusStreamName();
+    payload["paused"] = state_machine_->isPaused();
+    payload["ui_source"] = ui_source_;
     payload["target_temp_c"] = session.target_temp_c;
     payload["target_humidity_pct"] = session.target_humidity_pct;
     payload["elapsed_time_sec"] = session.elapsed_sec;

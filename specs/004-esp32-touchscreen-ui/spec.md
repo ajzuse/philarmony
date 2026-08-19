@@ -12,6 +12,18 @@
 
 Enhance the ESP32 filament dryer firmware with a touch-enabled user interface for display models equipped with touchscreen capability (resistive or capacitive). The on-device UI allows users to start/stop drying cycles, adjust target temperature and humidity, and perform basic configuration directly on the device without requiring the mobile/desktop app or WebSocket connection. This feature builds upon the existing display infrastructure from the base firmware specification.
 
+**v0.1 acceptance (locked):** Start from filament presets, Pause/Resume, Stop, mid-cycle target adjust, Settings, and on-device History are all required for acceptance — not deferred.
+
+## Clarifications
+
+### Session 2026-08-19
+
+- Q: What is in v0.1 acceptance (P1-only vs full Settings/History/mid-cycle)? → A: Full v0.1 — Settings + History + mid-cycle adjust all required for acceptance (Option A)
+- Q: Power-loss during active/paused cycle — boot resume policy? → A: Auto-resume previous cycle on boot (no prompt) (Option A)
+- Q: How long may a cycle stay paused? → A: Auto-stop after 30 minutes paused (Option B)
+- Q: On-device history list size (10 vs 50)? → A: Store 50; list UI shows newest 10 with “more” later (Option C)
+- Q: Mid-cycle target changes via touch — WS sync? → A: Apply locally and broadcast to WS clients (Option A)
+
 ## User Scenarios & Testing
 
 > **Test task policy (Constitution v1.0.0):** Journeys, acceptance criteria, and **automated** test-implementation tasks live here. Open **manual** validation (on-device UI smoke) → `specs/005-manual-validation`, named by stage. When `tasks.md` is generated, keep automation on this feature; do not leave open manuals here.
@@ -33,12 +45,20 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 3. User taps "Parar" → confirmation dialog appears ("Tem certeza?")
 4. User confirms → heater/fan stop, status returns to idle, cycle saved to history
 
+**Scenario 2b: Pause and Resume Drying Cycle**
+1. Drying cycle in progress, monitoring screen displayed
+2. User taps "Pausar" (Pause) — no confirmation required
+3. Heater cuts off within 500ms, elapsed timer freezes, status shows paused
+4. User taps "Retomar" (Resume) → control loop resumes with same profile/targets
+5. Stop remains available while paused (with confirmation)
+6. If paused continuously for 30 minutes without resume → auto-stop; show notice; return Home
+
 **Scenario 3: Adjust Target Temperature/Humidity Mid-Cycle**
 1. Drying cycle running
 2. User taps temperature/humidity value on monitoring screen
 3. Adjustment overlay appears with ± steppers or keypad
 4. User modifies target temperature (30-80°C) and/or target humidity (5-50%)
-5. User taps "Aplicar" → new targets sent to control loop immediately
+5. User taps "Aplicar" → new targets sent to control loop immediately and broadcast to WS clients (`ui_source=touch`)
 
 **Scenario 4: Basic Configuration via Touchscreen**
 1. From home screen, user taps "Configurações" (gear icon)
@@ -48,25 +68,30 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 
 **Scenario 5: View Cycle History on Device**
 1. From home screen, user taps "Histórico"
-2. List of last 10 cycles with: date, material, target temp, duration, result
+2. List shows the **newest 10** cycles with: date, material, target temp, duration, result
 3. Tap cycle for details: temperature/humidity curves (simplified sparklines), avg/max values
+4. "Mais" / load-more reveals older entries from the same circular buffer (up to 50 total stored)
 
 ### Acceptance Criteria
 
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
 | Start cycle | Device idle, touchscreen active | User completes start flow | Drying begins, monitoring screen shows live data |
-| Stop cycle | Drying in progress | User taps Stop, confirms | Heater/fan off within 500ms, status "stopped" |
+| Stop cycle | Drying in progress or paused | User taps Stop, confirms | Heater/fan off within 500ms, status "stopped" |
+| Pause cycle | Drying in progress | User taps Pause | Heater off within 500ms, status "paused", timer frozen |
+| Pause timeout | Cycle paused ≥30 min | Timeout elapses | Session auto-stops; heater off; UI idle with notice |
+| Resume cycle | Cycle paused (&lt;30 min) | User taps Resume | Status "drying", same targets, timer resumes |
 | Adjust targets | Drying in progress | User changes temp/humidity targets | Control loop receives new targets within 1s |
 | Configure settings | In settings menu | User changes brightness/unit/language | Change applied immediately, persists reboot |
-| View history | At least 1 completed cycle | User opens History | List shows cycles with key metrics |
+| View history | At least 1 completed cycle | User opens History | Newest 10 shown; Mais loads older up to 50 stored |
+| Power-loss resume | Cycle drying or paused when power lost | Device reboots | Prior session auto-resumes (no prompt); Monitoring shows restored state; SafetyEngine still gates heat |
 
 ### Edge Cases
 
 - Touch during screen transition: Ignore or queue until stable
 - Invalid touch coordinates (edge noise): Filter via debounce/radius
 - Screen timeout during config: Auto-save and return to monitoring
-- Power loss during cycle: Resume prompt on boot ("Continuar ciclo anterior?")
+- Power loss during cycle (drying or paused): Persist interrupted session to NVS; on boot **auto-resume** prior state without prompt (heater remains gated by SafetyEngine; UI opens Monitoring for drying or paused as applicable)
 - Touchscreen calibration drift: Recalibration option in settings
 - Gloved fingers / wet hands: Adjust touch sensitivity setting
 - Simultaneous WebSocket command + touch input: Last-write-wins with visual feedback
@@ -89,21 +114,21 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 - Portuguese (BR) primary, English (US) secondary - all strings externalized
 
 ### FR-003: Screen Navigation & State Machine
-- **Home/Idle**: Status summary, large Start button, Settings/History icons
+- **Home/Idle**: Status summary, large Start button, Settings/History icons (**required in v0.1**)
 - **Start Flow**: Material presets → Custom params → Confirm
-- **Monitoring**: Live values (large), progress ring, Stop button, tap values to adjust
-- **Settings**: Categorized list (Rede, Tela, Unidades, Sensores, Avançado)
-- **History**: Scrollable list, tap for detail modal
+- **Monitoring**: Live values (large), progress ring, Pause/Resume + Stop, tap values to adjust (**required in v0.1**)
+- **Settings**: Categorized list (Rede, Tela, Unidades, Sensores, Avançado) — **required in v0.1**
+- **History**: Scrollable list, tap for detail modal — **required in v0.1**
 - **Dialogs**: Confirmation, numeric keypad, message/toast
-- Navigation: Hardware back gesture (swipe from left) or on-screen back button
+- Navigation: On-screen back button (swipe-from-left optional; multi-touch gestures remain out of scope)
 - Screen timeout: Configurable (30s-10min, default 2min), dims to 10% brightness
 
 ### FR-004: Drying Cycle Control via Touch
-- **Start**: Validate targets (temp 30-80°C, humidity 5-50%, time 1-1440min), send internal start command
-- **Stop**: Immediate heater/fan cutoff, show confirmation dialog, log stop_reason="user_stopped"
-- **Adjust Targets**: Increment/decrement (±1°C, ±1%RH, ±5min) or numeric keypad, apply to running control loop
-- **Pause/Resume**: If firmware supports (future), placeholder in UI
-- Material Presets: PLA(50°C/4h/15%), PETG(65°C/4h/15%), ABS(80°C/2h/10%), TPU(45°C/4h/20%), Nylon(70°C/6h/10%), Custom
+- **Start**: Validate targets (temp 30-80°C, humidity 5-50%, time 1-1440min), send internal start command via ProfileManager (preset `profile_id` or custom params)
+- **Stop**: Immediate heater/fan cutoff, show confirmation dialog, log stop_reason="user_stopped" (allowed from drying or paused)
+- **Adjust Targets**: Increment/decrement (±1°C, ±1%RH, ±5min) or numeric keypad, apply to running control loop — **required in v0.1**
+- **Pause/Resume**: MVP — `PAUSED` state cuts heater within 500ms, freezes elapsed timer; Resume returns to DRYING with same session; expose `control/pause` / `control/resume` for WS sync (control app 003 may remain Stop-only until it adopts). **Max pause duration: 30 minutes** — then auto-stop (stop_reason reflecting pause timeout), heaters remain off, UI returns to idle/Home with toast
+- Material Presets: PLA(50°C/4h/15%), PETG(65°C/4h/15%), ABS(80°C/2h/10%), TPU(45°C/4h/20%), Nylon(70°C/6h/10%), Custom — sourced from ProfileManager / NVS, not a duplicate UI table
 
 ### FR-005: On-Device Configuration
 - **WiFi**: Show current SSID, signal (RSSI bars), "Reconfigurar" → triggers hotspot mode
@@ -115,9 +140,10 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 - **Advanced**: Device name, safety temp limit (read-only), firmware version, reset to defaults
 
 ### FR-006: History & Data Visualization
-- Local history stored in NVS/spiffs: last 50 cycles (circular buffer)
+- Local history stored in NVS/spiffs: last **50** cycles (circular buffer)
 - Each record: timestamp, material, target_temp, avg_temp, max_temp, target_humidity, avg_humidity, duration_sec, stop_reason
-- List view: Date, Material badge, Target temp, Duration, Result icon (✓/✗/⚠)
+- List view (initial): newest **10** entries — Date, Material badge, Target temp, Duration, Result icon (✓/✗/⚠)
+- List view (more): "Mais" control loads older records from the same buffer until all ≤50 are shown
 - Detail view: Sparkline charts (temp/humidity over time), statistics cards
 - Export: "Enviar para App" via WebSocket (when connected), or CSV to SD card (if present)
 
@@ -125,6 +151,7 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 - Touch UI and WebSocket API share same internal state
 - Commands from either source update state, both UIs reflect changes
 - WebSocket `status/update` includes `ui_source`: "touch" | "websocket" | "auto"
+- Mid-cycle target adjustments from touch **MUST** update the control loop and **broadcast** current targets via `status/update` (and ack if applicable) to connected clients within the WebSocket sync latency budget
 - Config changes via touch broadcast via `config/*/ack` to connected clients
 - Conflict resolution: Last command wins, visual feedback on both ends
 
@@ -149,6 +176,7 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 - UI task watchdog: reset if frame time >100ms
 - NVS write endurance: batch config writes, wear leveling
 - Power loss during write: atomic operations, checksum validation
+- Power loss mid-cycle: interrupted drying/paused session persisted; boot path auto-resumes session state (no user prompt); SafetyEngine MUST still block unsafe heat
 
 ### Usability
 - New user starts cycle without manual: >95% success rate
@@ -173,13 +201,15 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 - `previous`: enum (for back navigation)
 - `params`: object (context data for current screen)
 
-### MaterialPreset
-- `id`: string (pla, petg, abs, tpu, nylon, custom)
+### FilamentProfile (formerly referred to as "MaterialPreset")
+- Canonical entity from firmware ProfileManager / NVS (same schema as 001)
+- `id`: string (pla, petg, abs, tpu, nylon, custom, …)
 - `name_pt`: string
 - `name_en`: string
 - `target_temp_c`: number
 - `default_duration_min`: number
 - `target_humidity_pct`: number
+- UI Start flow lists ProfileManager profiles; MUST NOT maintain a duplicate preset table
 
 ### CycleRecord (on-device)
 - `id`: number (incremental)
@@ -191,7 +221,7 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 - `target_humidity_pct`: number
 - `avg_humidity_pct`: number
 - `duration_sec`: number
-- `stop_reason`: enum (completed, stopped, target_humidity, max_time, safety_cutoff, error, power_loss)
+- `stop_reason`: enum (completed, stopped, target_humidity, max_time, safety_cutoff, error, power_loss, pause_timeout)
 
 ### UISettings
 - `brightness_pct`: number (10-100)
@@ -214,7 +244,7 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 | Memory overhead | <200KB | Additional RAM vs headless firmware |
 | Cycle start via touch | <3 taps | Home → Material → Confirm |
 | Settings change persistence | 100% | Survives power cycle |
-| History retention | 50 cycles | Circular buffer in NVS/SPIFFS |
+| History retention | 50 cycles stored; list shows 10 then more | Circular buffer; UI pagination |
 | Gloved hand success rate | >90% | With "High" sensitivity |
 | WebSocket sync latency | <100ms | Touch action → WebSocket broadcast |
 
@@ -268,6 +298,8 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
       ↓
 [Monitoring] ←←←←←←←←←←←←←←
       ↓
+   [Pause] ⇄ [Paused]
+      ↓
     [Stop] → [Confirm] → [Home]
 ```
 
@@ -277,9 +309,11 @@ Enhance the ESP32 filament dryer firmware with a touch-enabled user interface fo
 |--------------|------------------|---------------------|
 | Tap "Iniciar" → Preset → Confirm | `dryer_start(preset)` | `control/start` |
 | Tap "Personalizado" → Set values → Confirm | `dryer_start(custom)` | `control/start` |
+| Tap "Pausar" | `dryer_pause(user)` | `control/pause` |
+| Tap "Retomar" | `dryer_resume()` | `control/resume` |
 | Tap "Parar" → Confirm | `dryer_stop(user)` | `control/stop` |
-| Tap temp value → Adjust → Apply | `dryer_set_target(temp)` | N/A (local only) |
-| Tap humidity value → Adjust → Apply | `dryer_set_target(humidity)` | N/A (local only) |
+| Tap temp value → Adjust → Apply | `dryer_set_target(temp)` | `status/update` (targets + `ui_source=touch`) |
+| Tap humidity value → Adjust → Apply | `dryer_set_target(humidity)` | `status/update` (targets + `ui_source=touch`) |
 | Settings → Brightness → Save | `config_display(brightness)` | `config/display` |
 | Settings → Language → Save | `config_language(lang)` | N/A (local only) |
 | Settings → Touch Calibrate | `touch_calibrate()` | N/A |
