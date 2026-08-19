@@ -65,6 +65,7 @@
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
 | 5 | `005-manual-validation` | Manual Validation Catalog   | ⚙️ Tasks Geradas | 2026-08-04 |
+| 6 | `006-ambient-humidity-sensor` | Ambient Temperature & Humidity Sensor   | 📝 Especificado | 2026-08-19 |
 
 ---
 
@@ -128,10 +129,6 @@
 ---
 
 ### 003 - Control App Multi-Plataforma (`specs/003-filament-dryer-control-app/`)
-
-**Código**: `apps/filament-dryer-control/` · core compartilhado `packages/philarmony_core/` · packaging `apps/filament-dryer-control/packaging/`  
-**Make**: `run-control`, `test-control`, `package-control-linux|macos|windows`  
-**Manuais**: `specs/005-manual-validation` stages **VS-CTRL-1…VS-CTRL-9**
 
 **Objetivo**: App unificado Desktop + Mobile para monitoramento, configuração e controle remoto.
 
@@ -215,8 +212,8 @@
 ┌────────────────────────────┬────────────┬────────────────────────┬──────┐
 │ FASE                       │ STATUS     │ ENTREGÁVEIS            │  %   │
 ├────────────────────────────┼────────────┼────────────────────────┼──────┤
-│ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 5 Specs completas    │ 100% │
-│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 4/5  │
+│ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 6 Specs completas    │ 100% │
+│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 4/6  │
 │ 3. Firmware Core           │ ⏳ AGUARDANDO │ ESP32 Base + WS + NVS   │ 0%   │
 │ 4. Touch UI                │ ⏳ AGUARDANDO │ LVGL + Touch Driver     │ 0%   │
 │ 5. Desktop Installer       │ ⏳ AGUARDANDO │ Tauri/Flutter + esptool │ 0%   │
@@ -349,4 +346,4 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 ---
 
 *README auto-gerado e sincronizado pela Constituição Philarmony v1.0.0*
-*Última atualização: 2026-08-11 | Trigger: tasks*
+*Última atualização: 2026-08-19 | Trigger: specify*
