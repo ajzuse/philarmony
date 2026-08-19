@@ -1,8 +1,5 @@
-import 'package:filament_dryer_control/data/pending_command_repository.dart';
 import 'package:filament_dryer_control/device/fake_philarmony_ws_client.dart';
-import 'package:filament_dryer_control/device/session_deps.dart';
 import 'package:filament_dryer_control/device/session_providers.dart';
-import 'package:filament_dryer_control/features/profiles/profile_sync_service.dart';
 import 'package:filament_dryer_control/features/profiles/profiles_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
