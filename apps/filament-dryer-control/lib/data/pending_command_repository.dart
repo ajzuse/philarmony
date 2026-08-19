@@ -7,7 +7,6 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
-import 'package:philarmony_core/philarmony_core.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_database.dart' as drift;

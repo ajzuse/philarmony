@@ -7,7 +7,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:philarmony_core/philarmony_core.dart';
 
-import '../../device/session_deps.dart';
 import '../../device/session_providers.dart';
 import 'profile_sync_service.dart';
 
