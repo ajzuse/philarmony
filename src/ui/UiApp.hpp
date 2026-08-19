@@ -106,6 +106,8 @@ enum class UiAction {
 
 class UiApp {
 public:
+    using HapticCallback = void (*)();
+
     UiApp(TouchUiController& controller, TouchManager& touch, CycleHistoryStore& history);
 
     bool begin(uint16_t width, uint16_t height,
@@ -115,6 +117,7 @@ public:
     UiScreenId current() const { return current_; }
     void setLanguage(const String& lang);
     void notifyRemoteStateChange();
+    void setHapticCallback(HapticCallback callback) { haptic_callback_ = callback; }
     LvglPort& lvgl() { return lvgl_; }
     bool ownsDisplay() const { return lvgl_ready_ && display_manager_; }
 
@@ -163,6 +166,7 @@ private:
     CycleHistoryStore& history_;
     LvglPort lvgl_;
     DisplayManager* display_manager_ = nullptr;
+    HapticCallback haptic_callback_ = nullptr;
     UiScreenId current_ = UiScreenId::Splash;
     UiScreenId previous_ = UiScreenId::Home;
     String language_ = "pt_br";
@@ -210,6 +214,7 @@ private:
     void handleFallbackTouch(const TouchPoint& point);
     void renderScreen();
     void updateInactivity();
+    void playTouchFeedback();
     void showToast(const String& text, uint32_t duration_ms = 3000);
     void saveUiSettings();
     void applyTouchCalibrationToManager(const TouchConfig& config);

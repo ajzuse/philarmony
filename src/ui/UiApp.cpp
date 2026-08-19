@@ -255,6 +255,7 @@ void UiApp::handleFallbackTouch(const TouchPoint& point) {
 }
 
 void UiApp::handleAction(UiAction action, int32_t value) {
+    playTouchFeedback();
     switch (action) {
         case UiAction::HomeStart:
             fallback_profile_index_ = 0;
@@ -550,6 +551,12 @@ void UiApp::updateInactivity() {
 void UiApp::showToast(const String& text, uint32_t duration_ms) {
     toast_text_ = text;
     toast_until_ms_ = millis() + duration_ms;
+}
+
+void UiApp::playTouchFeedback() {
+    if (haptic_callback_) {
+        haptic_callback_();
+    }
 }
 
 void UiApp::applyTouchCalibrationToManager(const TouchConfig& config) {
