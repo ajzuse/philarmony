@@ -83,7 +83,11 @@
 Ledger: `specs/003-filament-dryer-control-app/checklists/quickstart-validation.md`
 
 - [x] T012 [US3] Expand placeholder into stage-named control-app manuals (see T016–T024); touchscreen remains T013
-- [ ] T013 [US3] [MANUAL] **VS-UI-1 Touchscreen UI smoke** — when 004 ships P1 journeys, execute on-device UI smoke and record under `specs/004-esp32-touchscreen-ui/checklists/` (create checklist if missing)
+- [ ] T013 [US3] [MANUAL] **VS-UI-1 Touchscreen UI smoke** — when 004 ships P1 journeys, execute on-device UI smoke and record under `specs/004-esp32-touchscreen-ui/checklists/quickstart-validation.md`
+- [ ] T025 [P] [US3] [MANUAL] **VS-UI-2 Start from preset** — Home → PLA → Confirm → drying; record in 004 checklist
+- [ ] T026 [P] [US3] [MANUAL] **VS-UI-3 Pause / resume / 30min timeout** — pause heater off; resume; or timeout auto-stop; record in 004 checklist
+- [ ] T027 [P] [US3] [MANUAL] **VS-UI-4 Stop + mid-cycle targets + WS** — stop confirm; adjust targets broadcast; record
+- [ ] T028 [P] [US3] [MANUAL] **VS-UI-5 Settings + History + power-loss auto-resume** — settings persist; history 10+Mais; power cycle resumes; record
 - [ ] T016 [P] [US3] [MANUAL] **VS-CTRL-1 Discovery & connect** — Scan or manual host:80`/ws` → Connected → first `status/update` &lt;2s on real firmware/LAN; record in `specs/003-filament-dryer-control-app/checklists/quickstart-validation.md` (was 003 quickstart VS-1)
 - [ ] T017 [P] [US3] [MANUAL] **VS-CTRL-2 Start / stop (no pause)** — Start cycle → drying → Stop with confirm; heater/fan off; confirm UI has no Pause/Resume; record in 003 checklist (was VS-2)
 - [ ] T018 [US3] [MANUAL] **VS-CTRL-3 Config hardware** — Pin conflict blocked client-side; success/error topics per `001`; record in 003 checklist (was VS-3)

@@ -45,6 +45,10 @@
 #include "utils/SystemMetrics.hpp"
 #include "drivers/interfaces/IDriverInterfaces.hpp"
 #include "drivers/display/DisplayManager.hpp"
+#include "drivers/touch/TouchManager.hpp"
+#include "ui/TouchUiController.hpp"
+#include "ui/UiApp.hpp"
+#include "ui/history/CycleHistoryStore.hpp"
 #include "plugins/IPlugin.hpp"
 
 using namespace filament_dryer;
@@ -61,6 +65,10 @@ HardwareConfigParser hwParser;
 ProfileManager profileMgr(configMgr);
 ControlEngine controlEngine;
 DisplayManager displayManager;
+TouchManager touchManager;
+TouchUiController touchUiController(stateMachine, profileMgr, configMgr);
+CycleHistoryStore cycleHistory;
+UiApp* uiApp = nullptr;
 PluginManager pluginMgr;
 WifiManager wifiMgr;
 WebServer webServer(80);
@@ -206,6 +214,7 @@ static void beginCooldown(DryingStopReason reason) {
 TaskHandle_t controlLoopTaskHandle = nullptr;
 TaskHandle_t networkTaskHandle = nullptr;
 TaskHandle_t displayTaskHandle = nullptr;
+TaskHandle_t uiTaskHandle = nullptr;
 
 // ============================================================
 // Control Loop (Core 1) - 50Hz = 20ms period
@@ -331,6 +340,15 @@ void controlLoopTask(void* pvParameters) {
 
         if (pidAutotune.isRunning()) {
             pidAutotune.update(chamberTemp, heaterPower);
+        }
+
+        if (stateMachine.isPaused()) {
+            cutActuatorPower();
+            if (stateMachine.tickPauseTimeout()) {
+                cutActuatorPower();
+                cycleHistory.appendFromSession(stateMachine.getCurrentSession());
+            }
+            continue;
         }
 
         if (stateMachine.isDrying()) {
@@ -497,6 +515,18 @@ void networkTask(void* pvParameters) {
 // ============================================================
 // Display Task (Core 0) - Independent rendering
 // ============================================================
+void uiTask(void* pvParameters) {
+    (void)pvParameters;
+    const TickType_t period = pdMS_TO_TICKS(33); // ~30fps
+    TickType_t lastWakeTime = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&lastWakeTime, period);
+        if (uiApp) {
+            uiApp->loop();
+        }
+    }
+}
+
 void displayTask(void* pvParameters) {
     const TickType_t period = pdMS_TO_TICKS(200);
     TickType_t lastWakeTime = xTaskGetTickCount();
@@ -549,6 +579,7 @@ void onStateChange(SystemState oldState, SystemState newState) {
         case SystemState::COOLDOWN: newStr = "COOLDOWN"; break;
         case SystemState::STOPPED: newStr = "STOPPED"; break;
         case SystemState::FAULT_STOPPED: newStr = "FAULT_STOPPED"; break;
+        case SystemState::PAUSED: newStr = "PAUSED"; break;
     }
     logMgr.logSystem(LogLevel::INFO, LogModule::SYSTEM, 
                      "State transition: %s -> %s", oldStr.c_str(), newStr.c_str());
@@ -556,6 +587,15 @@ void onStateChange(SystemState oldState, SystemState newState) {
     // On fault or stop, clear cooldown gate and always cut actuators
     if (newState == SystemState::FAULT_STOPPED || newState == SystemState::STOPPED) {
         cooldownActive = false;
+        cutActuatorPower();
+        if (newState == SystemState::STOPPED) {
+            cycleHistory.appendFromSession(stateMachine.getCurrentSession());
+        }
+        if (uiApp) {
+            uiApp->notifyRemoteStateChange();
+        }
+    }
+    if (newState == SystemState::PAUSED) {
         cutActuatorPower();
     }
     if (newState == SystemState::DRYING) {
@@ -916,7 +956,7 @@ void initializeControlAlgorithm() {
 void reloadHardwareFromConfig() {
     // Belt-and-suspenders: API should reject reload during drying/cooldown;
     // if called anyway, e-stop before tearing down live drivers.
-    if (stateMachine.isDrying() || stateMachine.isCoolingDown()) {
+    if (stateMachine.isDrying() || stateMachine.isCoolingDown() || stateMachine.isPaused()) {
         cutActuatorPower();
         stateMachine.stopDrying(DryingStopReason::SAFETY_CUTOFF);
     }
@@ -1038,6 +1078,28 @@ void setup() {
     xTaskCreatePinnedToCore(
         displayTask, "DisplayTask", 4096, nullptr, 2, 
         &displayTaskHandle, 0); // Core 0
+
+    // Touch UI task (Core 1, below control priority)
+    {
+        JsonDocument touchDoc;
+        JsonObject touchCfg = touchDoc.to<JsonObject>();
+        touchCfg["controller_type"] = "auto";
+        touchManager.begin(touchCfg);
+        cycleHistory.begin();
+        touchUiController.setBroadcastCallback([](const JsonObject& status) {
+            wsServer.setUiSource("touch");
+            wsServer.broadcastTelemetry(status);
+        });
+        static UiApp ui_instance(touchUiController, touchManager, cycleHistory);
+        uiApp = &ui_instance;
+        DisplayConfig dc = configMgr.getDisplayConfig();
+        uint16_t w = dc.width > 0 ? dc.width : 320;
+        uint16_t h = dc.height > 0 ? dc.height : 240;
+        uiApp->begin(w, h);
+        xTaskCreatePinnedToCore(
+            uiTask, "UiTask", 8192, nullptr, 3,
+            &uiTaskHandle, 1);
+    }
     
     logMgr.logSystem(LogLevel::INFO, LogModule::SYSTEM, 
                      "Filament Dryer ESP32 v%s started", FIRMWARE_VERSION);

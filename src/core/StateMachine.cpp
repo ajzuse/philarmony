@@ -23,7 +23,7 @@
 
 namespace filament_dryer {
 
-constexpr bool StateMachine::valid_transitions[8][8];
+constexpr bool StateMachine::valid_transitions[9][9];
 
 StateMachine::StateMachine() {}
 
@@ -45,6 +45,7 @@ String StateMachine::getStateName() const {
         case SystemState::COOLDOWN: return "COOLDOWN";
         case SystemState::STOPPED: return "STOPPED";
         case SystemState::FAULT_STOPPED: return "FAULT_STOPPED";
+        case SystemState::PAUSED: return "PAUSED";
     }
     return "UNKNOWN";
 }
@@ -59,6 +60,7 @@ String StateMachine::getStatusStreamName() const {
         case SystemState::COOLDOWN: return "cooldown";
         case SystemState::STOPPED: return "stopped";
         case SystemState::FAULT_STOPPED: return "fault_stopped";
+        case SystemState::PAUSED: return "paused";
     }
     return "unknown";
 }
@@ -73,6 +75,8 @@ String StateMachine::stopReasonToString(DryingStopReason reason) {
         case DryingStopReason::SAFETY_CUTOFF: return "safety_cutoff";
         case DryingStopReason::SENSOR_ERROR: return "sensor_error";
         case DryingStopReason::THERMAL_RUNAWAY: return "thermal_runaway";
+        case DryingStopReason::PAUSE_TIMEOUT: return "pause_timeout";
+        case DryingStopReason::POWER_LOSS: return "power_loss";
     }
     return "unknown";
 }
@@ -80,7 +84,7 @@ String StateMachine::stopReasonToString(DryingStopReason reason) {
 bool StateMachine::canTransition(SystemState from, SystemState to) const {
     uint8_t f = static_cast<uint8_t>(from);
     uint8_t t = static_cast<uint8_t>(to);
-    if (f >= 8 || t >= 8) return false;
+    if (f >= 9 || t >= 9) return false;
     return valid_transitions[f][t];
 }
 
@@ -88,15 +92,15 @@ bool StateMachine::transitionTo(SystemState new_state) {
     if (!canTransition(current_state_, new_state)) {
         return false;
     }
-    
+
     previous_state_ = current_state_;
     current_state_ = new_state;
     state_enter_time_ = millis();
-    
+
     if (state_change_cb_) {
         state_change_cb_(previous_state_, new_state);
     }
-    
+
     return true;
 }
 
@@ -104,7 +108,7 @@ bool StateMachine::startDrying(const DryingSession& session) {
     if (current_state_ != SystemState::READY && current_state_ != SystemState::STOPPED) {
         return false;
     }
-    
+
     static uint32_t next_session_id = 1;
 
     current_session_ = session;
@@ -112,16 +116,58 @@ bool StateMachine::startDrying(const DryingSession& session) {
     current_session_.status = SystemState::DRYING;
     current_session_.start_timestamp = millis();
     current_session_.stop_reason = DryingStopReason::RUNNING;
-    
+    current_session_.heater_on = false;
+    current_session_.heater_power_pct = 0.0f;
+    elapsed_at_pause_sec_ = 0;
+    pause_enter_ms_ = 0;
+
+    return transitionTo(SystemState::DRYING);
+}
+
+bool StateMachine::pauseDrying() {
+    if (current_state_ != SystemState::DRYING) {
+        return false;
+    }
+
+    elapsed_at_pause_sec_ = current_session_.elapsed_sec;
+    if (current_session_.start_timestamp > 0) {
+        elapsed_at_pause_sec_ = (millis() - current_session_.start_timestamp) / 1000;
+    }
+    current_session_.elapsed_sec = elapsed_at_pause_sec_;
+    current_session_.heater_on = false;
+    current_session_.heater_power_pct = 0.0f;
+    current_session_.exhaust_fan_on = false;
+    current_session_.exhaust_fan_power_pct = 0.0f;
+    current_session_.status = SystemState::PAUSED;
+    pause_enter_ms_ = millis();
+    pause_active_ = true;
+
+    return transitionTo(SystemState::PAUSED);
+}
+
+bool StateMachine::resumeDrying() {
+    if (current_state_ != SystemState::PAUSED) {
+        return false;
+    }
+
+    // Keep elapsed frozen value; shift start_timestamp so uptime continues correctly.
+    current_session_.start_timestamp = millis() - (elapsed_at_pause_sec_ * 1000UL);
+    current_session_.status = SystemState::DRYING;
+    current_session_.stop_reason = DryingStopReason::RUNNING;
+    pause_enter_ms_ = 0;
+    pause_active_ = false;
+
     return transitionTo(SystemState::DRYING);
 }
 
 bool StateMachine::beginCooldown(DryingStopReason reason) {
-    if (current_state_ != SystemState::DRYING) {
+    if (current_state_ != SystemState::DRYING && current_state_ != SystemState::PAUSED) {
         return false;
     }
     pending_cooldown_reason_ = reason;
     current_session_.status = SystemState::COOLDOWN;
+    current_session_.heater_on = false;
+    current_session_.heater_power_pct = 0.0f;
     return transitionTo(SystemState::COOLDOWN);
 }
 
@@ -131,19 +177,33 @@ bool StateMachine::completeCooldown() {
     }
     current_session_.stop_reason = pending_cooldown_reason_;
     current_session_.status = SystemState::STOPPED;
-    current_session_.elapsed_sec = (millis() - current_session_.start_timestamp) / 1000;
+    if (current_session_.start_timestamp > 0) {
+        current_session_.elapsed_sec = (millis() - current_session_.start_timestamp) / 1000;
+    }
     return transitionTo(SystemState::STOPPED);
 }
 
 bool StateMachine::stopDrying(DryingStopReason reason) {
-    if (current_state_ != SystemState::DRYING && current_state_ != SystemState::COOLDOWN) {
+    if (current_state_ != SystemState::DRYING &&
+        current_state_ != SystemState::COOLDOWN &&
+        current_state_ != SystemState::PAUSED) {
         return false;
     }
-    
+
     current_session_.stop_reason = reason;
     current_session_.status = SystemState::STOPPED;
-    current_session_.elapsed_sec = (millis() - current_session_.start_timestamp) / 1000;
-    
+    current_session_.heater_on = false;
+    current_session_.heater_power_pct = 0.0f;
+    current_session_.exhaust_fan_on = false;
+    current_session_.exhaust_fan_power_pct = 0.0f;
+    if (current_state_ == SystemState::PAUSED) {
+        current_session_.elapsed_sec = elapsed_at_pause_sec_;
+    } else if (current_session_.start_timestamp > 0) {
+        current_session_.elapsed_sec = (millis() - current_session_.start_timestamp) / 1000;
+    }
+    pause_enter_ms_ = 0;
+    pause_active_ = false;
+
     return transitionTo(SystemState::STOPPED);
 }
 
@@ -153,24 +213,76 @@ bool StateMachine::updateDryingProgress(float current_temp, float current_humidi
     if (current_state_ != SystemState::DRYING && current_state_ != SystemState::COOLDOWN) {
         return false;
     }
-    
+
     current_session_.elapsed_sec = (millis() - current_session_.start_timestamp) / 1000;
-    current_session_.remaining_sec = (current_session_.max_duration_min * 60) - current_session_.elapsed_sec;
+    current_session_.remaining_sec =
+        (current_session_.max_duration_min * 60) > current_session_.elapsed_sec
+            ? (current_session_.max_duration_min * 60) - current_session_.elapsed_sec
+            : 0;
     current_session_.current_temp_c = current_temp;
     current_session_.current_humidity_pct = current_humidity;
     current_session_.heater_power_pct = heater_power_pct;
     current_session_.heater_on = heater_on;
     current_session_.exhaust_fan_power_pct = fan_power_pct;
     current_session_.exhaust_fan_on = fan_on;
-    
+
     if (session_update_cb_) {
         session_update_cb_(current_session_);
     }
-    
+
+    return true;
+}
+
+bool StateMachine::tickPauseTimeout() {
+    if (current_state_ != SystemState::PAUSED || !pause_active_) {
+        return false;
+    }
+    if (millis() - pause_enter_ms_ < kPauseTimeoutMs) {
+        return false;
+    }
+    return stopDrying(DryingStopReason::PAUSE_TIMEOUT);
+}
+
+bool StateMachine::captureInterruptedSession(DryingSession& out) const {
+    if (current_state_ != SystemState::DRYING && current_state_ != SystemState::PAUSED) {
+        return false;
+    }
+    out = current_session_;
+    return true;
+}
+
+bool StateMachine::restoreInterruptedSession(const DryingSession& session, SystemState state) {
+    if (state != SystemState::DRYING && state != SystemState::PAUSED) {
+        return false;
+    }
+    // Force path through READY then target state for matrix validity.
+    current_state_ = SystemState::READY;
+    current_session_ = session;
+    current_session_.status = state;
+    current_session_.heater_on = false;
+    current_session_.heater_power_pct = 0.0f;
+    if (state == SystemState::PAUSED) {
+        elapsed_at_pause_sec_ = session.elapsed_sec;
+        pause_enter_ms_ = millis();
+        pause_active_ = true;
+    } else {
+        current_session_.start_timestamp = millis() - (session.elapsed_sec * 1000UL);
+        pause_enter_ms_ = 0;
+        pause_active_ = false;
+    }
+    previous_state_ = SystemState::READY;
+    current_state_ = state;
+    state_enter_time_ = millis();
+    if (state_change_cb_) {
+        state_change_cb_(previous_state_, current_state_);
+    }
     return true;
 }
 
 uint32_t StateMachine::getSessionUptime() const {
+    if (current_state_ == SystemState::PAUSED) {
+        return elapsed_at_pause_sec_;
+    }
     if ((current_state_ == SystemState::DRYING || current_state_ == SystemState::COOLDOWN) &&
         current_session_.start_timestamp > 0) {
         return (millis() - current_session_.start_timestamp) / 1000;
@@ -179,15 +291,23 @@ uint32_t StateMachine::getSessionUptime() const {
 }
 
 float StateMachine::getProgressPercent() const {
-    if (current_state_ != SystemState::DRYING || current_session_.max_duration_min == 0) {
+    if ((current_state_ != SystemState::DRYING && current_state_ != SystemState::PAUSED) ||
+        current_session_.max_duration_min == 0) {
         return 0.0f;
     }
-    
+
     uint32_t total_sec = current_session_.max_duration_min * 60;
     uint32_t elapsed = getSessionUptime();
-    
+
     if (elapsed >= total_sec) return 100.0f;
     return (static_cast<float>(elapsed) / total_sec) * 100.0f;
+}
+
+uint32_t StateMachine::getPauseElapsedMs() const {
+    if (current_state_ != SystemState::PAUSED || pause_enter_ms_ == 0) {
+        return 0;
+    }
+    return millis() - pause_enter_ms_;
 }
 
 } // namespace filament_dryer
