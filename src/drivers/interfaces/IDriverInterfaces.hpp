@@ -170,4 +170,27 @@ protected:
     String last_error_;
 };
 
+// ============================================================
+// ITouchDriver - Touch Controller Interface
+// ============================================================
+struct TouchPoint {
+    bool pressed = false;
+    int16_t x = 0;
+    int16_t y = 0;
+    uint32_t timestamp_ms = 0;
+};
+
+class ITouchDriver {
+public:
+    virtual ~ITouchDriver() = default;
+    virtual bool begin(const JsonObject& config) = 0;
+    virtual TouchPoint read() = 0;
+    virtual bool isConnected() = 0;
+    virtual String getType() const = 0;
+    virtual void setSensitivity(const String& level) = 0; // low|medium|high
+
+protected:
+    String last_error_;
+};
+
 } // namespace filament_dryer
