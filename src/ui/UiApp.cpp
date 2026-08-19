@@ -732,7 +732,9 @@ lv_obj_t* UiApp::addButton(lv_obj_t* parent, const String& text,
                            UiAction action, int32_t value) {
     if (action_binding_count_ >= kMaxActionBindings) return nullptr;
     ActionBinding& binding = action_bindings_[action_binding_count_++];
-    binding = {this, action, value};
+    binding.app = this;
+    binding.action = action;
+    binding.value = value;
 
     lv_obj_t* button = lv_btn_create(parent);
     lv_obj_set_width(button, LV_PCT(100));
