@@ -66,7 +66,8 @@ ProfileManager profileMgr(configMgr);
 ControlEngine controlEngine;
 DisplayManager displayManager;
 TouchManager touchManager;
-TouchUiController touchUiController(stateMachine, profileMgr, configMgr);
+TouchUiController touchUiController(stateMachine, profileMgr, configMgr,
+                                    &safetyEngine);
 CycleHistoryStore cycleHistory;
 UiApp* uiApp = nullptr;
 PluginManager pluginMgr;
@@ -94,6 +95,7 @@ static volatile float g_liveChamberTemp = NAN;
 static volatile float g_liveChamberHumidity = NAN;
 static volatile float g_liveHeaterPowerPct = 0.0f;
 static volatile float g_liveFanPowerPct = 0.0f;
+static volatile bool g_touchUiOwnsDisplay = false;
 
 static void cutActuatorPower() {
     if (heaterActuator) {
@@ -346,7 +348,6 @@ void controlLoopTask(void* pvParameters) {
             cutActuatorPower();
             if (stateMachine.tickPauseTimeout()) {
                 cutActuatorPower();
-                cycleHistory.appendFromSession(stateMachine.getCurrentSession());
             }
             continue;
         }
@@ -536,6 +537,7 @@ void displayTask(void* pvParameters) {
 
         DisplayConfig dispConfig = configMgr.getDisplayConfig();
         if (!dispConfig.enabled) continue;
+        if (g_touchUiOwnsDisplay) continue;
         if (!displayManager.isRefreshDue()) continue;
 
         JsonDocument statusDoc;
@@ -595,6 +597,18 @@ void onStateChange(SystemState oldState, SystemState newState) {
             uiApp->notifyRemoteStateChange();
         }
     }
+    if (newState == SystemState::DRYING || newState == SystemState::PAUSED) {
+        DryingSession interrupted;
+        if (stateMachine.captureInterruptedSession(interrupted)) {
+            configMgr.saveInterruptedSession(interrupted, newState);
+        }
+    } else if (newState == SystemState::STOPPED ||
+               newState == SystemState::FAULT_STOPPED ||
+               (newState == SystemState::READY &&
+                (oldState == SystemState::STOPPED ||
+                 oldState == SystemState::FAULT_STOPPED))) {
+        configMgr.clearInterruptedSession();
+    }
     if (newState == SystemState::PAUSED) {
         cutActuatorPower();
     }
@@ -604,7 +618,12 @@ void onStateChange(SystemState oldState, SystemState newState) {
 }
 
 void onSessionUpdate(const DryingSession& session) {
-    // Update display, log, etc.
+    static uint32_t last_persist_ms = 0;
+    if ((stateMachine.isDrying() || stateMachine.isPaused()) &&
+        millis() - last_persist_ms >= 5000) {
+        last_persist_ms = millis();
+        configMgr.saveInterruptedSession(session, stateMachine.getState());
+    }
 }
 
 void onSafetyFault(FaultCode fault, const String& message) {
@@ -868,6 +887,7 @@ void initializeActuators() {
 void initializeDisplays() {
     DisplayConfig displayCfg = configMgr.getDisplayConfig();
     if (!displayCfg.enabled) {
+        g_touchUiOwnsDisplay = false;
         displayManager.end();
         return;
     }
@@ -911,7 +931,7 @@ void initializeDisplays() {
         layout["compact_mode"] = displayCfg.compact_mode;
         displayManager.setLayout(layout);
 
-        activeDisplay = nullptr;
+        activeDisplay = displayManager.getActiveDriver();
         logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY_MODULE,
                          "Display %s initialized", displayManager.getActiveType().c_str());
     }
@@ -1007,6 +1027,7 @@ void setup() {
     // Initialize LittleFS
     if (!LittleFS.begin()) {
     }
+    cycleHistory.begin();
     
     // Initialize ConfigManager (loads all NVS configs)
     if (!configMgr.begin()) {
@@ -1061,6 +1082,14 @@ void setup() {
     initializeSensors();
     initializeActuators();
     initializeDisplays();
+
+    DryingSession interruptedSession;
+    SystemState interruptedState = SystemState::READY;
+    if (configMgr.loadInterruptedSession(interruptedSession, interruptedState)) {
+        stateMachine.restoreInterruptedSession(interruptedSession,
+                                               interruptedState);
+    }
+
     initializeControlAlgorithm();
 
     sysMetrics.begin();
@@ -1083,19 +1112,42 @@ void setup() {
     {
         JsonDocument touchDoc;
         JsonObject touchCfg = touchDoc.to<JsonObject>();
-        touchCfg["controller_type"] = "auto";
-        touchManager.begin(touchCfg);
-        cycleHistory.begin();
+        TouchConfig savedTouch = configMgr.getTouchConfig();
+        DisplayConfig dc = configMgr.getDisplayConfig();
+        touchCfg["controller_type"] = savedTouch.controller_type;
+        touchCfg["i2c_address"] = savedTouch.i2c_address;
+        touchCfg["spi_cs"] = savedTouch.spi_cs;
+        touchCfg["irq_pin"] = savedTouch.irq_pin;
+        touchCfg["spi_mosi"] = savedTouch.spi_mosi;
+        touchCfg["spi_miso"] = savedTouch.spi_miso;
+        touchCfg["spi_sclk"] = savedTouch.spi_sclk;
+        touchCfg["sensitivity"] = savedTouch.sensitivity;
+        touchCfg["swap_xy"] = savedTouch.swap_xy;
+        touchCfg["invert_x"] = savedTouch.invert_x;
+        touchCfg["invert_y"] = savedTouch.invert_y;
+        touchCfg["display_width"] = dc.width;
+        touchCfg["display_height"] = dc.height;
+        JsonObject calibration = touchCfg["calibration"].to<JsonObject>();
+        calibration["x_min"] = savedTouch.calibration.x_min;
+        calibration["x_max"] = savedTouch.calibration.x_max;
+        calibration["y_min"] = savedTouch.calibration.y_min;
+        calibration["y_max"] = savedTouch.calibration.y_max;
+        calibration["swapped_xy"] = savedTouch.calibration.swapped_xy;
+        const bool touchStarted = touchManager.begin(touchCfg);
         touchUiController.setBroadcastCallback([](const JsonObject& status) {
             wsServer.setUiSource("touch");
             wsServer.broadcastTelemetry(status);
         });
+        touchUiController.setWifiHotspotCallback([]() {
+            wifiMgr.startAP();
+        });
         static UiApp ui_instance(touchUiController, touchManager, cycleHistory);
         uiApp = &ui_instance;
-        DisplayConfig dc = configMgr.getDisplayConfig();
         uint16_t w = dc.width > 0 ? dc.width : 320;
         uint16_t h = dc.height > 0 ? dc.height : 240;
-        uiApp->begin(w, h);
+        const bool uiStarted = uiApp->begin(w, h, &displayManager);
+        g_touchUiOwnsDisplay =
+            touchStarted && uiStarted && displayManager.getActiveDriver();
         xTaskCreatePinnedToCore(
             uiTask, "UiTask", 8192, nullptr, 3,
             &uiTaskHandle, 1);

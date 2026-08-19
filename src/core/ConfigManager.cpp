@@ -68,8 +68,8 @@ WifiConfig ConfigManager::getWifiConfig() const {
     WifiConfig config;
     if (!initialized_) return config;
     
-    String json;
-    if (prefs_.getString(KEY_WIFI, json)) {
+    String json = prefs_.getString(KEY_WIFI, "");
+    if (!json.isEmpty()) {
         JsonDocument doc;
         if (deserializeJson(doc, json) == DeserializationError::Ok) {
             config.ssid = doc["ssid"] | "";
@@ -123,8 +123,8 @@ SensorConfig ConfigManager::getSensorConfig() const {
     SensorConfig config;
     if (!initialized_) return config;
     
-    String json;
-    if (prefs_.getString(KEY_SENSOR, json)) {
+    String json = prefs_.getString(KEY_SENSOR, "");
+    if (!json.isEmpty()) {
         JsonDocument doc;
         if (deserializeJson(doc, json) == DeserializationError::Ok) {
             config.type = doc["type"] | "sht31";
@@ -186,8 +186,8 @@ ActuatorConfig ConfigManager::getActuatorConfig() const {
     ActuatorConfig config;
     if (!initialized_) return config;
     
-    String json;
-    if (prefs_.getString(KEY_ACTUATOR, json)) {
+    String json = prefs_.getString(KEY_ACTUATOR, "");
+    if (!json.isEmpty()) {
         JsonDocument doc;
         if (deserializeJson(doc, json) == DeserializationError::Ok) {
             config.heater_type = doc["heater_type"] | "mosfet_pwm";
@@ -257,8 +257,8 @@ DisplayConfig ConfigManager::getDisplayConfig() const {
     DisplayConfig config;
     if (!initialized_) return config;
     
-    String json;
-    if (prefs_.getString(KEY_DISPLAY, json)) {
+    String json = prefs_.getString(KEY_DISPLAY, "");
+    if (!json.isEmpty()) {
         JsonDocument doc;
         if (deserializeJson(doc, json) == DeserializationError::Ok) {
             config.enabled = doc["enabled"] | false;
@@ -325,13 +325,188 @@ void ConfigManager::setDisplayConfig(const DisplayConfig& config) {
     writeString(KEY_DISPLAY, json);
 }
 
+TouchConfig ConfigManager::getTouchConfig() const {
+    TouchConfig config;
+    if (!initialized_) return config;
+
+    String json = prefs_.getString(KEY_TOUCH, "");
+    if (!json.isEmpty()) {
+        JsonDocument doc;
+        if (deserializeJson(doc, json) == DeserializationError::Ok) {
+            config.controller_type = doc["controller_type"] | "auto";
+            config.i2c_address = doc["i2c_address"] | 0;
+            config.spi_cs = doc["spi_cs"] | -1;
+            config.irq_pin = doc["irq_pin"] | -1;
+            config.spi_mosi = doc["spi_mosi"] | -1;
+            config.spi_miso = doc["spi_miso"] | -1;
+            config.spi_sclk = doc["spi_sclk"] | -1;
+            config.sensitivity = doc["sensitivity"] | "medium";
+            config.swap_xy = doc["swap_xy"] | false;
+            config.invert_x = doc["invert_x"] | false;
+            config.invert_y = doc["invert_y"] | false;
+            if (doc["calibration"].is<JsonObject>()) {
+                JsonObject calibration = doc["calibration"].as<JsonObject>();
+                config.calibration.x_min = calibration["x_min"] | 200;
+                config.calibration.x_max = calibration["x_max"] | 3800;
+                config.calibration.y_min = calibration["y_min"] | 200;
+                config.calibration.y_max = calibration["y_max"] | 3800;
+                config.calibration.swapped_xy =
+                    calibration["swapped_xy"] | false;
+            }
+        }
+    }
+    return config;
+}
+
+bool ConfigManager::setTouchConfig(const TouchConfig& config) {
+    if (!initialized_) return false;
+
+    JsonDocument doc;
+    doc["controller_type"] = config.controller_type;
+    doc["i2c_address"] = config.i2c_address;
+    doc["spi_cs"] = config.spi_cs;
+    doc["irq_pin"] = config.irq_pin;
+    doc["spi_mosi"] = config.spi_mosi;
+    doc["spi_miso"] = config.spi_miso;
+    doc["spi_sclk"] = config.spi_sclk;
+    doc["sensitivity"] = config.sensitivity;
+    doc["swap_xy"] = config.swap_xy;
+    doc["invert_x"] = config.invert_x;
+    doc["invert_y"] = config.invert_y;
+    JsonObject calibration = doc["calibration"].to<JsonObject>();
+    calibration["x_min"] = config.calibration.x_min;
+    calibration["x_max"] = config.calibration.x_max;
+    calibration["y_min"] = config.calibration.y_min;
+    calibration["y_max"] = config.calibration.y_max;
+    calibration["swapped_xy"] = config.calibration.swapped_xy;
+
+    String json;
+    serializeJson(doc, json);
+    return writeString(KEY_TOUCH, json);
+}
+
+UISettings ConfigManager::getUiSettings() const {
+    UISettings settings;
+    if (!initialized_) return settings;
+
+    String json = prefs_.getString(KEY_UI, "");
+    if (!json.isEmpty()) {
+        JsonDocument doc;
+        if (deserializeJson(doc, json) == DeserializationError::Ok) {
+            settings.brightness_pct = doc["brightness_pct"] | 80;
+            settings.timeout_sec = doc["timeout_sec"] | 120;
+            settings.orientation = doc["orientation"] | 0;
+            settings.temp_unit = doc["temp_unit"] | "celsius";
+            settings.language = doc["language"] | "pt_br";
+            settings.touch_sensitivity =
+                doc["touch_sensitivity"] | "medium";
+            settings.high_contrast = doc["high_contrast"] | false;
+            settings.pin_lock_enabled = doc["pin_lock_enabled"] | false;
+            settings.pin_hash = doc["pin_hash"] | "";
+        }
+    }
+    return settings;
+}
+
+bool ConfigManager::setUiSettings(const UISettings& settings) {
+    if (!initialized_) return false;
+
+    JsonDocument doc;
+    doc["brightness_pct"] = settings.brightness_pct;
+    doc["timeout_sec"] = settings.timeout_sec;
+    doc["orientation"] = settings.orientation;
+    doc["temp_unit"] = settings.temp_unit;
+    doc["language"] = settings.language;
+    doc["touch_sensitivity"] = settings.touch_sensitivity;
+    doc["high_contrast"] = settings.high_contrast;
+    doc["pin_lock_enabled"] = settings.pin_lock_enabled;
+    doc["pin_hash"] = settings.pin_hash;
+
+    String json;
+    serializeJson(doc, json);
+    return writeString(KEY_UI, json);
+}
+
+bool ConfigManager::saveInterruptedSession(const DryingSession& session,
+                                           SystemState state) {
+    if (!initialized_ ||
+        (state != SystemState::DRYING && state != SystemState::PAUSED)) {
+        return false;
+    }
+
+    JsonDocument doc;
+    doc["state"] = static_cast<uint8_t>(state);
+    doc["session_id"] = session.session_id;
+    doc["status"] = static_cast<uint8_t>(session.status);
+    doc["profile_id"] = session.profile_id;
+    doc["target_temp_c"] = session.target_temp_c;
+    doc["target_humidity_pct"] = session.target_humidity_pct;
+    doc["max_duration_min"] = session.max_duration_min;
+    doc["elapsed_sec"] = session.elapsed_sec;
+    doc["remaining_sec"] = session.remaining_sec;
+    doc["start_timestamp"] = session.start_timestamp;
+    doc["stop_reason"] = static_cast<uint8_t>(session.stop_reason);
+    doc["current_temp_c"] = session.current_temp_c;
+    doc["current_humidity_pct"] = session.current_humidity_pct;
+
+    String json;
+    serializeJson(doc, json);
+    return writeString(KEY_INTERRUPTED, json);
+}
+
+bool ConfigManager::loadInterruptedSession(DryingSession& session,
+                                           SystemState& state) {
+    if (!initialized_) return false;
+
+    String json = prefs_.getString(KEY_INTERRUPTED, "");
+    if (json.isEmpty()) return false;
+
+    JsonDocument doc;
+    if (deserializeJson(doc, json) != DeserializationError::Ok) {
+        clearInterruptedSession();
+        return false;
+    }
+
+    const uint8_t raw_state = doc["state"] | static_cast<uint8_t>(SystemState::READY);
+    state = static_cast<SystemState>(raw_state);
+    if (state != SystemState::DRYING && state != SystemState::PAUSED) {
+        clearInterruptedSession();
+        return false;
+    }
+
+    session.session_id = doc["session_id"] | 0u;
+    session.status = state;
+    session.profile_id = doc["profile_id"] | "";
+    session.target_temp_c = doc["target_temp_c"] | 0.0f;
+    session.target_humidity_pct = doc["target_humidity_pct"] | 0.0f;
+    session.max_duration_min = doc["max_duration_min"] | 0;
+    session.elapsed_sec = doc["elapsed_sec"] | 0u;
+    session.remaining_sec = doc["remaining_sec"] | 0u;
+    session.start_timestamp = doc["start_timestamp"] | 0u;
+    session.stop_reason = static_cast<DryingStopReason>(
+        doc["stop_reason"] | static_cast<uint8_t>(DryingStopReason::RUNNING));
+    session.current_temp_c = doc["current_temp_c"] | NAN;
+    session.current_humidity_pct = doc["current_humidity_pct"] | NAN;
+    session.heater_on = false;
+    session.heater_power_pct = 0.0f;
+    session.exhaust_fan_on = false;
+    session.exhaust_fan_power_pct = 0.0f;
+    return session.max_duration_min > 0 && session.target_temp_c > 0.0f;
+}
+
+void ConfigManager::clearInterruptedSession() {
+    if (initialized_) {
+        prefs_.remove(KEY_INTERRUPTED);
+    }
+}
+
 // PID Configuration
 PidConfig ConfigManager::getPidConfig() const {
     PidConfig config;
     if (!initialized_) return config;
     
-    String json;
-    if (prefs_.getString(KEY_PID, json)) {
+    String json = prefs_.getString(KEY_PID, "");
+    if (!json.isEmpty()) {
         JsonDocument doc;
         if (deserializeJson(doc, json) == DeserializationError::Ok) {
             config.kp = doc["kp"] | 0.0f;
@@ -362,8 +537,8 @@ std::vector<FilamentProfile> ConfigManager::getProfiles() const {
     std::vector<FilamentProfile> profiles;
     if (!initialized_) return profiles;
     
-    String json;
-    if (prefs_.getString(KEY_PROFILES, json)) {
+    String json = prefs_.getString(KEY_PROFILES, "");
+    if (!json.isEmpty()) {
         JsonDocument doc;
         if (deserializeJson(doc, json) == DeserializationError::Ok) {
             JsonArray arr = doc.as<JsonArray>();
@@ -630,8 +805,8 @@ JsonObject ConfigManager::getObjectConfig(const String& object_name) {
     if (!initialized_) return doc.as<JsonObject>();
     
     String key = "obj_" + object_name;
-    String json;
-    if (prefs_.getString(key.c_str(), json)) {
+    String json = prefs_.getString(key.c_str(), "");
+    if (!json.isEmpty()) {
         deserializeJson(doc, json);
     }
     return doc.as<JsonObject>();
@@ -728,6 +903,40 @@ String ConfigManager::toJson() const {
     for (const String& f : display.fields) {
         fields_arr.add(f);
     }
+
+    // Touch
+    JsonObject touch_obj = doc.createNestedObject("touch");
+    TouchConfig touch = getTouchConfig();
+    touch_obj["controller_type"] = touch.controller_type;
+    touch_obj["i2c_address"] = touch.i2c_address;
+    touch_obj["spi_cs"] = touch.spi_cs;
+    touch_obj["irq_pin"] = touch.irq_pin;
+    touch_obj["spi_mosi"] = touch.spi_mosi;
+    touch_obj["spi_miso"] = touch.spi_miso;
+    touch_obj["spi_sclk"] = touch.spi_sclk;
+    touch_obj["sensitivity"] = touch.sensitivity;
+    touch_obj["swap_xy"] = touch.swap_xy;
+    touch_obj["invert_x"] = touch.invert_x;
+    touch_obj["invert_y"] = touch.invert_y;
+    JsonObject calibration_obj = touch_obj.createNestedObject("calibration");
+    calibration_obj["x_min"] = touch.calibration.x_min;
+    calibration_obj["x_max"] = touch.calibration.x_max;
+    calibration_obj["y_min"] = touch.calibration.y_min;
+    calibration_obj["y_max"] = touch.calibration.y_max;
+    calibration_obj["swapped_xy"] = touch.calibration.swapped_xy;
+
+    // UI settings
+    JsonObject ui_obj = doc.createNestedObject("ui");
+    UISettings ui = getUiSettings();
+    ui_obj["brightness_pct"] = ui.brightness_pct;
+    ui_obj["timeout_sec"] = ui.timeout_sec;
+    ui_obj["orientation"] = ui.orientation;
+    ui_obj["temp_unit"] = ui.temp_unit;
+    ui_obj["language"] = ui.language;
+    ui_obj["touch_sensitivity"] = ui.touch_sensitivity;
+    ui_obj["high_contrast"] = ui.high_contrast;
+    ui_obj["pin_lock_enabled"] = ui.pin_lock_enabled;
+    ui_obj["pin_hash"] = ui.pin_hash;
     
     // PID
     JsonObject pid_obj = doc.createNestedObject("pid");
@@ -864,6 +1073,49 @@ bool ConfigManager::fromJson(const String& json) {
             display.fields.push_back(v.as<String>());
         }
         setDisplayConfig(display);
+    }
+
+    // Touch
+    if (doc["touch"].is<JsonObject>()) {
+        JsonObject obj = doc["touch"].as<JsonObject>();
+        TouchConfig touch;
+        touch.controller_type = obj["controller_type"] | "auto";
+        touch.i2c_address = obj["i2c_address"] | 0;
+        touch.spi_cs = obj["spi_cs"] | -1;
+        touch.irq_pin = obj["irq_pin"] | -1;
+        touch.spi_mosi = obj["spi_mosi"] | -1;
+        touch.spi_miso = obj["spi_miso"] | -1;
+        touch.spi_sclk = obj["spi_sclk"] | -1;
+        touch.sensitivity = obj["sensitivity"] | "medium";
+        touch.swap_xy = obj["swap_xy"] | false;
+        touch.invert_x = obj["invert_x"] | false;
+        touch.invert_y = obj["invert_y"] | false;
+        if (obj["calibration"].is<JsonObject>()) {
+            JsonObject calibration = obj["calibration"].as<JsonObject>();
+            touch.calibration.x_min = calibration["x_min"] | 200;
+            touch.calibration.x_max = calibration["x_max"] | 3800;
+            touch.calibration.y_min = calibration["y_min"] | 200;
+            touch.calibration.y_max = calibration["y_max"] | 3800;
+            touch.calibration.swapped_xy =
+                calibration["swapped_xy"] | false;
+        }
+        setTouchConfig(touch);
+    }
+
+    // UI settings
+    if (doc["ui"].is<JsonObject>()) {
+        JsonObject obj = doc["ui"].as<JsonObject>();
+        UISettings ui;
+        ui.brightness_pct = obj["brightness_pct"] | 80;
+        ui.timeout_sec = obj["timeout_sec"] | 120;
+        ui.orientation = obj["orientation"] | 0;
+        ui.temp_unit = obj["temp_unit"] | "celsius";
+        ui.language = obj["language"] | "pt_br";
+        ui.touch_sensitivity = obj["touch_sensitivity"] | "medium";
+        ui.high_contrast = obj["high_contrast"] | false;
+        ui.pin_lock_enabled = obj["pin_lock_enabled"] | false;
+        ui.pin_hash = obj["pin_hash"] | "";
+        setUiSettings(ui);
     }
     
     // PID

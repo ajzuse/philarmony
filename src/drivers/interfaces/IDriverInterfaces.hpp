@@ -161,6 +161,11 @@ public:
     
     // Set brightness (0-255)
     virtual void setBrightness(uint8_t brightness) = 0;
+    virtual uint8_t getBrightness() const { return 255; }
+
+    // Push an RGB565 region (used by LVGL partial-buffer flush).
+    virtual void pushRgb565(int16_t x, int16_t y, uint16_t w, uint16_t h,
+                            const uint16_t* data) {}
     
     // Sleep/wake for power saving
     virtual void sleep() = 0;

@@ -129,6 +129,8 @@ bool LvglPort::init(TouchManager& touch_manager, uint16_t width, uint16_t height
     touch_manager_ = &touch_manager;
     flush_callback_ = flush_callback;
     callback_context_ = context;
+    last_touch_ms_ = millis();
+    last_touch_point_ = TouchPoint{};
     impl_ = new (std::nothrow) Impl(this);
     if (!impl_) {
         return false;
@@ -219,6 +221,8 @@ void LvglPort::deinit() {
     flush_callback_ = nullptr;
     callback_context_ = nullptr;
     initialized_ = false;
+    last_touch_ms_ = 0;
+    last_touch_point_ = TouchPoint{};
 }
 
 void LvglPort::tick() {
@@ -237,7 +241,12 @@ void LvglPort::flush(int16_t x1, int16_t y1, int16_t x2, int16_t y2,
 }
 
 TouchPoint LvglPort::readInput() {
-    return touch_manager_ ? touch_manager_->read() : TouchPoint{};
+    TouchPoint point = touch_manager_ ? touch_manager_->read() : TouchPoint{};
+    last_touch_point_ = point;
+    if (point.pressed) {
+        last_touch_ms_ = point.timestamp_ms ? point.timestamp_ms : millis();
+    }
+    return point;
 }
 
 } // namespace filament_dryer

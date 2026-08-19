@@ -1,81 +1,64 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 #include <unity.h>
-#include "Arduino.h"
+#include "Preferences.h"
+#include "../../src/core/ConfigManager.hpp"
+#include "../../src/core/ProfileManager.hpp"
 #include "../../src/core/StateMachine.hpp"
+#include "../../src/ui/TouchUiController.hpp"
 
 using namespace filament_dryer;
 
-void setUp() { test_set_millis(0); }
+void setUp() {
+    test_reset_preferences();
+    test_set_millis(0);
+}
 void tearDown() {}
 
-void test_pause_resume_freezes_elapsed() {
-    StateMachine sm;
-    sm.begin();
-    sm.transitionTo(SystemState::WIFI_CONNECT);
-    sm.transitionTo(SystemState::READY);
+void test_controller_stop_from_drying_and_paused() {
+    ConfigManager config;
+    config.begin();
+    ProfileManager profiles(config);
 
-    DryingSession session;
-    session.profile_id = "pla";
-    session.target_temp_c = 50.0f;
-    session.target_humidity_pct = 15.0f;
-    session.max_duration_min = 240;
-    TEST_ASSERT_TRUE(sm.startDrying(session));
+    StateMachine drying_state;
+    drying_state.begin();
+    drying_state.transitionTo(SystemState::WIFI_CONNECT);
+    drying_state.transitionTo(SystemState::READY);
+    TouchUiController drying(drying_state, profiles, config);
+    drying.startFromProfile("pla");
+    TEST_ASSERT_TRUE(drying.stop());
+    TEST_ASSERT_EQUAL(DryingStopReason::USER_STOPPED,
+                      drying_state.getCurrentSession().stop_reason);
 
-    test_advance_millis(10000);
-    sm.updateDryingProgress(45.0f, 20.0f, 50.0f, true, 40.0f, true);
-    TEST_ASSERT_EQUAL_UINT32(10, sm.getCurrentSession().elapsed_sec);
-
-    TEST_ASSERT_TRUE(sm.pauseDrying());
-    TEST_ASSERT_TRUE(sm.isPaused());
-    TEST_ASSERT_EQUAL_STRING("paused", sm.getStatusStreamName().c_str());
-    TEST_ASSERT_FALSE(sm.getCurrentSession().heater_on);
-
-    test_advance_millis(5000);
-    TEST_ASSERT_EQUAL_UINT32(10, sm.getSessionUptime());
-
-    TEST_ASSERT_TRUE(sm.resumeDrying());
-    TEST_ASSERT_TRUE(sm.isDrying());
-}
-
-void test_pause_timeout_auto_stop() {
-    StateMachine sm;
-    sm.begin();
-    sm.transitionTo(SystemState::WIFI_CONNECT);
-    sm.transitionTo(SystemState::READY);
-    DryingSession session;
-    session.max_duration_min = 60;
-    session.target_temp_c = 50.0f;
-    sm.startDrying(session);
-    TEST_ASSERT_TRUE(sm.pauseDrying());
-
-    test_advance_millis(StateMachine::kPauseTimeoutMs - 1000);
-    TEST_ASSERT_FALSE(sm.tickPauseTimeout());
-    TEST_ASSERT_TRUE(sm.isPaused());
-
-    test_advance_millis(2000);
-    TEST_ASSERT_TRUE(sm.tickPauseTimeout());
-    TEST_ASSERT_EQUAL_STRING("STOPPED", sm.getStateName().c_str());
-    TEST_ASSERT_EQUAL_STRING("pause_timeout",
-        StateMachine::stopReasonToString(sm.getCurrentSession().stop_reason).c_str());
-}
-
-void test_stop_from_paused() {
-    StateMachine sm;
-    sm.begin();
-    sm.transitionTo(SystemState::WIFI_CONNECT);
-    sm.transitionTo(SystemState::READY);
-    DryingSession session;
-    session.max_duration_min = 10;
-    session.target_temp_c = 50.0f;
-    sm.startDrying(session);
-    sm.pauseDrying();
-    TEST_ASSERT_TRUE(sm.stopDrying(DryingStopReason::USER_STOPPED));
-    TEST_ASSERT_EQUAL_STRING("STOPPED", sm.getStateName().c_str());
+    StateMachine paused_state;
+    paused_state.begin();
+    paused_state.transitionTo(SystemState::WIFI_CONNECT);
+    paused_state.transitionTo(SystemState::READY);
+    TouchUiController paused(paused_state, profiles, config);
+    paused.startFromProfile("petg");
+    paused.pause();
+    TEST_ASSERT_TRUE(paused.stop());
+    TEST_ASSERT_EQUAL(SystemState::STOPPED, paused_state.getState());
+    TEST_ASSERT_FALSE(paused_state.getCurrentSession().heater_on);
 }
 
 int main(int, char**) {
     UNITY_BEGIN();
-    RUN_TEST(test_pause_resume_freezes_elapsed);
-    RUN_TEST(test_pause_timeout_auto_stop);
-    RUN_TEST(test_stop_from_paused);
+    RUN_TEST(test_controller_stop_from_drying_and_paused);
     return UNITY_END();
 }

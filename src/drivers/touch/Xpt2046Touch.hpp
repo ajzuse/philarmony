@@ -22,6 +22,9 @@
 #pragma once
 
 #include "../interfaces/IDriverInterfaces.hpp"
+#ifndef UNIT_TEST
+#include <SPI.h>
+#endif
 
 namespace filament_dryer {
 
@@ -36,8 +39,16 @@ public:
 private:
     int8_t cs_pin_ = -1;
     int8_t irq_pin_ = -1;
+    int8_t mosi_pin_ = -1;
+    int8_t miso_pin_ = -1;
+    int8_t sclk_pin_ = -1;
     bool initialized_ = false;
     String sensitivity_ = "medium";
+#ifndef UNIT_TEST
+    SPIClass* spi_ = nullptr;
+    uint16_t transfer12(uint8_t command);
+#endif
+    uint16_t pressureThreshold() const;
 };
 
 } // namespace filament_dryer

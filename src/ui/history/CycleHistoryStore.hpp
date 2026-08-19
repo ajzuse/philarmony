@@ -53,8 +53,12 @@ public:
     bool getById(uint32_t id, CycleRecord& out) const;
 
 private:
+    static constexpr const char* kPath = "/cycle_history.json";
     std::vector<CycleRecord> records_;
     uint32_t next_id_ = 1;
+
+    bool load();
+    bool persist() const;
 };
 
 } // namespace filament_dryer

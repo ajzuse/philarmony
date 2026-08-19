@@ -47,6 +47,8 @@ public:
                const uint16_t* pixels);
     TouchPoint readInput();
     bool isInitialized() const { return initialized_; }
+    uint32_t lastTouchMs() const { return last_touch_ms_; }
+    TouchPoint lastTouchPoint() const { return last_touch_point_; }
 
 private:
     struct Impl;
@@ -55,6 +57,8 @@ private:
     FlushCallback flush_callback_ = nullptr;
     void* callback_context_ = nullptr;
     bool initialized_ = false;
+    uint32_t last_touch_ms_ = 0;
+    TouchPoint last_touch_point_;
 };
 
 } // namespace filament_dryer

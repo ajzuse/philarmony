@@ -34,5 +34,17 @@ const Color success = 0x69F0AE;
 const Color warning = 0xFFD740;
 const Color error = 0xFF5252;
 
+Color backgroundFor(bool high_contrast) {
+    return high_contrast ? 0x000000 : background;
+}
+
+Color surfaceFor(bool high_contrast) {
+    return high_contrast ? 0x101010 : surface;
+}
+
+Color textFor(bool high_contrast) {
+    return high_contrast ? 0xFFFFFF : text_primary;
+}
+
 } // namespace ui_theme
 } // namespace filament_dryer

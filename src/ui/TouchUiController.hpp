@@ -26,6 +26,7 @@
 
 #include "../core/ConfigManager.hpp"
 #include "../core/ProfileManager.hpp"
+#include "../core/SafetyEngine.hpp"
 #include "../core/StateMachine.hpp"
 
 namespace filament_dryer {
@@ -33,9 +34,11 @@ namespace filament_dryer {
 class TouchUiController {
 public:
     using BroadcastCallback = void (*)(const JsonObject& status);
+    using WifiHotspotCallback = void (*)();
 
     TouchUiController(StateMachine& state_machine, ProfileManager& profile_manager,
-                      ConfigManager& config_manager);
+                      ConfigManager& config_manager,
+                      SafetyEngine* safety = nullptr);
 
     bool startFromProfile(const String& profile_id);
     bool startCustom(float temperature_c, float humidity_pct,
@@ -43,7 +46,26 @@ public:
     bool pause();
     bool resume();
     bool stop();
-    bool applyTargets(float temperature_c, float humidity_pct);
+    bool applyTargets(float temperature_c, float humidity_pct,
+                      uint16_t duration_min);
+
+    std::vector<FilamentProfile> listProfiles() const;
+    ConfigManager& config() { return config_manager_; }
+    const ConfigManager& config() const { return config_manager_; }
+    UISettings getUiSettings() const;
+    TouchConfig getTouchConfig() const;
+    bool applyUiSettings(const UISettings& settings);
+    bool applyTouchConfig(const TouchConfig& config);
+    void requestWifiHotspot();
+    void setWifiHotspotCallback(WifiHotspotCallback callback) {
+        wifi_hotspot_callback_ = callback;
+    }
+
+    SystemState getState() const { return state_machine_.getState(); }
+    const DryingSession& getCurrentSession() const {
+        return state_machine_.getCurrentSession();
+    }
+    bool consumePauseTimeoutEvent();
 
     void tick();
     String getUiSource() const { return "touch"; }
@@ -57,11 +79,17 @@ private:
     StateMachine& state_machine_;
     ProfileManager& profile_manager_;
     ConfigManager& config_manager_;
+    SafetyEngine* safety_ = nullptr;
     BroadcastCallback broadcast_callback_ = nullptr;
+    WifiHotspotCallback wifi_hotspot_callback_ = nullptr;
     uint32_t pause_started_ms_ = 0;
     bool pause_timer_active_ = false;
+    bool pause_timeout_pending_ = false;
+    bool pause_timeout_reported_ = false;
 
     void broadcastStatus();
+    void broadcastAck(const char* topic, bool success);
+    bool safetyAllows(float temperature_c) const;
 };
 
 } // namespace filament_dryer

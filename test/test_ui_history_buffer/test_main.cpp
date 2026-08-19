@@ -1,38 +1,65 @@
+/*
+ * Philarmony Filament Dryer ESP32 Firmware
+ * Copyright (C) 2026 Philarmony Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 #include <unity.h>
-#include "Arduino.h"
+#include "LittleFS.h"
 #include "../../src/ui/history/CycleHistoryStore.hpp"
-#include "../../src/core/StateMachine.hpp"
 
 using namespace filament_dryer;
 
-void setUp() { test_set_millis(0); }
+void setUp() {
+    test_reset_littlefs();
+    test_set_millis(0);
+}
 void tearDown() {}
 
-void test_history_ring_and_page() {
+void test_history_persists_ring_and_pages_newest_first() {
     CycleHistoryStore store;
     TEST_ASSERT_TRUE(store.begin());
-
-    for (uint32_t i = 0; i < 12; ++i) {
-        DryingSession s;
-        s.profile_id = String("pla");
-        s.target_temp_c = 50.0f;
-        s.elapsed_sec = i;
-        s.stop_reason = DryingStopReason::COMPLETED;
-        store.appendFromSession(s);
+    for (uint32_t i = 0; i < 55; ++i) {
+        DryingSession session;
+        session.profile_id = (i % 2) ? "pla" : "petg";
+        session.target_temp_c = 50.0f;
+        session.target_humidity_pct = 15.0f;
+        session.current_temp_c = 48.0f;
+        session.current_humidity_pct = 18.0f;
+        session.elapsed_sec = i;
+        session.stop_reason = DryingStopReason::COMPLETED;
+        TEST_ASSERT_TRUE(store.appendFromSession(session));
         test_advance_millis(1000);
     }
+    TEST_ASSERT_EQUAL(CycleHistoryStore::kCapacity, store.size());
 
-    TEST_ASSERT_EQUAL(12, store.size());
-    auto page = store.page(0, 10);
-    TEST_ASSERT_EQUAL(10, page.size());
-    TEST_ASSERT_EQUAL_UINT32(11, page[0].duration_sec); // newest
-
-    auto more = store.page(10, 10);
-    TEST_ASSERT_EQUAL(2, more.size());
+    CycleHistoryStore reopened;
+    TEST_ASSERT_TRUE(reopened.begin());
+    TEST_ASSERT_EQUAL(CycleHistoryStore::kCapacity, reopened.size());
+    const auto first = reopened.page(0, 10);
+    TEST_ASSERT_EQUAL(10, first.size());
+    TEST_ASSERT_EQUAL_UINT32(54, first[0].duration_sec);
+    const auto more = reopened.page(10, 10);
+    TEST_ASSERT_EQUAL(10, more.size());
+    TEST_ASSERT_EQUAL_UINT32(44, more[0].duration_sec);
+    const auto last = reopened.page(40, 10);
+    TEST_ASSERT_EQUAL(10, last.size());
+    TEST_ASSERT_EQUAL_UINT32(14, last[0].duration_sec);
 }
 
 int main(int, char**) {
     UNITY_BEGIN();
-    RUN_TEST(test_history_ring_and_page);
+    RUN_TEST(test_history_persists_ring_and_pages_newest_first);
     return UNITY_END();
 }

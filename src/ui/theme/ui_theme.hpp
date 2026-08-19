@@ -27,6 +27,7 @@ namespace filament_dryer {
 namespace ui_theme {
 
 using Color = uint32_t;
+static constexpr int16_t kMinTouchTargetPx = 48;
 
 extern const Color background;
 extern const Color surface;
@@ -40,6 +41,10 @@ extern const Color border;
 extern const Color success;
 extern const Color warning;
 extern const Color error;
+
+Color backgroundFor(bool high_contrast);
+Color surfaceFor(bool high_contrast);
+Color textFor(bool high_contrast);
 
 } // namespace ui_theme
 } // namespace filament_dryer

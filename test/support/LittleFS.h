@@ -28,6 +28,9 @@ public:
     }
 
     File open(const char* path, const char* mode) {
+        if (mode && mode[0] == 'w') {
+            test_littlefs_storage()[path] = "";
+        }
         return File(String(path), mode);
     }
 };
