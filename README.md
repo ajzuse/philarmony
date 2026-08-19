@@ -63,7 +63,7 @@
 | 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | ⚙️ Tasks Geradas | 2026-07-23   |
-| 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📋 Planejado | 2026-07-23   |
+| 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 5 | `005-manual-validation` | Manual Validation Catalog   | ⚙️ Tasks Geradas | 2026-08-04 |
 | 6 | `006-ambient-humidity-sensor` | Ambient Temperature & Humidity Sensor   | 📝 Especificado | 2026-08-19 |
 
@@ -183,30 +183,30 @@
       ↓
  [Monitoring] ←←←←←←←←←←←←←←←←←←
       ↓
-   [Pause] ⇄ [Paused]
+   [Pause] ⇄ [Paused] (max 30 min)
       ↓
     [Stop] → [Confirm] → [Home]
 ```
 
-**Plano**: `specs/004-esp32-touchscreen-ui/plan.md` (+ research, data-model, contracts, quickstart). Stack: **LVGL v8+** + LovyanGFX flush; DEC-013.
+**Plano + Tasks**: `plan.md`, `tasks.md` (T001–T066). Stack LVGL+LovyanGFX; DEC-013. Clarify 2026-08-19: full v0.1, auto-resume, history 50/list 10+Mais.
 
 #### Funcionalidades Touch
 
 | Feature | Detalhes |
 |---------|----------|
-| **Start Flow** | 3 taps: Home → Perfil filamento → Confirm (ProfileManager) ou Custom → Params → Confirm |
-| **Pause/Resume** | MVP: estado `PAUSED` (heater off, timer frozen); WS `control/pause` / `control/resume` |
-| **Monitoring** | Valores grandes, progress ring, Pausar/Retomar + Parar, tap values para ajustar mid-cycle (P2) |
-| **Settings** | WiFi (reconfig→hotspot), Display (brightness, timeout, orientation), Units (°C/°F), Language, Touch (sensibilidade, calibração 4-pontos), Advanced (device name, firmware, reset) |
-| **History** | 50 ciclos circular buffer NVS/SPIFFS, list + detail com sparklines, export via WS/CSV |
-| **Sync WS** | Estado compartilhado, `ui_source` no status, config ack broadcast, last-write-wins |
-| **Acessibilidade** | Targets 48x48px, high contrast mode, haptic/beep feedback, PIN lock opcional |
+| **Start Flow** | Home → Perfil (ProfileManager) → Confirm ou Custom |
+| **Pause/Resume** | `PAUSED` heater off; auto-stop 30 min; WS `control/pause`/`resume` |
+| **Monitoring** | Valores grandes, progress, Pausar/Retomar/Parar, mid-cycle adjust + WS broadcast |
+| **Settings** | WiFi, Display, Units, Language, Touch calib, Advanced — v0.1 required |
+| **History** | 50 stored; list newest 10 + Mais; detail sparklines |
+| **Sync WS** | `ui_source`, last-write-wins, power-loss auto-resume |
+| **Acessibilidade** | Targets 48x48px, high contrast, haptic/beep if present, PIN optional |
 
 #### Entidades
 - `TouchConfig` - controller_type, pins, calibration, sensitivity, swap/invert axes
 - `UIScreen` - state machine enum + params
-- `FilamentProfile` - presets via ProfileManager (sem tabela duplicada na UI)
-- `CycleRecord` - 50 entries circular buffer
+- `FilamentProfile` - via ProfileManager (no duplicate UI table)
+- `CycleRecord` - 50 circular buffer
 - `UISettings` - brightness, timeout, orientation, units, language, touch, contrast, pin_lock
 
 ---
@@ -351,4 +351,4 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 ---
 
 *README auto-gerado e sincronizado pela Constituição Philarmony v1.0.0*
-*Última atualização: 2026-08-19 | Trigger: plan*
+*Última atualização: 2026-08-19 | Trigger: tasks*
