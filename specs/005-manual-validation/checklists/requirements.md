@@ -25,3 +25,6 @@
 - [x] Former 002 T031 → 005 T009 (VS-1)
 - [x] Former 002 T062 → 005 T010 (VS-4) + T011 (VS-5)
 - [x] Results still recorded in `specs/002-esp32-desktop-installer/checklists/quickstart-validation.md`
+- [x] Former 003 quickstart VS-1…VS-9 → 005 T016–T024 (**VS-CTRL-1…VS-CTRL-9**)
+- [x] Control-app ledger at `specs/003-filament-dryer-control-app/checklists/quickstart-validation.md`
+- [x] 003 T087 closed; no open `[MANUAL]` on 003 `tasks.md`

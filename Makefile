@@ -7,6 +7,7 @@ PORT         ?=
 UPLOAD_PORT  ?= $(PORT)
 
 INSTALLER_APP := apps/esp32-desktop-installer
+CONTROL_APP := apps/filament-dryer-control
 INSTALLER_CORE := packages/philarmony_core
 INSTALLER_DIST := $(INSTALLER_APP)/dist
 FIRMWARE_ASSET_DIR := $(INSTALLER_APP)/assets/firmware
@@ -51,10 +52,10 @@ endef
 	sync-installer-firmware bundle-esptool package-installer package-installer-linux \
 	package-installer-linux-appimage package-installer-linux-deb package-installer-linux-rpm \
 	package-installer-windows package-installer-macos \
-	run run-installer run-macos run-linux run-windows \
+	run run-installer run-control run-macos run-linux run-windows \
 	devices doctor pub-get create-platforms \
-	test-core test-installer test-flutter \
-	clean-installer
+	test-core test-installer test-control test-flutter \
+	clean-installer clean-control
 
 .DEFAULT_GOAL := all
 
@@ -78,7 +79,12 @@ help:
 	@echo "  make create-platforms      flutter create --platforms=windows,macos,linux"
 	@echo "  make test-core             dart test in packages/philarmony_core"
 	@echo "  make test-installer        flutter test in installer app"
-	@echo "  make test-flutter          test-core + test-installer"
+	@echo "  make test-control            flutter test in control app"
+	@echo "  make test-flutter          test-core + test-installer + test-control"
+	@echo "  make run-control           Run control app (DEVICE=$(DEVICE))"
+	@echo "  make package-control-linux Build linux release for control app"
+	@echo "  make package-control-macos / package-control-windows  (host OS)"
+	@echo "  make package-control          Alias → package-control-linux"
 	@echo "  make clean-installer       flutter clean"
 	@echo ""
 	@echo "Desktop installer — packaging:"
@@ -126,6 +132,7 @@ pub-get:
 	$(call require_flutter)
 	cd $(INSTALLER_CORE) && $(DART) pub get
 	cd $(INSTALLER_APP) && $(FLUTTER) pub get
+	cd $(CONTROL_APP) && $(FLUTTER) pub get
 
 create-platforms:
 	$(call require_flutter)
@@ -152,7 +159,47 @@ test-installer:
 	$(call require_flutter)
 	cd $(INSTALLER_APP) && $(FLUTTER) pub get && $(FLUTTER) test
 
-test-flutter: test-core test-installer
+test-control:
+	$(call require_flutter)
+	cd $(CONTROL_APP) && $(FLUTTER) pub get && $(FLUTTER) gen-l10n && $(FLUTTER) test
+
+test-flutter: test-core test-installer test-control
+
+clean-control:
+	$(call require_flutter)
+	cd $(CONTROL_APP) && $(FLUTTER) clean
+
+run-control: pub-get
+	$(call require_flutter)
+	cd $(CONTROL_APP) && $(FLUTTER) gen-l10n && $(FLUTTER) run -d $(DEVICE)
+
+package-control-linux:
+	$(call require_flutter)
+	@mkdir -p dist/control-linux
+	cd $(CONTROL_APP) && $(FLUTTER) build linux --release
+	@bundle=$$(ls -d $(CONTROL_APP)/build/linux/*/release/bundle 2>/dev/null | head -1); \
+	  if [ -n "$$bundle" ]; then cp -a "$$bundle/." dist/control-linux/; \
+	  echo "Packed → dist/control-linux/"; else echo "Linux bundle not found"; exit 1; fi
+
+package-control-linux-appimage: package-control-linux
+	@chmod +x $(CONTROL_APP)/packaging/build-appimage.sh
+	$(CONTROL_APP)/packaging/build-appimage.sh
+
+package-control-macos:
+	$(call require_flutter)
+	@mkdir -p dist/control-macos
+	cd $(CONTROL_APP) && $(FLUTTER) build macos --release
+	@chmod +x $(CONTROL_APP)/packaging/build-dmg.sh
+	$(CONTROL_APP)/packaging/build-dmg.sh
+
+package-control-windows:
+	$(call require_flutter)
+	@mkdir -p dist/control-windows
+	cd $(CONTROL_APP) && $(FLUTTER) build windows --release
+	@chmod +x $(CONTROL_APP)/packaging/build-msix.sh
+	cd $(CONTROL_APP) && $(DART) pub get && bash packaging/build-msix.sh
+
+package-control: package-control-linux
 
 clean-installer:
 	$(call require_flutter)

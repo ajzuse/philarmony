@@ -72,16 +72,29 @@
 
 ---
 
-## Phase 5: User Story 3 — Future product manual stages (Priority: P2)
+## Phase 5: User Story 3 — Control-app & touchscreen manual stages (Priority: P2)
 
-**Goal**: Placeholder lane for 003/004 device/UI smokes when those features need release gates
+**Goal**: Catalog device/UI/packaging smokes for 003 (control app) and 004 (touchscreen) so product `tasks.md` stay free of open manuals
 
-**Independent Test**: When 003/004 require manual smoke, tasks are appended here (not on product open lists)
+**Independent Test**: Each shipped control-app release gate has a VS-CTRL-* row here; results recorded in the 003 ledger
 
-- [ ] T012 [US3] [MANUAL] **VS-CTRL-1 Control-app device smoke** — when 003 ships P1 journeys, add/execute device discovery + dashboard smoke and record under `specs/003-filament-dryer-control-app/checklists/` (create checklist if missing)
-- [ ] T013 [US3] [MANUAL] **VS-UI-1 Touchscreen UI smoke** — when 004 ships P1 journeys, add/execute on-device UI smoke and record under `specs/004-esp32-touchscreen-ui/checklists/` (create checklist if missing)
+### Migrated from 003 quickstart (VS-1…VS-9 → VS-CTRL-1…VS-CTRL-9)
 
-**Checkpoint**: No open manual tasks appear on 003/004 `tasks.md`
+Ledger: `specs/003-filament-dryer-control-app/checklists/quickstart-validation.md`
+
+- [x] T012 [US3] Expand placeholder into stage-named control-app manuals (see T016–T024); touchscreen remains T013
+- [ ] T013 [US3] [MANUAL] **VS-UI-1 Touchscreen UI smoke** — when 004 ships P1 journeys, execute on-device UI smoke and record under `specs/004-esp32-touchscreen-ui/checklists/` (create checklist if missing)
+- [ ] T016 [P] [US3] [MANUAL] **VS-CTRL-1 Discovery & connect** — Scan or manual host:80`/ws` → Connected → first `status/update` &lt;2s on real firmware/LAN; record in `specs/003-filament-dryer-control-app/checklists/quickstart-validation.md` (was 003 quickstart VS-1)
+- [ ] T017 [P] [US3] [MANUAL] **VS-CTRL-2 Start / stop (no pause)** — Start cycle → drying → Stop with confirm; heater/fan off; confirm UI has no Pause/Resume; record in 003 checklist (was VS-2)
+- [ ] T018 [US3] [MANUAL] **VS-CTRL-3 Config hardware** — Pin conflict blocked client-side; success/error topics per `001`; record in 003 checklist (was VS-3)
+- [ ] T019 [P] [US3] [MANUAL] **VS-CTRL-4 History offline** — Complete a cycle → airplane/offline → list + detail from local store; record in 003 checklist (was VS-4)
+- [ ] T020 [P] [US3] [MANUAL] **VS-CTRL-5 Adaptive layout** — Resize across ~600 / ~1024; chrome matches `contracts/adaptive-layout.md`; record in 003 checklist (was VS-5)
+- [ ] T021 [US3] [MANUAL] **VS-CTRL-6 Multi-device** — Two `KnownDevice`s → switcher updates session; max concurrent enforced; record in 003 checklist (was VS-6)
+- [ ] T022 [P] [US3] [MANUAL] **VS-CTRL-7 History export CSV + PDF** — Same completed cycle → CSV and PDF both openable; PDF has summary (+ charts when samples exist); record in 003 checklist (was VS-7)
+- [ ] T023 [US3] [MANUAL] **VS-CTRL-8 Mobile background WS** — Active cycle → background app ≥2 min on **Android and iOS** → status continues or reconnects; complete/fault notification when permitted; record in 003 checklist (was VS-8)
+- [ ] T024 [P] [US3] [MANUAL] **VS-CTRL-9 Packaging smoke (desktop)** — `make package-control-linux` (and/or macOS/Windows targets) → launch artifact; record in 003 checklist (was VS-9)
+
+**Checkpoint**: No open `[MANUAL]` tasks on `specs/003-filament-dryer-control-app/tasks.md` or `004` open lists
 
 ---
 
@@ -95,16 +108,18 @@
 ## Dependencies & Execution Order
 
 ```text
-Done: T001–T008, T014 (policy + migration scaffolding)
-Open manuals (human): T009 (VS-1) then T010 // T011 (VS-4 // VS-5)
-Future: T012–T013 when 003/004 need smoke
+Done: T001–T008, T012, T014 (policy + 003 migration scaffolding)
+Open manuals (installer): T009 (VS-1) then T010 // T011 (VS-4 // VS-5)
+Open manuals (control app): T016…T024 (VS-CTRL-*) — prioritize T016, T017, T022, T023 for MVP gate
+Future touchscreen: T013 (VS-UI-1)
 Polish: T015 audit after stage closures
 ```
 
 ### Parallel Opportunities
 
 - T010 // T011 (different host OS families)
-- T012 // T013 (different product surfaces, when ready)
+- T016 // T017 // T019 // T020 // T022 // T024 (different control-app surfaces / hosts)
+- T013 independent of control-app stages
 
 ---
 
@@ -114,18 +129,27 @@ Polish: T015 audit after stage closures
 
 1. T009 — VS-1 real ESP32 flash smoke  
 2. T010 + T011 — VS-4 / VS-5 host packaging smoke  
-3. T015 — confirm zero open manuals on product specs  
+
+### Control-app MVP manual gate (003 clarify locks)
+
+1. T016 — VS-CTRL-1 discovery/connect  
+2. T017 — VS-CTRL-2 start/stop  
+3. T022 — VS-CTRL-7 CSV+PDF  
+4. T023 — VS-CTRL-8 background WS (iOS+Android)  
+5. Remaining T018–T021, T024 as feature completeness  
 
 ### Suggested MVP Scope
 
-**US2 stages T009–T011** only.
+**Installer**: US2 stages T009–T011  
+**Control app (when shipping 003 MVP)**: T016, T017, T022, T023  
 
 ---
 
 ## Notes
 
-- Preconditions for VS-1: `make bundle-esptool` + `make sync-installer-firmware`  
+- Preconditions for installer VS-1: `make bundle-esptool` + `make sync-installer-firmware`  
 - Flash Success ≠ network reachability  
+- Control-app stage IDs use **VS-CTRL-*** to avoid colliding with installer **VS-1 / VS-4 / VS-5**  
 - Do not add automated test tasks to this catalog  
 - Commit only with explicit user approval (constitution) unless cloud-agent policy overrides  
 

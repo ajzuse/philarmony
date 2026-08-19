@@ -60,11 +60,11 @@
 
 | # | Spec | Nome | Status | Última Atualização |
 |---|------|------|--------|-------------------|
-| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ✅ Implementado | 2026-07-28   |
-| 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | ✅ Implementado (manuais → 005) | 2026-08-04   |
-| 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | 📝 Especificado | 2026-07-23   |
+| 1 | `001-filament-dryer-esp32` | Filament Dryer ESP32 Base Structure   | ⚙️ Tasks Geradas | 2026-07-23   |
+| 2 | `002-esp32-desktop-installer` | ESP32 Desktop Installer   | ⚙️ Tasks Geradas | 2026-07-23   |
+| 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | 📝 Especificado | 2026-07-23   |
-| 5 | `005-manual-validation` | Manual Validation Catalog   | 🚧 Tasks (VS-1/4/5 abertos) | 2026-08-04   |
+| 5 | `005-manual-validation` | Manual Validation Catalog   | ⚙️ Tasks Geradas | 2026-08-04 |
 
 ---
 
@@ -79,7 +79,7 @@
 | Área | Detalhes |
 |------|----------|
 | **WiFi & Conectividade** | Conexão WiFi com fallback automático para Hotspot "philarmony"/"philarmony" (IP fixo 192.168.4.1) com servidor HTTP para configuração |
-| **WebSocket API** | Servidor WebSocket na porta **80** path  com tópicos: `config/hardware`, `config/display`, `config/control`, `control/start`, `control/stop`, `control/pid_calibrate`, `status/subscribe`, `status/update`, `config/profiles/*`, `logs/stream` |
+| **WebSocket API** | Servidor WebSocket na porta **80** path `/ws` com tópicos: `config/hardware`, `config/display`, `config/control`, `control/start`, `control/stop`, `control/pid_calibrate`, `status/subscribe`, `status/update`, `config/profiles/*`, `logs/stream` |
 | **Controle Térmico** | PWM heater (0-100%), ventoinha exaustão PWM/digital, PID opcional, limite segurança 80°C hardcoded |
 | **Sensores** | DHT22, DS18B20, BME280 configuráveis via GPIO |
 | **Display** | SSD1306, SH1106 (I2C), ST7789, ILI9341 (SPI) - resolução configurável, campos selecionáveis |
@@ -128,6 +128,10 @@
 ---
 
 ### 003 - Control App Multi-Plataforma (`specs/003-filament-dryer-control-app/`)
+
+**Código**: `apps/filament-dryer-control/` · core compartilhado `packages/philarmony_core/` · packaging `apps/filament-dryer-control/packaging/`  
+**Make**: `run-control`, `test-control`, `package-control-linux|macos|windows`  
+**Manuais**: `specs/005-manual-validation` stages **VS-CTRL-1…VS-CTRL-9**
 
 **Objetivo**: App unificado Desktop + Mobile para monitoramento, configuração e controle remoto.
 
@@ -205,41 +209,19 @@
 
 ---
 
-### 005 - Catálogo de Validações Manuais (`specs/005-manual-validation/`)
-
-**Objetivo**: Única especificação para tasks abertas de **validação manual** (smoke HW, packaging host, sign-off de checklist), nomeadas por etapa (VS-*).
-
-#### Diretriz (Constituição v1.0.0)
-- Specs de produto (001–004): jornadas + critérios de aceitação + tasks de teste **automatizado**
-- Tasks abertas de validação **manual** MUST nascer em `005-manual-validation`
-- Histórico `[x]` de automação nas specs de produto permanece
-- Etapas manuais do installer: **VS-1** (T009), **VS-4** (T010), **VS-5** (T011); ledger em `002/.../quickstart-validation.md`
-- CI falha o PR se qualquer flow test automatizado mandatório falhar (automação nas specs de produto)
-
-#### Escopo da Spec
-| Área | Detalhes |
-|------|----------|
-| **Catálogo único (manual)** | Inventário e tracking de smokes/checklists humanos |
-| **VS-1** | First-flash hardware smoke (ESP32 real) |
-| **VS-4 / VS-5** | Host packaging smoke Win/macOS e Linux |
-| **Futuro 003/004** | VS-CTRL-1 / VS-UI-1 quando essas features pedirem smoke |
-| **Ledger** | Resultados registrados nos checklists da spec de produto dona |
-
----
-
 ## 📊 Progresso Geral do Projeto
 
 ```
 ┌────────────────────────────┬────────────┬────────────────────────┬──────┐
 │ FASE                       │ STATUS     │ ENTREGÁVEIS            │  %   │
 ├────────────────────────────┼────────────┼────────────────────────┼──────┤
-│ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 5 Specs (incl. 005 manuais) │ 100% │
-│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 3/5  │
-│ 3. Firmware Core           │ ✅ CONCLUÍDO │ ESP32 Base + WS + NVS + Make/CI │ 100% │
+│ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 5 Specs completas    │ 100% │
+│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 4/5  │
+│ 3. Firmware Core           │ ⏳ AGUARDANDO │ ESP32 Base + WS + NVS   │ 0%   │
 │ 4. Touch UI                │ ⏳ AGUARDANDO │ LVGL + Touch Driver     │ 0%   │
-│ 5. Desktop Installer       │ ✅ CONCLUÍDO │ Produto done; manuais em 005 │ 100% │
+│ 5. Desktop Installer       │ ⏳ AGUARDANDO │ Tauri/Flutter + esptool │ 0%   │
 │ 6. Control App (Multi)     │ ⏳ AGUARDANDO │ Flutter + SQLite + WS   │ 0%   │
-│ 7. Integration & Testing   │ 🚧 EM ANDAMENTO │ 005 manuais VS-1/4/5 abertos │ 40% │
+│ 7. Integration & Testing   │ ⏳ FUTURO    │ E2E, CI/CD, Release     │ 0%   │
 └────────────────────────────┴────────────┴────────────────────────┴──────┘
 ```
 
@@ -253,7 +235,7 @@
 | **GUI Firmware** | LVGL v8+ | Leve, touch-ready, double buffer, temas |
 | **WebSocket** | async_web_server / ESPAsyncWebServer | Non-blocking, multi-client, 1Hz nativo |
 | **NVS/Storage** | NVS (config) + SPIFFS (fonts/assets) | Wear-leveling, atômico, padrão ESP32 |
-| **Desktop Installer** | Flutter 3.44 (FVM) + esptool + MSIX/DMG/deb/rpm | `make run` / `make bundle-esptool`; produto done |
+| **Desktop Installer** | Tauri (Rust + Web) ou Flutter Desktop | Binário nativo pequeno, esptool.py integrado |
 | **Control App** | Flutter 3.x (Dart) | Single codebase Desktop+Mobile, SQLite, WS |
 | **Build/CI** | GitHub Actions + PlatformIO | Matrix build ESP32 variants, artifact upload |
 | **Docs** | Markdown PT-BR/EN-US em `/docs` | GitHub Pages ready, versionado com código |
@@ -282,12 +264,11 @@ philarmony/
 │   ├── flow/
 │   └── integration/
 ├── examples/
-├── specs/                       # Especificações (5 atuais)
+├── specs/                       # Especificações (4 atuais)
 │   ├── 001-filament-dryer-esp32/
 │   ├── 002-esp32-desktop-installer/
 │   ├── 003-filament-dryer-control-app/
-│   ├── 004-esp32-touchscreen-ui/
-│   └── 005-manual-validation/        # Catálogo único de validações manuais
+│   └── 004-esp32-touchscreen-ui/
 ├── README.md                    # Este arquivo (auto-sincronizado)
 └── LICENSE
 ```
@@ -306,7 +287,7 @@ philarmony/
 
 ## 🧪 Testes
 
-Flow tests automatizados de jornada completa são o gate mandatório de CI (Constituição: Teste Automatizado e Qualidade). **Tasks de automação ficam nas specs de produto** (001–004) e **continuam a ser implementadas**. Tasks abertas de **validação manual** concentram-se em [`specs/005-manual-validation`](specs/005-manual-validation/spec.md), nomeadas por etapa (VS-*); histórico `[x]` de automação nas specs de produto permanece.
+Todo o desenvolvimento deve seguir as práticas de Test-First (TDD) sempre que possível. Se o TDD não for possível, apenas os testes de fluxo completo são permitidos.
 
 ---
 
@@ -367,5 +348,5 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 
 ---
 
-*README auto-gerado e sincronizado pela Constituição Philarmony v0.6.0*
-*Última atualização: 2026-07-29 | Trigger: tasks*
+*README auto-gerado e sincronizado pela Constituição Philarmony v1.0.0*
+*Última atualização: 2026-08-11 | Trigger: tasks*
