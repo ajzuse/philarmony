@@ -28,6 +28,11 @@ public:
         data_.push_back(static_cast<char>(value));
         return 1;
     }
+    size_t write(const uint8_t* values, size_t length) {
+        if (!values) return 0;
+        data_.append(reinterpret_cast<const char*>(values), length);
+        return length;
+    }
     int read() const {
         if (read_pos_ >= data_.size()) return -1;
         return static_cast<uint8_t>(data_[read_pos_++]);
