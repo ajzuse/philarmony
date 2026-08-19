@@ -24,6 +24,14 @@ public:
     size_t length() const { return data_.length(); }
     bool isEmpty() const { return data_.empty(); }
     void reserve(size_t n) { data_.reserve(n); }
+    size_t write(uint8_t value) {
+        data_.push_back(static_cast<char>(value));
+        return 1;
+    }
+    int read() const {
+        if (read_pos_ >= data_.size()) return -1;
+        return static_cast<uint8_t>(data_[read_pos_++]);
+    }
 
     String& operator=(const char* s) {
         data_ = s ? s : "";
@@ -69,6 +77,7 @@ public:
 
 private:
     std::string data_;
+    mutable size_t read_pos_ = 0;
 };
 
 inline String operator+(const String& lhs, float rhs) {
