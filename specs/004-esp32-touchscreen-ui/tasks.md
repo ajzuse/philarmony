@@ -290,3 +290,25 @@ Task: "StartCustom in src/ui/screens/screen_start_custom.cpp"
 - Constitution: GPLv3 headers, PT-BR/EN-US, SafetyEngine authority  
 
 **Constitution compliance:** PROJECT_NAME = Philarmony, provisions per `.specify/memory/constitution.md`
+
+---
+
+## Phase 10: Convergence
+
+**Purpose**: Close gaps found by `/speckit-converge` (2026-08-19) between v0.1 acceptance and current firmware. Prior work T001–T066 remains historical `[x]`.
+
+- [ ] T067 CRITICAL Persist interrupted DRYING/PAUSED session to NVS/LittleFS and call `StateMachine::restoreInterruptedSession` on boot (SafetyEngine still gates heat) in `src/main.cpp` and `src/core/StateMachine.cpp` per Power-loss AC / clarify lock (missing)
+- [ ] T068 CRITICAL Replace region-tap stubs with real LVGL screen implementations (`.cpp`) under `src/ui/screens/` and live Monitoring rendering via `src/ui/UiApp.cpp` / `src/ui/LvglPort.cpp` per FR-002 / FR-003 / US1–US6 (missing)
+- [ ] T069 CRITICAL Implement Settings actions (WiFi→hotspot, brightness/timeout/orientation, units, language, touch sensitivity + 4-point calibration, advanced reset) with NVS persist and `config/*/ack` in `src/ui/` + `src/core/ConfigManager.*` + `src/ui/TouchUiController.cpp` per FR-005 / US5 (missing)
+- [ ] T070 CRITICAL Implement real XPT2046 SPI pressure/coordinate sampling in `src/drivers/touch/Xpt2046Touch.cpp` for CYD bring-up per FR-001 / plan: CYD primary (missing)
+- [ ] T071 CRITICAL Replace placeholder/StateMachine-only UI tests with automated journeys covering ProfileManager start, pause toast path, settings NVS, and history pagination in `test/test_ui_*/` per Constitution: automated flow testing (contradicts)
+- [ ] T072 Add `TouchConfig` + `UISettings` structs with NVS load/save getters/setters in `src/core/ConfigManager.hpp` and `src/core/ConfigManager.cpp` per FR-001 / FR-005 / plan: NVS storage (missing)
+- [ ] T073 Drive StartPresets from `ProfileManager::listProfiles()` (localized names) instead of hardcoding `"pla"` in `src/ui/UiApp.cpp` / `src/ui/screens/screen_start_presets.*` per FR-004 / US1 (contradicts)
+- [ ] T074 Wire LVGL flush callback to active LovyanGFX display path and avoid dual conflicting render ownership with legacy `displayTask` in `src/ui/LvglPort.cpp` and `src/main.cpp` per FR-002 / plan: LVGL+LovyanGFX (partial)
+- [ ] T075 Implement configurable screen timeout dim-to-10% brightness and touch-wake restore in `src/ui/UiApp.cpp` / `src/ui/LvglPort.cpp` per FR-003 / T059 intent (missing)
+- [ ] T076 On `pause_timeout` stop, show localized toast and navigate Monitoring→Home in `src/ui/UiApp.cpp` / `src/ui/TouchUiController.cpp` per FR-004 / US2 (missing)
+- [ ] T077 Persist `CycleHistoryStore` (50) to LittleFS/NVS, wire list/Mais via `page()`, detail stats + sparklines in `src/ui/history/CycleHistoryStore.*` and history screens per FR-006 / US6 (partial)
+- [ ] T078 Extend mid-cycle adjust for humidity (±1%RH) and duration (±5min) with validation + `status/update` broadcast in `src/ui/screens/screen_target_adjust.*` and `src/ui/TouchUiController.cpp` per FR-004 / US4 / FR-007 (partial)
+- [ ] T079 Bootstrap `TouchManager::begin` from persisted board touch pins/calibration (not hardcoded auto-only) in `src/main.cpp` + ConfigManager per FR-001 (partial)
+- [ ] T080 Inject SafetyEngine prechecks into touch start/resume/adjust command path in `src/ui/TouchUiController.cpp` per control-bridge / Constitution: Failsafe (partial)
+- [ ] T081 Implement FR-008 accessibility on real widgets: ≥48×48 targets, high-contrast toggle, optional haptic/beep in `src/ui/theme/` and settings per FR-008 (missing)
