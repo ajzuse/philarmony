@@ -110,7 +110,7 @@ bool ProfileManager::buildSessionFromRequest(const JsonObject& payload,
         session.target_humidity_pct = payload["target_humidity_pct"].as<float>();
     }
 
-    const bool has_humidity = !isnan(session.target_humidity_pct);
+    const bool has_humidity = !std::isnan(session.target_humidity_pct);
     return ConfigManager::validateStartParams(session.target_temp_c, session.max_duration_min,
                                               has_humidity ? session.target_humidity_pct : 15.0f,
                                               has_humidity);
