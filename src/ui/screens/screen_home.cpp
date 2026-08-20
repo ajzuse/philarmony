@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ScreenBuilders.hpp"
+#include <cmath>
 
 namespace filament_dryer {
 namespace ui_screens {
@@ -23,16 +24,23 @@ namespace ui_screens {
 lv_obj_t* buildHome(UiApp& app) {
     lv_obj_t* root = app.createScreen();
     app.addTitle(root, "Philarmony");
-    app.addLabel(root, (app.isEnglish() ? "Status: " : "Estado: ") +
-                           String(app.isPaused() ? "paused" : "ready"));
-    app.addButton(root, app.isEnglish() ? "Start drying" : "Iniciar secagem",
-                  UiAction::HomeStart);
-    app.addButton(root, app.isEnglish() ? "History" : "Historico",
-                  UiAction::HomeHistory);
-    app.addButton(root, app.isEnglish() ? "Settings" : "Configuracoes",
-                  UiAction::HomeSettings);
+    app.addLabel(root, String(app.tr("label_status")) + ": " +
+                           app.tr(app.statusKey()));
+    const float temp = std::isfinite(app.liveTemperatureC())
+                           ? app.liveTemperatureC()
+                           : app.session().current_temp_c;
+    const float rh = std::isfinite(app.liveHumidityPct())
+                         ? app.liveHumidityPct()
+                         : app.session().current_humidity_pct;
+    app.addLabel(root, String(app.tr("label_temp")) + ": " +
+                           app.formatTemp(temp));
+    app.addLabel(root, String(app.tr("label_rh")) + ": " +
+                           String(rh, 1) + "%");
+    app.addButton(root, app.tr("btn_start"), UiAction::HomeStart);
+    app.addButton(root, app.tr("btn_history"), UiAction::HomeHistory);
+    app.addButton(root, app.tr("btn_settings"), UiAction::HomeSettings);
     return root;
 }
 
-} // namespace ui_screens
-} // namespace filament_dryer
+}  // namespace ui_screens
+}  // namespace filament_dryer

@@ -149,6 +149,10 @@ void DisplayManager::setBrightness(uint8_t brightness) {
     if (active_display_) active_display_->setBrightness(brightness);
 }
 
+void DisplayManager::setRotation(uint8_t rotation) {
+    if (active_display_) active_display_->setRotation(rotation);
+}
+
 uint8_t DisplayManager::getBrightness() const {
     return active_display_ ? active_display_->getBrightness() : 0;
 }

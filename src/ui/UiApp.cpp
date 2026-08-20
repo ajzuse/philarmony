@@ -21,8 +21,10 @@
 #include "screens/ScreenBuilders.hpp"
 #include "theme/ui_theme.hpp"
 #include "../drivers/display/DisplayManager.hpp"
+#include "firmware_version.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace filament_dryer {
 
@@ -34,6 +36,8 @@ bool UiApp::begin(uint16_t width, uint16_t height,
                   DisplayManager* display_manager) {
     width_ = width;
     height_ = height;
+    native_width_ = width;
+    native_height_ = height;
     display_manager_ =
         display_manager && display_manager->getActiveDriver()
             ? display_manager
@@ -46,10 +50,15 @@ bool UiApp::begin(uint16_t width, uint16_t height,
     if (display_manager_) {
         display_manager_->setBrightness(
             static_cast<uint8_t>((settings_.brightness_pct * 255u) / 100u));
-        lvgl_ready_ = lvgl_.init(touch_, width, height, flushToDisplay,
+        applyOrientation();
+        lvgl_ready_ = lvgl_.init(touch_, width_, height_, flushToDisplay,
                                  display_manager_);
     }
-    show(UiScreenId::Home);
+    if (ui_format::isActiveCycle(controller_.getState())) {
+        show(UiScreenId::Monitoring);
+    } else {
+        show(UiScreenId::Home);
+    }
     return lvgl_ready_;
 }
 
@@ -67,17 +76,55 @@ void UiApp::setLanguage(const String& lang) {
 
 void UiApp::notifyRemoteStateChange() {
     remote_toast_ = true;
-    showToast(isEnglish() ? "State changed remotely"
-                          : "Estado alterado remotamente");
+    showToast(tr("toast_remote"));
+    syncFromSharedState();
     renderScreen();
 }
 
+void UiApp::setLiveReadings(float temp_c, float humidity_pct) {
+    live_temp_c_ = temp_c;
+    live_humidity_pct_ = humidity_pct;
+}
+
+const char* UiApp::statusKey() const {
+    switch (controller_.getState()) {
+        case SystemState::DRYING:
+            return "status_drying";
+        case SystemState::PAUSED:
+            return "status_paused";
+        case SystemState::STOPPED:
+        case SystemState::FAULT_STOPPED:
+            return "status_stopped";
+        default:
+            return "status_idle";
+    }
+}
+
+WifiSnapshot UiApp::wifiStatus() const {
+    if (wifi_status_callback_) {
+        return wifi_status_callback_();
+    }
+    WifiSnapshot snapshot;
+    snapshot.ssid = controller_.config().getWifiConfig().ssid;
+    return snapshot;
+}
+
+String UiApp::firmwareVersion() const {
+    return FIRMWARE_VERSION;
+}
+
 void UiApp::loop() {
+    const uint32_t frame_start = millis();
     controller_.tick();
+    touch_.serviceWatchdog();
     if (controller_.consumePauseTimeoutEvent()) {
-        showToast(isEnglish() ? "Pause timeout: cycle stopped"
-                              : "Tempo de pausa esgotado: ciclo parado");
+        showToast(tr("toast_pause_timeout"));
         show(UiScreenId::Home);
+    }
+
+    if (millis() - last_sync_ms_ >= 250) {
+        last_sync_ms_ = millis();
+        syncFromSharedState();
     }
 
     if (calibration_active_) {
@@ -100,6 +147,20 @@ void UiApp::loop() {
     if (millis() - last_timeout_check_ms_ >= 500) {
         last_timeout_check_ms_ = millis();
         updateInactivity();
+    }
+
+    const uint32_t frame_ms = millis() - frame_start;
+    if (frame_ms > 100) {
+        ++slow_frame_count_;
+        if (slow_frame_count_ >= 5 && display_manager_) {
+            lvgl_.deinit();
+            lvgl_ready_ = lvgl_.init(touch_, width_, height_, flushToDisplay,
+                                     display_manager_);
+            slow_frame_count_ = 0;
+            renderScreen();
+        }
+    } else {
+        slow_frame_count_ = 0;
     }
 }
 
@@ -200,13 +261,13 @@ void UiApp::handleFallbackTouch(const TouchPoint& point) {
                 handleAction(UiAction::BackHome);
             } else {
                 const int32_t row =
-                    ((point.y - top_h) * 5) /
+                    ((point.y - top_h) * 6) /
                     std::max<int16_t>(1, height_ - top_h);
                 const UiAction actions[] = {
                     UiAction::SettingsWifi, UiAction::SettingsDisplay,
                     UiAction::SettingsUnits, UiAction::SettingsTouch,
-                    UiAction::SettingsAdvanced};
-                handleAction(actions[std::min<int32_t>(4, row)]);
+                    UiAction::SettingsSensors, UiAction::SettingsAdvanced};
+                handleAction(actions[std::min<int32_t>(5, row)]);
             }
             break;
         case UiScreenId::SettingsWifi:
@@ -239,6 +300,15 @@ void UiApp::handleFallbackTouch(const TouchPoint& point) {
         case UiScreenId::SettingsAdvanced:
             handleAction(point.y < top_h ? UiAction::BackSettings
                                          : UiAction::FactoryResetPrompt);
+            break;
+        case UiScreenId::SettingsSensors:
+            handleAction(UiAction::BackSettings);
+            break;
+        case UiScreenId::DialogKeypad:
+            if (point.y < top_h) handleAction(UiAction::Cancel);
+            else if (lower && left) handleAction(UiAction::KeypadOk);
+            else if (lower) handleAction(UiAction::KeypadBackspace);
+            else handleAction(UiAction::KeypadDigit, 0);
             break;
         case UiScreenId::HistoryList:
             if (point.y < top_h) handleAction(UiAction::BackHome);
@@ -326,23 +396,24 @@ void UiApp::handleAction(UiAction action, int32_t value) {
             renderScreen();
             break;
         case UiAction::CustomStart:
-            if (controller_.startCustom(draft_temp_c_, draft_humidity_pct_,
-                                        draft_duration_min_)) {
-                show(UiScreenId::Monitoring);
-            } else {
-                showToast(isEnglish() ? "Invalid or unsafe targets"
-                                      : "Alvos invalidos ou inseguros");
-                renderScreen();
-            }
+            confirm_mode_ = ConfirmMode::StartCustom;
+            show(UiScreenId::DialogConfirm);
             break;
         case UiAction::Confirm:
             if (confirm_mode_ == ConfirmMode::StartProfile) {
                 if (controller_.startFromProfile(pending_profile_id_)) {
                     show(UiScreenId::Monitoring);
                 } else {
-                    showToast(isEnglish() ? "Unable to start cycle"
-                                          : "Nao foi possivel iniciar");
+                    showToast(tr("toast_start_fail"));
                     show(UiScreenId::StartPresets);
+                }
+            } else if (confirm_mode_ == ConfirmMode::StartCustom) {
+                if (controller_.startCustom(draft_temp_c_, draft_humidity_pct_,
+                                            draft_duration_min_)) {
+                    show(UiScreenId::Monitoring);
+                } else {
+                    showToast(tr("toast_invalid"));
+                    show(UiScreenId::StartCustom);
                 }
             } else if (confirm_mode_ == ConfirmMode::StopCycle) {
                 if (controller_.stop()) show(UiScreenId::Home);
@@ -355,8 +426,7 @@ void UiApp::handleAction(UiAction action, int32_t value) {
                         static_cast<uint8_t>(
                             (settings_.brightness_pct * 255u) / 100u));
                 }
-                showToast(isEnglish() ? "Settings reset"
-                                      : "Configuracoes restauradas");
+                showToast(tr("toast_reset"));
                 show(UiScreenId::Home);
             }
             break;
@@ -369,8 +439,7 @@ void UiApp::handleAction(UiAction action, int32_t value) {
             const bool success =
                 isPaused() ? controller_.resume() : controller_.pause();
             if (!success) {
-                showToast(isEnglish() ? "Command rejected"
-                                      : "Comando rejeitado");
+                showToast(tr("toast_rejected"));
             }
             renderScreen();
             break;
@@ -392,8 +461,7 @@ void UiApp::handleAction(UiAction action, int32_t value) {
                                          draft_duration_min_)) {
                 show(UiScreenId::Monitoring);
             } else {
-                showToast(isEnglish() ? "Target update rejected"
-                                      : "Atualizacao rejeitada");
+                showToast(tr("toast_target_rejected"));
                 renderScreen();
             }
             break;
@@ -412,10 +480,12 @@ void UiApp::handleAction(UiAction action, int32_t value) {
         case UiAction::SettingsAdvanced:
             show(UiScreenId::SettingsAdvanced);
             break;
+        case UiAction::SettingsSensors:
+            show(UiScreenId::SettingsSensors);
+            break;
         case UiAction::WifiHotspot:
             controller_.requestWifiHotspot();
-            showToast(isEnglish() ? "Configuration hotspot requested"
-                                  : "Hotspot de configuracao solicitado");
+            showToast(tr("toast_hotspot"));
             renderScreen();
             break;
         case UiAction::BrightnessMinus:
@@ -444,6 +514,7 @@ void UiApp::handleAction(UiAction action, int32_t value) {
             settings_.orientation =
                 settings_.orientation == 270 ? 0 : settings_.orientation + 90;
             saveUiSettings();
+            applyOrientation();
             break;
         case UiAction::TempUnitToggle:
             settings_.temp_unit =
@@ -494,6 +565,32 @@ void UiApp::handleAction(UiAction action, int32_t value) {
             }
             break;
         }
+        case UiAction::HistoryExport:
+            if (exportSelectedHistory()) {
+                showToast(tr("toast_export_ok"));
+            } else {
+                showToast(tr("toast_export_fail"));
+            }
+            renderScreen();
+            break;
+        case UiAction::OpenKeypad:
+            openKeypad(static_cast<KeypadField>(value));
+            break;
+        case UiAction::KeypadDigit:
+            if (keypad_buffer_.length() < 5) {
+                keypad_buffer_ += String(static_cast<char>('0' + constrain(value, 0, 9)));
+            }
+            renderScreen();
+            break;
+        case UiAction::KeypadBackspace:
+            if (!keypad_buffer_.isEmpty()) {
+                keypad_buffer_.remove(keypad_buffer_.length() - 1);
+            }
+            renderScreen();
+            break;
+        case UiAction::KeypadOk:
+            applyKeypadValue();
+            break;
         default:
             break;
     }
@@ -501,22 +598,24 @@ void UiApp::handleAction(UiAction action, int32_t value) {
 
 String UiApp::confirmationText() const {
     if (confirm_mode_ == ConfirmMode::StopCycle) {
-        return isEnglish() ? "Stop the active cycle?"
-                           : "Parar o ciclo ativo?";
+        return tr("msg_stop");
     }
     if (confirm_mode_ == ConfirmMode::FactoryReset) {
-        return isEnglish() ? "Reset all settings?"
-                           : "Restaurar configuracoes?";
+        return tr("msg_reset");
     }
-    return (isEnglish() ? "Start profile " : "Iniciar perfil ") +
-           pending_profile_id_ + "?";
+    if (confirm_mode_ == ConfirmMode::StartCustom) {
+        return String(tr("title_custom")) + " " +
+               formatTemp(draft_temp_c_, 0) + " / " +
+               String(draft_humidity_pct_, 0) + "% / " +
+               String(draft_duration_min_) + " min";
+    }
+    return String(tr("btn_confirm")) + " " + pending_profile_id_ + "?";
 }
 
 void UiApp::saveUiSettings() {
     if (!controller_.applyUiSettings(settings_)) {
         settings_ = controller_.getUiSettings();
-        showToast(isEnglish() ? "Settings rejected"
-                              : "Configuracoes rejeitadas");
+        showToast(tr("toast_settings_rejected"));
     }
     language_ = settings_.language;
     if (display_manager_) {
@@ -543,6 +642,12 @@ void UiApp::updateInactivity() {
     if (!dimmed_ &&
         millis() - last_touch_ms_ >=
             static_cast<uint32_t>(settings_.timeout_sec) * 1000UL) {
+        controller_.applyUiSettings(settings_);
+        if (ui_format::isActiveCycle(controller_.getState()) &&
+            current_ != UiScreenId::Monitoring &&
+            current_ != UiScreenId::DialogConfirm) {
+            show(UiScreenId::Monitoring);
+        }
         display_manager_->setBrightness(25);
         dimmed_ = true;
     }
@@ -618,12 +723,77 @@ void UiApp::finishCalibration() {
     calibration_point_index_ = 0;
     if (controller_.applyTouchConfig(config)) {
         applyTouchCalibrationToManager(config);
-        showToast(isEnglish() ? "Calibration saved" : "Calibracao salva");
+        showToast(tr("toast_cal_ok"));
     } else {
         applyTouchCalibrationToManager(controller_.getTouchConfig());
-        showToast(isEnglish() ? "Calibration failed" : "Falha na calibracao");
+        showToast(tr("toast_cal_fail"));
     }
     renderScreen();
+}
+
+void UiApp::applyOrientation() {
+    if (!display_manager_) return;
+    display_manager_->setRotation(
+        ui_format::orientationToLgfx(settings_.orientation));
+    const bool swapped =
+        settings_.orientation == 90 || settings_.orientation == 270;
+    width_ = swapped ? native_height_ : native_width_;
+    height_ = swapped ? native_width_ : native_height_;
+    if (lvgl_ready_) {
+        lvgl_.deinit();
+        lvgl_ready_ = lvgl_.init(touch_, width_, height_, flushToDisplay,
+                                 display_manager_);
+        renderScreen();
+    }
+}
+
+void UiApp::syncFromSharedState() {
+    const SystemState state = controller_.getState();
+    if (ui_format::isActiveCycle(state) &&
+        (current_ == UiScreenId::Home || current_ == UiScreenId::Splash)) {
+        show(UiScreenId::Monitoring);
+    }
+}
+
+void UiApp::openKeypad(KeypadField field) {
+    keypad_field_ = field;
+    if (field == KeypadField::Temperature) {
+        keypad_buffer_ = String(static_cast<int>(draft_temp_c_));
+    } else if (field == KeypadField::Humidity) {
+        keypad_buffer_ = String(static_cast<int>(draft_humidity_pct_));
+    } else {
+        keypad_buffer_ = String(draft_duration_min_);
+    }
+    show(UiScreenId::DialogKeypad);
+}
+
+void UiApp::applyKeypadValue() {
+    const int value = keypad_buffer_.toInt();
+    if (keypad_field_ == KeypadField::Temperature) {
+        draft_temp_c_ = constrain(static_cast<float>(value), 30.0f, 80.0f);
+    } else if (keypad_field_ == KeypadField::Humidity) {
+        draft_humidity_pct_ =
+            constrain(static_cast<float>(value), 5.0f, 50.0f);
+    } else {
+        draft_duration_min_ =
+            static_cast<uint16_t>(constrain(value, 1, 1440));
+    }
+    show(previous_ == UiScreenId::StartCustom ? UiScreenId::StartCustom
+                                              : UiScreenId::TargetAdjust);
+}
+
+bool UiApp::exportSelectedHistory() {
+    CycleRecord record;
+    if (!selectedHistory(record)) {
+        return false;
+    }
+    JsonDocument doc;
+    if (!history_.fillExportJson(record, doc.to<JsonObject>())) {
+        return false;
+    }
+    controller_.broadcastJson(doc.as<JsonObject>());
+    history_.writeCsvToSd(record);
+    return true;
 }
 
 void UiApp::flushToDisplay(int16_t x1, int16_t y1, int16_t x2, int16_t y2,
@@ -674,6 +844,12 @@ void UiApp::renderScreen() {
             break;
         case UiScreenId::SettingsAdvanced:
             next = ui_screens::buildSettingsAdvanced(*this);
+            break;
+        case UiScreenId::SettingsSensors:
+            next = ui_screens::buildSettingsSensors(*this);
+            break;
+        case UiScreenId::DialogKeypad:
+            next = ui_screens::buildDialogKeypad(*this);
             break;
         case UiScreenId::HistoryList:
             next = ui_screens::buildHistoryList(*this);

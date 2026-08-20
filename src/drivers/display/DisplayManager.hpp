@@ -57,6 +57,7 @@ public:
                     const uint16_t* data);
     void setBrightness(uint8_t brightness);
     uint8_t getBrightness() const;
+    void setRotation(uint8_t rotation);
 
     bool         isAnyConnected()  const;
     String       getActiveType()   const { return active_type_; }

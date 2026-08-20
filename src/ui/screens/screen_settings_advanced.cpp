@@ -22,17 +22,17 @@ namespace ui_screens {
 
 lv_obj_t* buildSettingsAdvanced(UiApp& app) {
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.isEnglish() ? "Advanced" : "Avancado");
-    app.addLabel(root, app.isEnglish()
-                           ? "Sensors are configured by the installer."
-                           : "Sensores sao configurados pelo instalador.");
-    app.addButton(root, app.isEnglish() ? "Factory reset"
-                                        : "Restaurar configuracoes",
-                  UiAction::FactoryResetPrompt);
-    app.addButton(root, app.isEnglish() ? "Back" : "Voltar",
-                  UiAction::BackSettings);
+    app.addTitle(root, app.tr("title_advanced"));
+    app.addLabel(root, String(app.tr("label_device")) + ": " +
+                           app.deviceName());
+    app.addLabel(root, String(app.tr("label_firmware")) + ": " +
+                           app.firmwareVersion());
+    app.addLabel(root, String(app.tr("label_safety")) + ": " +
+                           app.formatTemp(app.safetyTempLimitC(), 0));
+    app.addButton(root, app.tr("btn_reset"), UiAction::FactoryResetPrompt);
+    app.addButton(root, app.tr("btn_back"), UiAction::BackSettings);
     return root;
 }
 
-} // namespace ui_screens
-} // namespace filament_dryer
+}  // namespace ui_screens
+}  // namespace filament_dryer

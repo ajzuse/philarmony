@@ -23,22 +23,21 @@ namespace ui_screens {
 lv_obj_t* buildSettingsDisplay(UiApp& app) {
     const UISettings settings = app.settings();
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.isEnglish() ? "Display" : "Tela");
-    app.addLabel(root, String(app.isEnglish() ? "Brightness: " : "Brilho: ") +
+    app.addTitle(root, app.tr("title_display"));
+    app.addLabel(root, String(app.tr("label_brightness")) + ": " +
                            String(settings.brightness_pct) + "%");
     app.addButton(root, "- 10%", UiAction::BrightnessMinus);
     app.addButton(root, "+ 10%", UiAction::BrightnessPlus);
-    app.addLabel(root, String("Timeout: ") + String(settings.timeout_sec) + " s");
+    app.addLabel(root, String(app.tr("label_timeout")) + ": " +
+                           String(settings.timeout_sec) + " s");
     app.addButton(root, "- 30 s", UiAction::TimeoutMinus);
     app.addButton(root, "+ 30 s", UiAction::TimeoutPlus);
-    app.addButton(root, String(app.isEnglish() ? "Orientation: "
-                                               : "Orientacao: ") +
+    app.addButton(root, String(app.tr("label_orientation")) + ": " +
                             String(settings.orientation),
                   UiAction::OrientationNext);
-    app.addButton(root, app.isEnglish() ? "Back" : "Voltar",
-                  UiAction::BackSettings);
+    app.addButton(root, app.tr("btn_back"), UiAction::BackSettings);
     return root;
 }
 
-} // namespace ui_screens
-} // namespace filament_dryer
+}  // namespace ui_screens
+}  // namespace filament_dryer

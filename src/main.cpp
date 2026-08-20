@@ -523,6 +523,7 @@ void uiTask(void* pvParameters) {
     for (;;) {
         vTaskDelayUntil(&lastWakeTime, period);
         if (uiApp) {
+            uiApp->setLiveReadings(g_liveChamberTemp, g_liveChamberHumidity);
             uiApp->loop();
         }
     }
@@ -593,11 +594,17 @@ void onStateChange(SystemState oldState, SystemState newState) {
         if (newState == SystemState::STOPPED) {
             cycleHistory.appendFromSession(stateMachine.getCurrentSession());
         }
-        if (uiApp) {
+        if (uiApp && wsServer.getUiSource() == "websocket") {
             uiApp->notifyRemoteStateChange();
         }
     }
     if (newState == SystemState::DRYING || newState == SystemState::PAUSED) {
+        if (newState == SystemState::DRYING && oldState != SystemState::PAUSED) {
+            cycleHistory.resetSampler();
+        }
+        if (uiApp && wsServer.getUiSource() == "websocket") {
+            uiApp->notifyRemoteStateChange();
+        }
         DryingSession interrupted;
         if (stateMachine.captureInterruptedSession(interrupted)) {
             configMgr.saveInterruptedSession(interrupted, newState);
@@ -619,6 +626,12 @@ void onStateChange(SystemState oldState, SystemState newState) {
 
 void onSessionUpdate(const DryingSession& session) {
     static uint32_t last_persist_ms = 0;
+    static uint32_t last_sample_ms = 0;
+    if (stateMachine.isDrying() && millis() - last_sample_ms >= 1000) {
+        last_sample_ms = millis();
+        cycleHistory.recordSample(session.current_temp_c,
+                                  session.current_humidity_pct);
+    }
     if ((stateMachine.isDrying() || stateMachine.isPaused()) &&
         millis() - last_persist_ms >= 5000) {
         last_persist_ms = millis();
@@ -1127,6 +1140,8 @@ void setup() {
         touchCfg["invert_y"] = savedTouch.invert_y;
         touchCfg["display_width"] = dc.width;
         touchCfg["display_height"] = dc.height;
+        touchCfg["sda_pin"] = dc.i2c_sda;
+        touchCfg["scl_pin"] = dc.i2c_scl;
         JsonObject calibration = touchCfg["calibration"].to<JsonObject>();
         calibration["x_min"] = savedTouch.calibration.x_min;
         calibration["x_max"] = savedTouch.calibration.x_max;
@@ -1143,6 +1158,29 @@ void setup() {
         });
         static UiApp ui_instance(touchUiController, touchManager, cycleHistory);
         uiApp = &ui_instance;
+        uiApp->setWifiStatusCallback([]() {
+            WifiSnapshot snapshot;
+            snapshot.ssid = wifiMgr.getConfig().ssid;
+            if (snapshot.ssid.isEmpty() && wifiMgr.isAPActive()) {
+                snapshot.ssid = WifiManager::AP_SSID;
+            }
+            snapshot.rssi = wifiMgr.getRSSI();
+            snapshot.connected = wifiMgr.isConnected();
+            return snapshot;
+        });
+        const int8_t haptic_pin = configMgr.getActuatorConfig().custom_pin;
+        if (haptic_pin >= 0) {
+            pinMode(haptic_pin, OUTPUT);
+            uiApp->setHapticCallback([]() {
+                const int8_t pin = configMgr.getActuatorConfig().custom_pin;
+                if (pin < 0) {
+                    return;
+                }
+                digitalWrite(pin, HIGH);
+                delayMicroseconds(1500);
+                digitalWrite(pin, LOW);
+            });
+        }
         uint16_t w = dc.width > 0 ? dc.width : 320;
         uint16_t h = dc.height > 0 ? dc.height : 240;
         const bool uiStarted = uiApp->begin(w, h, &displayManager);

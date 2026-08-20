@@ -22,14 +22,12 @@ namespace ui_screens {
 
 lv_obj_t* buildDialogConfirm(UiApp& app) {
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.isEnglish() ? "Confirm" : "Confirmar");
+    app.addTitle(root, app.tr("title_confirm"));
     app.addLabel(root, app.confirmationText());
-    app.addButton(root, app.isEnglish() ? "Confirm" : "Confirmar",
-                  UiAction::Confirm);
-    app.addButton(root, app.isEnglish() ? "Cancel" : "Cancelar",
-                  UiAction::Cancel);
+    app.addButton(root, app.tr("btn_confirm"), UiAction::Confirm);
+    app.addButton(root, app.tr("btn_cancel"), UiAction::Cancel);
     return root;
 }
 
-} // namespace ui_screens
-} // namespace filament_dryer
+}  // namespace ui_screens
+}  // namespace filament_dryer

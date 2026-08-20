@@ -36,6 +36,17 @@ public:
     String(unsigned long value) : data_(std::to_string(value)) {}
     String(float value) : data_(std::to_string(value)) {}
     String(double value) : data_(std::to_string(value)) {}
+    String(float value, unsigned decimals) {
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.*f", static_cast<int>(decimals),
+                      static_cast<double>(value));
+        data_ = buf;
+    }
+    String(double value, unsigned decimals) {
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.*f", static_cast<int>(decimals), value);
+        data_ = buf;
+    }
 
     const char* c_str() const { return data_.c_str(); }
     size_t length() const { return data_.length(); }

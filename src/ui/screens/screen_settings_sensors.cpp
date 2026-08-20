@@ -16,33 +16,27 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ScreenBuilders.hpp"
-#include "../ui_format.hpp"
 
 namespace filament_dryer {
 namespace ui_screens {
 
-lv_obj_t* buildHistoryList(UiApp& app) {
+lv_obj_t* buildSettingsSensors(UiApp& app) {
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.tr("title_history"));
-    const auto records = app.historyPage();
-    if (records.empty()) {
-        app.addLabel(root, app.tr("label_no_history"));
+    app.addTitle(root, app.tr("title_sensors"));
+    app.addLabel(root, app.tr("sensors_readonly"));
+    const SensorConfig sensors = app.sensorConfig();
+    app.addLabel(root, "T: " + sensors.type + "  0x" +
+                           String(sensors.i2c_address, HEX) +
+                           "  SDA " + String(sensors.sda_pin) +
+                           " SCL " + String(sensors.scl_pin));
+    if (!sensors.humidity_type.isEmpty()) {
+        app.addLabel(root, "RH: " + sensors.humidity_type + "  0x" +
+                               String(sensors.humidity_i2c_address, HEX));
     }
-    for (size_t i = 0; i < records.size(); ++i) {
-        const CycleRecord& record = records[i];
-        const String line =
-            ui_format::formatUnixDate(record.timestamp_unix) + "  [" +
-            record.material_id + "]  " +
-            app.formatTemp(record.target_temp_c, 0) + "  " +
-            String(record.duration_sec / 60) + " min  " +
-            ui_format::resultIcon(record.stop_reason);
-        app.addButton(root, line, UiAction::HistorySelect,
-                      static_cast<int32_t>(i));
+    if (!sensors.extra_temp_type.isEmpty()) {
+        app.addLabel(root, "T2: " + sensors.extra_temp_type);
     }
-    if (app.hasMoreHistory()) {
-        app.addButton(root, app.tr("btn_more"), UiAction::HistoryMore);
-    }
-    app.addButton(root, app.tr("btn_back"), UiAction::BackHome);
+    app.addButton(root, app.tr("btn_back"), UiAction::BackSettings);
     return root;
 }
 

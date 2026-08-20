@@ -72,6 +72,18 @@ public:
     void setBroadcastCallback(BroadcastCallback callback) {
         broadcast_callback_ = callback;
     }
+    float progressPercent() const {
+        return state_machine_.getProgressPercent();
+    }
+    float safetyTempLimitC() const {
+        if (!safety_) return 80.0f;
+        return safety_->getConfig().hard_temp_limit_c;
+    }
+    void broadcastJson(JsonObject payload) {
+        if (broadcast_callback_) {
+            broadcast_callback_(payload);
+        }
+    }
 
 private:
     static constexpr uint32_t kPauseTimeoutMs = 30UL * 60UL * 1000UL;

@@ -118,6 +118,12 @@ void ST7735Display::setBrightness(uint8_t brightness) {
     if (display_) display_->setBrightness(brightness);
 }
 
+void ST7735Display::setRotation(uint8_t rotation) {
+    rotation_ = rotation;
+    metrics_.rotation = rotation;
+    if (display_) display_->setRotation(rotation);
+}
+
 void ST7735Display::pushRgb565(int16_t x, int16_t y, uint16_t w, uint16_t h,
                                const uint16_t* data) {
     if (initialized_ && display_ && data && w > 0 && h > 0) {

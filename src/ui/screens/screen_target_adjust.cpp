@@ -22,23 +22,29 @@ namespace ui_screens {
 
 lv_obj_t* buildTargetAdjust(UiApp& app) {
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.isEnglish() ? "Adjust targets" : "Ajustar alvos");
-    app.addLabel(root, String("Temp: ") + String(app.draftTemperature(), 0) + " C");
-    app.addButton(root, "- 1 C", UiAction::TargetTempMinus);
-    app.addButton(root, "+ 1 C", UiAction::TargetTempPlus);
-    app.addLabel(root, String("RH: ") + String(app.draftHumidity(), 0) + "%");
+    app.addTitle(root, app.tr("title_adjust"));
+    app.addLabel(root, String(app.tr("label_temp")) + ": " +
+                           app.formatTemp(app.draftTemperature(), 0));
+    app.addButton(root, "- 1", UiAction::TargetTempMinus);
+    app.addButton(root, "+ 1", UiAction::TargetTempPlus);
+    app.addButton(root, app.tr("btn_keypad"), UiAction::OpenKeypad,
+                  static_cast<int32_t>(KeypadField::Temperature));
+    app.addLabel(root, String(app.tr("label_rh")) + ": " +
+                           String(app.draftHumidity(), 0) + "%");
     app.addButton(root, "- 1% RH", UiAction::TargetHumidityMinus);
     app.addButton(root, "+ 1% RH", UiAction::TargetHumidityPlus);
-    app.addLabel(root, String(app.isEnglish() ? "Duration: " : "Duracao: ") +
+    app.addButton(root, app.tr("btn_keypad"), UiAction::OpenKeypad,
+                  static_cast<int32_t>(KeypadField::Humidity));
+    app.addLabel(root, String(app.tr("label_duration")) + ": " +
                            String(app.draftDuration()) + " min");
     app.addButton(root, "- 5 min", UiAction::TargetDurationMinus);
     app.addButton(root, "+ 5 min", UiAction::TargetDurationPlus);
-    app.addButton(root, app.isEnglish() ? "Apply" : "Aplicar",
-                  UiAction::ApplyTargets);
-    app.addButton(root, app.isEnglish() ? "Cancel" : "Cancelar",
-                  UiAction::Cancel);
+    app.addButton(root, app.tr("btn_keypad"), UiAction::OpenKeypad,
+                  static_cast<int32_t>(KeypadField::Duration));
+    app.addButton(root, app.tr("btn_apply"), UiAction::ApplyTargets);
+    app.addButton(root, app.tr("btn_cancel"), UiAction::Cancel);
     return root;
 }
 
-} // namespace ui_screens
-} // namespace filament_dryer
+}  // namespace ui_screens
+}  // namespace filament_dryer

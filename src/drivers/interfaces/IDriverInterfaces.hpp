@@ -166,6 +166,8 @@ public:
     // Push an RGB565 region (used by LVGL partial-buffer flush).
     virtual void pushRgb565(int16_t x, int16_t y, uint16_t w, uint16_t h,
                             const uint16_t* data) {}
+
+    virtual void setRotation(uint8_t rotation) { (void)rotation; }
     
     // Sleep/wake for power saving
     virtual void sleep() = 0;

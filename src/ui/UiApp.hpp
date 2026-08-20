@@ -26,6 +26,8 @@
 #include "history/CycleHistoryStore.hpp"
 #include "../drivers/touch/TouchManager.hpp"
 #include "LvglPort.hpp"
+#include "ui_i18n.hpp"
+#include "ui_format.hpp"
 
 #if !defined(UNIT_TEST)
 #include <lvgl.h>
@@ -47,9 +49,11 @@ enum class UiScreenId {
     SettingsUnits,
     SettingsTouch,
     SettingsAdvanced,
+    SettingsSensors,
     HistoryList,
     HistoryDetail,
     DialogConfirm,
+    DialogKeypad,
     TargetAdjust
 };
 
@@ -88,6 +92,7 @@ enum class UiAction {
     SettingsUnits,
     SettingsTouch,
     SettingsAdvanced,
+    SettingsSensors,
     WifiHotspot,
     BrightnessMinus,
     BrightnessPlus,
@@ -101,12 +106,26 @@ enum class UiAction {
     CalibrationStart,
     FactoryResetPrompt,
     HistoryMore,
-    HistorySelect
+    HistorySelect,
+    HistoryExport,
+    OpenKeypad,
+    KeypadDigit,
+    KeypadBackspace,
+    KeypadOk
+};
+
+enum class KeypadField { Temperature, Humidity, Duration };
+
+struct WifiSnapshot {
+    String ssid;
+    int32_t rssi = 0;
+    bool connected = false;
 };
 
 class UiApp {
 public:
     using HapticCallback = void (*)();
+    using WifiStatusCallback = WifiSnapshot (*)();
 
     UiApp(TouchUiController& controller, TouchManager& touch, CycleHistoryStore& history);
 
@@ -118,10 +137,13 @@ public:
     void setLanguage(const String& lang);
     void notifyRemoteStateChange();
     void setHapticCallback(HapticCallback callback) { haptic_callback_ = callback; }
+    void setWifiStatusCallback(WifiStatusCallback callback) {
+        wifi_status_callback_ = callback;
+    }
+    void setLiveReadings(float temp_c, float humidity_pct);
     LvglPort& lvgl() { return lvgl_; }
     bool ownsDisplay() const { return lvgl_ready_ && display_manager_; }
 
-    // Screen-module API. Widgets use one validated dispatcher.
     void handleAction(UiAction action, int32_t value = 0);
 #if !defined(UNIT_TEST)
     lv_obj_t* createScreen();
@@ -131,6 +153,9 @@ public:
                         int32_t value = 0);
 #endif
 
+    const char* tr(const char* key) const {
+        return ui_i18n::tr(isEnglish(), key);
+    }
     std::vector<FilamentProfile> profiles() const {
         return controller_.listProfiles();
     }
@@ -142,11 +167,24 @@ public:
     }
     UISettings settings() const { return settings_; }
     bool isEnglish() const { return language_ == "en_us"; }
+    bool fahrenheit() const {
+        return ui_format::useFahrenheit(settings_.temp_unit);
+    }
+    String formatTemp(float celsius, uint8_t decimals = 1) const {
+        return ui_format::formatTemp(celsius, fahrenheit(), decimals);
+    }
     bool highContrast() const { return settings_.high_contrast; }
     float draftTemperature() const { return draft_temp_c_; }
     float draftHumidity() const { return draft_humidity_pct_; }
     uint16_t draftDuration() const { return draft_duration_min_; }
     bool isPaused() const { return controller_.getState() == SystemState::PAUSED; }
+    bool isDrying() const { return controller_.getState() == SystemState::DRYING; }
+    const char* statusKey() const;
+    float liveTemperatureC() const { return live_temp_c_; }
+    float liveHumidityPct() const { return live_humidity_pct_; }
+    float progressPercent() const {
+        return controller_.progressPercent();
+    }
     size_t historyOffset() const { return history_offset_; }
     bool hasMoreHistory() const {
         return history_offset_ + CycleHistoryStore::kInitialPage < history_.size();
@@ -157,9 +195,16 @@ public:
     bool calibrationActive() const { return calibration_active_; }
     uint8_t calibrationPointIndex() const { return calibration_point_index_; }
     String confirmationText() const;
+    WifiSnapshot wifiStatus() const;
+    SensorConfig sensorConfig() const { return controller_.config().getSensorConfig(); }
+    String firmwareVersion() const;
+    String deviceName() const { return "Philarmony"; }
+    float safetyTempLimitC() const { return controller_.safetyTempLimitC(); }
+    String keypadBuffer() const { return keypad_buffer_; }
+    KeypadField keypadField() const { return keypad_field_; }
 
 private:
-    enum class ConfirmMode { StartProfile, StopCycle, FactoryReset };
+    enum class ConfirmMode { StartProfile, StartCustom, StopCycle, FactoryReset };
 
     TouchUiController& controller_;
     TouchManager& touch_;
@@ -167,6 +212,7 @@ private:
     LvglPort lvgl_;
     DisplayManager* display_manager_ = nullptr;
     HapticCallback haptic_callback_ = nullptr;
+    WifiStatusCallback wifi_status_callback_ = nullptr;
     UiScreenId current_ = UiScreenId::Splash;
     UiScreenId previous_ = UiScreenId::Home;
     String language_ = "pt_br";
@@ -175,13 +221,19 @@ private:
     float draft_temp_c_ = 50.0f;
     float draft_humidity_pct_ = 15.0f;
     uint16_t draft_duration_min_ = 240;
+    float live_temp_c_ = NAN;
+    float live_humidity_pct_ = NAN;
     size_t history_offset_ = 0;
     uint32_t selected_history_id_ = 0;
     ConfirmMode confirm_mode_ = ConfirmMode::StartProfile;
+    KeypadField keypad_field_ = KeypadField::Temperature;
+    String keypad_buffer_;
     bool remote_toast_ = false;
     uint32_t last_timeout_check_ms_ = 0;
     uint32_t last_touch_ms_ = 0;
     uint32_t last_monitor_refresh_ms_ = 0;
+    uint32_t last_sync_ms_ = 0;
+    uint8_t slow_frame_count_ = 0;
     bool lvgl_ready_ = false;
     bool dimmed_ = false;
     bool fallback_pressed_ = false;
@@ -190,6 +242,8 @@ private:
     uint32_t toast_until_ms_ = 0;
     uint16_t width_ = 0;
     uint16_t height_ = 0;
+    uint16_t native_width_ = 0;
+    uint16_t native_height_ = 0;
 
     bool calibration_active_ = false;
     bool calibration_touch_down_ = false;
@@ -221,9 +275,14 @@ private:
     void startCalibration();
     void handleCalibrationTouch();
     void finishCalibration();
+    void applyOrientation();
+    void syncFromSharedState();
+    void openKeypad(KeypadField field);
+    void applyKeypadValue();
+    bool exportSelectedHistory();
     static void flushToDisplay(int16_t x1, int16_t y1, int16_t x2,
                                int16_t y2, const uint16_t* pixels,
                                void* context);
 };
 
-} // namespace filament_dryer
+}  // namespace filament_dryer

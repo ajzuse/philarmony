@@ -16,33 +16,21 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ScreenBuilders.hpp"
-#include "../ui_format.hpp"
 
 namespace filament_dryer {
 namespace ui_screens {
 
-lv_obj_t* buildHistoryList(UiApp& app) {
+lv_obj_t* buildDialogKeypad(UiApp& app) {
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.tr("title_history"));
-    const auto records = app.historyPage();
-    if (records.empty()) {
-        app.addLabel(root, app.tr("label_no_history"));
+    app.addTitle(root, app.tr("title_keypad"));
+    app.addLabel(root, app.keypadBuffer().isEmpty() ? "0" : app.keypadBuffer());
+    for (int digit = 1; digit <= 9; ++digit) {
+        app.addButton(root, String(digit), UiAction::KeypadDigit, digit);
     }
-    for (size_t i = 0; i < records.size(); ++i) {
-        const CycleRecord& record = records[i];
-        const String line =
-            ui_format::formatUnixDate(record.timestamp_unix) + "  [" +
-            record.material_id + "]  " +
-            app.formatTemp(record.target_temp_c, 0) + "  " +
-            String(record.duration_sec / 60) + " min  " +
-            ui_format::resultIcon(record.stop_reason);
-        app.addButton(root, line, UiAction::HistorySelect,
-                      static_cast<int32_t>(i));
-    }
-    if (app.hasMoreHistory()) {
-        app.addButton(root, app.tr("btn_more"), UiAction::HistoryMore);
-    }
-    app.addButton(root, app.tr("btn_back"), UiAction::BackHome);
+    app.addButton(root, "0", UiAction::KeypadDigit, 0);
+    app.addButton(root, "<", UiAction::KeypadBackspace);
+    app.addButton(root, app.tr("btn_confirm"), UiAction::KeypadOk);
+    app.addButton(root, app.tr("btn_cancel"), UiAction::Cancel);
     return root;
 }
 

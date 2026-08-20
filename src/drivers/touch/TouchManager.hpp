@@ -60,10 +60,12 @@ public:
     void setSensitivity(const String& level);
     void setCalibration(const Calibration& calibration);
     TouchPoint applyCalibration(const TouchPoint& point) const;
+    void serviceWatchdog();
 
 private:
     static constexpr uint32_t kPressDebounceMs = 50;
     static constexpr uint32_t kReleaseDebounceMs = 100;
+    static constexpr uint32_t kWatchdogMs = 5000;
     static constexpr int32_t kDragThresholdSquared = 8 * 8;
 
     ITouchDriver* active_driver_ = nullptr;
@@ -71,7 +73,9 @@ private:
     TouchPoint filtered_point_;
     TouchPoint candidate_point_;
     uint32_t candidate_since_ms_ = 0;
+    uint32_t last_watchdog_ms_ = 0;
     bool candidate_valid_ = false;
+    String last_config_json_;
 
     bool tryDriver(const String& type, const JsonObject& config);
     void loadCalibration(const JsonObject& config);

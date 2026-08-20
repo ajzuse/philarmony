@@ -24,12 +24,14 @@
 #include "Cst816sTouch.hpp"
 #include "Ft6236Touch.hpp"
 #include "Gt911Touch.hpp"
+#include "Stmpe610Touch.hpp"
 #include "Xpt2046Touch.hpp"
 
 namespace filament_dryer {
 
 namespace {
-constexpr const char* kI2cProbeOrder[] = {"ft6236", "gt911", "cst816s"};
+constexpr const char* kI2cProbeOrder[] = {"ft6236", "gt911", "cst816s",
+                                          "stmpe610"};
 constexpr size_t kI2cProbeCount = sizeof(kI2cProbeOrder) / sizeof(kI2cProbeOrder[0]);
 }
 
@@ -39,6 +41,9 @@ TouchManager::~TouchManager() {
 
 bool TouchManager::begin(const JsonObject& config) {
     end();
+    last_config_json_.clear();
+    serializeJson(config, last_config_json_);
+    last_watchdog_ms_ = millis();
     loadCalibration(config);
 
     String type = config["controller_type"] | "auto";
@@ -67,8 +72,27 @@ bool TouchManager::begin(const JsonObject& config) {
 
     if (active_driver_) {
         setSensitivity(config["sensitivity"] | "medium");
+        last_watchdog_ms_ = millis();
     }
     return active_driver_ != nullptr;
+}
+
+void TouchManager::serviceWatchdog() {
+    if (!active_driver_ || last_config_json_.isEmpty()) {
+        return;
+    }
+    if (millis() - last_watchdog_ms_ < kWatchdogMs) {
+        return;
+    }
+    last_watchdog_ms_ = millis();
+    if (active_driver_->isConnected()) {
+        return;
+    }
+    JsonDocument doc;
+    if (deserializeJson(doc, last_config_json_) != DeserializationError::Ok) {
+        return;
+    }
+    begin(doc.as<JsonObject>());
 }
 
 void TouchManager::end() {
@@ -190,12 +214,23 @@ bool TouchManager::tryDriver(const String& type, const JsonObject& config) {
         driver = new Cst816sTouch();
     } else if (type == "xpt2046") {
         driver = new Xpt2046Touch();
+    } else if (type == "stmpe610") {
+        driver = new Stmpe610Touch();
     }
 
     if (!driver) {
         return false;
     }
-    if (!driver->begin(config) || !driver->isConnected()) {
+    JsonDocument patched;
+    for (JsonPair p : config) {
+        patched[p.key()] = p.value();
+    }
+    patched["controller_type"] = type;
+    if (type == "stmpe610" &&
+        (config["controller_type"] | String("auto")) == "auto") {
+        patched["bus"] = "i2c";
+    }
+    if (!driver->begin(patched.as<JsonObject>()) || !driver->isConnected()) {
         delete driver;
         return false;
     }

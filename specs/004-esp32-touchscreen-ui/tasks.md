@@ -312,3 +312,28 @@ Task: "StartCustom in src/ui/screens/screen_start_custom.cpp"
 - [x] T079 Bootstrap `TouchManager::begin` from persisted board touch pins/calibration (not hardcoded auto-only) in `src/main.cpp` + ConfigManager per FR-001 (partial)
 - [x] T080 Inject SafetyEngine prechecks into touch start/resume/adjust command path in `src/ui/TouchUiController.cpp` per control-bridge / Constitution: Failsafe (partial)
 - [x] T081 Implement FR-008 accessibility on real widgets: ≥48×48 targets, high-contrast toggle, optional haptic/beep in `src/ui/theme/` and settings per FR-008 (missing)
+
+---
+
+## Phase 11: Convergence
+
+**Purpose**: Close remaining gaps found by `/speckit-converge` (2026-08-20) after Phase 10 work. Prior work T001–T081 remains historical `[x]`.
+
+- [x] T082 Open Monitoring (drying or paused) on boot after `restoreInterruptedSession` instead of always `show(Home)` in `src/ui/UiApp.cpp` and `src/main.cpp` per Power-loss AC / QS-6 (partial)
+- [x] T083 Show Home live status (idle/drying/paused) plus chamber temperature and humidity in `src/ui/screens/screen_home.cpp` per FR-003 / US1 (partial)
+- [x] T084 Drive touch UI from shared state: navigate to Monitoring on remote start/pause, and toast last-write-wins only for WebSocket-originated changes (not local stop) in `src/main.cpp` and `src/ui/UiApp.cpp` per FR-007 (contradicts)
+- [x] T085 Show current SSID and RSSI bars on the WiFi settings screen in `src/ui/screens/screen_settings_wifi.cpp` per FR-005 (partial)
+- [x] T086 Add Settings Sensors (read-only types/pins) and Advanced device name, firmware version, and safety temp limit in `src/ui/screens/screen_settings_advanced.cpp` / new sensors screen per FR-005 / FR-003 (partial)
+- [x] T087 Apply `temp_unit` °C/°F conversion to all on-device temperature labels (Home, Monitoring, History, adjust overlays) in `src/ui/screens/` per FR-005 (partial)
+- [x] T088 Apply saved display orientation (0/90/180/270) to LovyanGFX/LVGL on change and at boot in `src/ui/UiApp.cpp` and display path per FR-005 (partial)
+- [x] T089 Store CycleRecord `timestamp` as unix_ms and render History list with date, material badge, target temp, duration, and result icon in `src/ui/history/CycleHistoryStore.*` and `src/ui/screens/screen_history_list.cpp` per FR-006 / US6 (partial)
+- [x] T090 Accumulate avg/max during the cycle and render History detail temp/humidity sparklines over time (not a 3-point target/avg/max summary) in `src/ui/history/` and `src/ui/screens/screen_history_detail.cpp` per FR-006 (partial)
+- [x] T091 Implement History “Enviar para App” WebSocket export and CSV-to-SD when an SD card is present in `src/ui/screens/screen_history_detail.cpp` per FR-006 (missing)
+- [x] T092 Add Monitoring progress ring from `StateMachine::getProgressPercent()` with large live values in `src/ui/screens/screen_monitoring.cpp` per FR-003 (missing)
+- [x] T093 Add numeric keypad dialog for custom start and mid-cycle target entry in `src/ui/screens/` per FR-003 / data-model: dialog_keypad P1 (missing)
+- [x] T094 Implement STMPE610 touch driver and include it in `TouchManager` auto-probe in `src/drivers/touch/` per FR-001 (missing)
+- [x] T095 Wire screens to externalized PT-BR/EN-US string tables instead of hardcoded labels in `src/ui/screens/` and `src/ui/assets/` per FR-002 (partial)
+- [x] T096 Route custom start through the Confirm dialog (not immediate `CustomStart`) in `src/ui/screens/screen_start_custom.cpp` and `src/ui/UiApp.cpp` per US1 / ui-screens contract (partial)
+- [x] T097 On screen timeout during Settings/Start, auto-save pending UI settings and return to Monitoring if a cycle is active in `src/ui/UiApp.cpp` per FR-003 / Edge Cases (partial)
+- [x] T098 Attach haptic/beep feedback when a vibration motor or audio path is present from `src/main.cpp` into `UiApp::setHapticCallback` per FR-008 (partial)
+- [x] T099 Add touch-controller watchdog (reset if no IRQ/read for 5s) and UI-task frame watchdog (reset if frame time >100ms) in `src/drivers/touch/` and `src/ui/` per NFR Reliability (missing)

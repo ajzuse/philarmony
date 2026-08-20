@@ -35,8 +35,10 @@ lv_obj_t* buildSettingsDisplay(UiApp& app);
 lv_obj_t* buildSettingsUnits(UiApp& app);
 lv_obj_t* buildSettingsTouch(UiApp& app);
 lv_obj_t* buildSettingsAdvanced(UiApp& app);
+lv_obj_t* buildSettingsSensors(UiApp& app);
 lv_obj_t* buildHistoryList(UiApp& app);
 lv_obj_t* buildHistoryDetail(UiApp& app);
+lv_obj_t* buildDialogKeypad(UiApp& app);
 #endif
 
 } // namespace ui_screens

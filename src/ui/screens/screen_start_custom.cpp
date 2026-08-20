@@ -22,23 +22,29 @@ namespace ui_screens {
 
 lv_obj_t* buildStartCustom(UiApp& app) {
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.isEnglish() ? "Custom cycle" : "Ciclo personalizado");
-    app.addLabel(root, String("Temp: ") + String(app.draftTemperature(), 0) + " C");
-    app.addButton(root, "- 1 C", UiAction::CustomTempMinus);
-    app.addButton(root, "+ 1 C", UiAction::CustomTempPlus);
-    app.addLabel(root, String("RH: ") + String(app.draftHumidity(), 0) + "%");
+    app.addTitle(root, app.tr("title_custom"));
+    app.addLabel(root, String(app.tr("label_temp")) + ": " +
+                           app.formatTemp(app.draftTemperature(), 0));
+    app.addButton(root, "- 1", UiAction::CustomTempMinus);
+    app.addButton(root, "+ 1", UiAction::CustomTempPlus);
+    app.addButton(root, app.tr("btn_keypad"), UiAction::OpenKeypad,
+                  static_cast<int32_t>(KeypadField::Temperature));
+    app.addLabel(root, String(app.tr("label_rh")) + ": " +
+                           String(app.draftHumidity(), 0) + "%");
     app.addButton(root, "- 1% RH", UiAction::CustomHumidityMinus);
     app.addButton(root, "+ 1% RH", UiAction::CustomHumidityPlus);
-    app.addLabel(root, String(app.isEnglish() ? "Duration: " : "Duracao: ") +
+    app.addButton(root, app.tr("btn_keypad"), UiAction::OpenKeypad,
+                  static_cast<int32_t>(KeypadField::Humidity));
+    app.addLabel(root, String(app.tr("label_duration")) + ": " +
                            String(app.draftDuration()) + " min");
     app.addButton(root, "- 5 min", UiAction::CustomDurationMinus);
     app.addButton(root, "+ 5 min", UiAction::CustomDurationPlus);
-    app.addButton(root, app.isEnglish() ? "Start" : "Iniciar",
-                  UiAction::CustomStart);
-    app.addButton(root, app.isEnglish() ? "Back" : "Voltar",
-                  UiAction::BackPresets);
+    app.addButton(root, app.tr("btn_keypad"), UiAction::OpenKeypad,
+                  static_cast<int32_t>(KeypadField::Duration));
+    app.addButton(root, app.tr("btn_confirm"), UiAction::CustomStart);
+    app.addButton(root, app.tr("btn_back"), UiAction::BackPresets);
     return root;
 }
 
-} // namespace ui_screens
-} // namespace filament_dryer
+}  // namespace ui_screens
+}  // namespace filament_dryer

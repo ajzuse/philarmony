@@ -16,22 +16,26 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ScreenBuilders.hpp"
+#include "../ui_format.hpp"
 
 namespace filament_dryer {
 namespace ui_screens {
 
 lv_obj_t* buildSettingsWifi(UiApp& app) {
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, "WiFi");
-    app.addLabel(root, app.isEnglish()
-                           ? "Start the configuration hotspot to change network."
-                           : "Inicie o hotspot para alterar a rede.");
-    app.addButton(root, app.isEnglish() ? "Reconfigure" : "Reconfigurar",
-                  UiAction::WifiHotspot);
-    app.addButton(root, app.isEnglish() ? "Back" : "Voltar",
-                  UiAction::BackSettings);
+    app.addTitle(root, app.tr("title_wifi"));
+    const WifiSnapshot wifi = app.wifiStatus();
+    const String ssid =
+        wifi.ssid.isEmpty() ? String("--") : wifi.ssid;
+    app.addLabel(root, String(app.tr("label_ssid")) + ": " + ssid);
+    app.addLabel(root, String(app.tr("label_rssi")) + ": " +
+                           ui_format::rssiBars(wifi.rssi, wifi.connected) +
+                           " (" + String(wifi.rssi) + " dBm)");
+    app.addLabel(root, app.tr("wifi_hotspot_hint"));
+    app.addButton(root, app.tr("btn_reconfigure"), UiAction::WifiHotspot);
+    app.addButton(root, app.tr("btn_back"), UiAction::BackSettings);
     return root;
 }
 
-} // namespace ui_screens
-} // namespace filament_dryer
+}  // namespace ui_screens
+}  // namespace filament_dryer

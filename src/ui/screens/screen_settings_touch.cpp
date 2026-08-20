@@ -22,34 +22,26 @@ namespace ui_screens {
 
 lv_obj_t* buildSettingsTouch(UiApp& app) {
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.isEnglish() ? "Touch" : "Toque");
+    app.addTitle(root, app.tr("title_touch"));
     if (app.calibrationActive()) {
-        static const char* points_pt[] = {
-            "superior esquerdo", "superior direito",
-            "inferior direito", "inferior esquerdo"};
-        static const char* points_en[] = {
-            "top left", "top right", "bottom right", "bottom left"};
+        static const char* keys[] = {
+            "cal_top_left", "cal_top_right",
+            "cal_bottom_right", "cal_bottom_left"};
         const uint8_t index = app.calibrationPointIndex();
-        app.addLabel(root, String(app.isEnglish() ? "Touch target: "
-                                                  : "Toque no alvo: ") +
-                               (app.isEnglish() ? points_en[index]
-                                                : points_pt[index]));
+        app.addLabel(root, String(app.tr("cal_prompt")) +
+                               app.tr(keys[index]));
         app.addLabel(root, "+");
         return root;
     }
 
     app.addButton(root,
-                  String(app.isEnglish() ? "Sensitivity: "
-                                         : "Sensibilidade: ") +
+                  String(app.tr("label_sensitivity")) + ": " +
                       app.settings().touch_sensitivity,
                   UiAction::SensitivityCycle);
-    app.addButton(root, app.isEnglish() ? "Calibrate (4 points)"
-                                        : "Calibrar (4 pontos)",
-                  UiAction::CalibrationStart);
-    app.addButton(root, app.isEnglish() ? "Back" : "Voltar",
-                  UiAction::BackSettings);
+    app.addButton(root, app.tr("btn_calibrate"), UiAction::CalibrationStart);
+    app.addButton(root, app.tr("btn_back"), UiAction::BackSettings);
     return root;
 }
 
-} // namespace ui_screens
-} // namespace filament_dryer
+}  // namespace ui_screens
+}  // namespace filament_dryer

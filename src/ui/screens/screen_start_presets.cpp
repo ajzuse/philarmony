@@ -22,24 +22,21 @@ namespace ui_screens {
 
 lv_obj_t* buildStartPresets(UiApp& app) {
     lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.isEnglish() ? "Filament profiles"
-                                       : "Perfis de filamento");
+    app.addTitle(root, app.tr("title_presets"));
     const auto profiles = app.profiles();
     for (size_t i = 0; i < profiles.size(); ++i) {
         const FilamentProfile& profile = profiles[i];
         const String name =
             app.isEnglish() ? profile.name_en : profile.name_pt;
         app.addButton(root,
-                      name + "  " + String(profile.target_temp_c, 0) + " C  " +
-                          String(profile.default_duration_min) + " min",
+                      name + "  " + app.formatTemp(profile.target_temp_c, 0) +
+                          "  " + String(profile.default_duration_min) + " min",
                       UiAction::PresetSelect, static_cast<int32_t>(i));
     }
-    app.addButton(root, app.isEnglish() ? "Custom" : "Personalizado",
-                  UiAction::PresetCustom);
-    app.addButton(root, app.isEnglish() ? "Back" : "Voltar",
-                  UiAction::BackHome);
+    app.addButton(root, app.tr("btn_custom"), UiAction::PresetCustom);
+    app.addButton(root, app.tr("btn_back"), UiAction::BackHome);
     return root;
 }
 
-} // namespace ui_screens
-} // namespace filament_dryer
+}  // namespace ui_screens
+}  // namespace filament_dryer

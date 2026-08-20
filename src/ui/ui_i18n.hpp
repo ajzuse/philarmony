@@ -15,23 +15,36 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#include "ScreenBuilders.hpp"
+
+#pragma once
+
+#include <cstring>
+
+#include "assets/ui_strings_en_us.hpp"
+#include "assets/ui_strings_pt_br.hpp"
 
 namespace filament_dryer {
-namespace ui_screens {
+namespace ui_i18n {
 
-lv_obj_t* buildSettingsMain(UiApp& app) {
-    lv_obj_t* root = app.createScreen();
-    app.addTitle(root, app.tr("title_settings"));
-    app.addButton(root, app.tr("title_wifi"), UiAction::SettingsWifi);
-    app.addButton(root, app.tr("title_display"), UiAction::SettingsDisplay);
-    app.addButton(root, app.tr("title_units"), UiAction::SettingsUnits);
-    app.addButton(root, app.tr("title_touch"), UiAction::SettingsTouch);
-    app.addButton(root, app.tr("title_sensors"), UiAction::SettingsSensors);
-    app.addButton(root, app.tr("title_advanced"), UiAction::SettingsAdvanced);
-    app.addButton(root, app.tr("btn_back"), UiAction::BackHome);
-    return root;
+inline const char* tr(bool english, const char* key) {
+    if (key == nullptr) {
+        return "";
+    }
+    if (english) {
+        for (size_t i = 0; i < ui_strings_en_us::table_size; ++i) {
+            if (strcmp(ui_strings_en_us::table[i].key, key) == 0) {
+                return ui_strings_en_us::table[i].value;
+            }
+        }
+    } else {
+        for (size_t i = 0; i < ui_strings_pt_br::table_size; ++i) {
+            if (strcmp(ui_strings_pt_br::table[i].key, key) == 0) {
+                return ui_strings_pt_br::table[i].value;
+            }
+        }
+    }
+    return key;
 }
 
-}  // namespace ui_screens
+}  // namespace ui_i18n
 }  // namespace filament_dryer

@@ -58,8 +58,30 @@ void test_history_persists_ring_and_pages_newest_first() {
     TEST_ASSERT_EQUAL_UINT32(14, last[0].duration_sec);
 }
 
+void test_history_records_samples_and_average() {
+    CycleHistoryStore store;
+    TEST_ASSERT_TRUE(store.begin());
+    store.resetSampler();
+    store.recordSample(40.0f, 20.0f);
+    store.recordSample(50.0f, 10.0f);
+    DryingSession session;
+    session.profile_id = "pla";
+    session.target_temp_c = 50.0f;
+    session.target_humidity_pct = 15.0f;
+    session.elapsed_sec = 120;
+    session.stop_reason = DryingStopReason::COMPLETED;
+    TEST_ASSERT_TRUE(store.appendFromSession(session));
+    CycleRecord record;
+    TEST_ASSERT_TRUE(store.getById(1, record));
+    TEST_ASSERT_EQUAL(2, record.sample_count);
+    TEST_ASSERT_FLOAT_WITHIN(0.1f, 45.0f, record.avg_temp_c);
+    TEST_ASSERT_FLOAT_WITHIN(0.1f, 50.0f, record.max_temp_c);
+    TEST_ASSERT_TRUE(store.toCsv(record).indexOf("pla") >= 0);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_history_persists_ring_and_pages_newest_first);
+    RUN_TEST(test_history_records_samples_and_average);
     return UNITY_END();
 }
