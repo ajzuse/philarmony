@@ -56,31 +56,35 @@ inline uint8_t orientationToLgfx(uint16_t degrees) {
 
 inline const char* resultIcon(const String& stop_reason) {
     if (stop_reason == "completed" || stop_reason == "target_humidity") {
-        return "✓";
+        return "OK";
     }
     if (stop_reason == "safety_cutoff" || stop_reason == "error" ||
         stop_reason == "sensor_error") {
-        return "✗";
+        return "X";
     }
-    return "⚠";
+    return "!";
 }
 
 inline String rssiBars(int32_t rssi, bool connected) {
     if (!connected) {
         return "----";
     }
-    if (rssi >= -55) return "████";
-    if (rssi >= -67) return "███_";
-    if (rssi >= -80) return "██__";
-    return "█___";
+    if (rssi >= -55) return "####";
+    if (rssi >= -67) return "###-";
+    if (rssi >= -80) return "##--";
+    return "#---";
 }
 
-inline uint32_t unixNowSec() {
+inline uint64_t unixNowMs() {
     const time_t now = time(nullptr);
     if (now < 1600000000) {
         return 0;
     }
-    return static_cast<uint32_t>(now);
+    return static_cast<uint64_t>(now) * 1000ULL;
+}
+
+inline uint32_t unixNowSec() {
+    return static_cast<uint32_t>(unixNowMs() / 1000ULL);
 }
 
 inline String formatUnixDate(uint32_t unix_sec) {
@@ -101,6 +105,10 @@ inline String formatUnixDate(uint32_t unix_sec) {
              parts.tm_year + 1900, parts.tm_mon + 1, parts.tm_mday,
              parts.tm_hour, parts.tm_min);
     return String(buf);
+}
+
+inline String formatUnixDateMs(uint64_t unix_ms) {
+    return formatUnixDate(static_cast<uint32_t>(unix_ms / 1000ULL));
 }
 
 inline bool isActiveCycle(SystemState state) {

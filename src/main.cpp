@@ -1009,6 +1009,10 @@ void initializeNetwork() {
         if (s == WifiManager::Status::CONNECTED) {
             logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                              "WiFi connected: %s", wifiMgr.getLocalIP().c_str());
+            if (wifiMgr.isNtpStarted()) {
+                logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
+                                 "SNTP time sync started");
+            }
             stateMachine.transitionTo(SystemState::READY);
         } else if (s == WifiManager::Status::AP_ACTIVE) {
             stateMachine.transitionTo(SystemState::HOTSPOT);

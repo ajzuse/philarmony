@@ -337,3 +337,12 @@ Task: "StartCustom in src/ui/screens/screen_start_custom.cpp"
 - [x] T097 On screen timeout during Settings/Start, auto-save pending UI settings and return to Monitoring if a cycle is active in `src/ui/UiApp.cpp` per FR-003 / Edge Cases (partial)
 - [x] T098 Attach haptic/beep feedback when a vibration motor or audio path is present from `src/main.cpp` into `UiApp::setHapticCallback` per FR-008 (partial)
 - [x] T099 Add touch-controller watchdog (reset if no IRQ/read for 5s) and UI-task frame watchdog (reset if frame time >100ms) in `src/drivers/touch/` and `src/ui/` per NFR Reliability (missing)
+
+---
+
+## Phase 12: Convergence
+
+**Purpose**: Close remaining gaps found by `/speckit-converge` (2026-08-20) after Phase 11 work. Prior work T001–T099 remains historical `[x]`.
+
+- [x] T100 Wire SNTP/NTP time sync on WiFi connect and store CycleRecord timestamps as unix_ms so History list dates are real (not `"--"`) in `src/network/WifiManager.*` / `src/main.cpp` and `src/ui/history/CycleHistoryStore.*` per FR-006 / US6 (partial)
+- [x] T101 Add Noto Sans or Roboto LVGL font subsets (12/16/24/32pt) under `src/ui/assets/` and apply them to labels/values/buttons in `src/ui/theme/` / `src/ui/UiApp.cpp` per FR-002 / plan: LittleFS fonts (missing)

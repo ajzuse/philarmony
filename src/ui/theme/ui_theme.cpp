@@ -17,6 +17,9 @@
  */
 
 #include "ui_theme.hpp"
+#if defined(PHILARMONY_HAS_LVGL) && !defined(UNIT_TEST)
+#include "../assets/ui_fonts.hpp"
+#endif
 
 namespace filament_dryer {
 namespace ui_theme {
@@ -45,6 +48,13 @@ Color surfaceFor(bool high_contrast) {
 Color textFor(bool high_contrast) {
     return high_contrast ? 0xFFFFFF : text_primary;
 }
+
+#if defined(PHILARMONY_HAS_LVGL) && !defined(UNIT_TEST)
+const lv_font_t* fontLabel() { return &ui_font_roboto_12; }
+const lv_font_t* fontButton() { return &ui_font_roboto_16; }
+const lv_font_t* fontValue() { return &ui_font_roboto_24; }
+const lv_font_t* fontTitle() { return &ui_font_roboto_32; }
+#endif
 
 } // namespace ui_theme
 } // namespace filament_dryer

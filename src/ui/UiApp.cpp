@@ -897,7 +897,7 @@ lv_obj_t* UiApp::createScreen() {
 
 lv_obj_t* UiApp::addTitle(lv_obj_t* parent, const String& text) {
     lv_obj_t* label = addLabel(parent, text);
-    lv_obj_set_style_text_font(label, LV_FONT_DEFAULT, 0);
+    lv_obj_set_style_text_font(label, ui_theme::fontTitle(), 0);
     return label;
 }
 
@@ -906,6 +906,7 @@ lv_obj_t* UiApp::addLabel(lv_obj_t* parent, const String& text) {
     lv_label_set_text(label, text.c_str());
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(label, LV_PCT(100));
+    lv_obj_set_style_text_font(label, ui_theme::fontLabel(), 0);
     lv_obj_set_style_text_color(
         label, lv_color_hex(ui_theme::textFor(highContrast())), 0);
     return label;
@@ -929,6 +930,7 @@ lv_obj_t* UiApp::addButton(lv_obj_t* parent, const String& text,
     lv_obj_add_event_cb(button, lvActionCallback, LV_EVENT_CLICKED, &binding);
     lv_obj_t* label = lv_label_create(button);
     lv_label_set_text(label, text.c_str());
+    lv_obj_set_style_text_font(label, ui_theme::fontButton(), 0);
     lv_obj_set_style_text_color(
         label, lv_color_hex(ui_theme::textFor(highContrast())), 0);
     lv_obj_center(label);

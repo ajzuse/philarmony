@@ -31,7 +31,7 @@ lv_obj_t* buildHistoryList(UiApp& app) {
     for (size_t i = 0; i < records.size(); ++i) {
         const CycleRecord& record = records[i];
         const String line =
-            ui_format::formatUnixDate(record.timestamp_unix) + "  [" +
+            ui_format::formatUnixDateMs(record.timestamp_ms) + "  [" +
             record.material_id + "]  " +
             app.formatTemp(record.target_temp_c, 0) + "  " +
             String(record.duration_sec / 60) + " min  " +

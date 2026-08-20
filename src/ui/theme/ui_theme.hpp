@@ -17,11 +17,15 @@
  */
 
 /**
- * UI theme - Dark, high-contrast RGB888 color palette
+ * UI theme - Dark, high-contrast RGB888 color palette + Roboto type scale
  */
 #pragma once
 
 #include <stdint.h>
+
+#if defined(PHILARMONY_HAS_LVGL) && !defined(UNIT_TEST)
+#include <lvgl.h>
+#endif
 
 namespace filament_dryer {
 namespace ui_theme {
@@ -45,6 +49,14 @@ extern const Color error;
 Color backgroundFor(bool high_contrast);
 Color surfaceFor(bool high_contrast);
 Color textFor(bool high_contrast);
+
+#if defined(PHILARMONY_HAS_LVGL) && !defined(UNIT_TEST)
+/** 12pt labels, 16pt buttons, 24pt values, 32pt titles (FR-002). */
+const lv_font_t* fontLabel();
+const lv_font_t* fontButton();
+const lv_font_t* fontValue();
+const lv_font_t* fontTitle();
+#endif
 
 } // namespace ui_theme
 } // namespace filament_dryer

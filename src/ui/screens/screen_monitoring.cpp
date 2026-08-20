@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ScreenBuilders.hpp"
+#include "../theme/ui_theme.hpp"
 
 namespace filament_dryer {
 namespace ui_screens {
@@ -29,6 +30,7 @@ lv_obj_t* buildMonitoring(UiApp& app) {
     lv_obj_t* temp = app.addLabel(
         root, app.formatTemp(session.current_temp_c) + " / " +
                   app.formatTemp(session.target_temp_c, 0));
+    lv_obj_set_style_text_font(temp, ui_theme::fontValue(), 0);
     lv_obj_set_style_text_letter_space(temp, 1, 0);
     lv_obj_set_style_pad_ver(temp, 8, 0);
     app.addLabel(root, String(app.tr("label_rh")) + ": " +

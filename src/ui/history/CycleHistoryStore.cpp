@@ -119,7 +119,7 @@ void CycleHistoryStore::recordSample(float temp_c, float humidity_pct) {
 bool CycleHistoryStore::appendFromSession(const DryingSession& session) {
     CycleRecord rec;
     rec.id = next_id_++;
-    rec.timestamp_unix = ui_format::unixNowSec();
+    rec.timestamp_ms = ui_format::unixNowMs();
     rec.material_id = session.profile_id;
     rec.target_temp_c = session.target_temp_c;
     rec.target_humidity_pct = session.target_humidity_pct;
@@ -189,10 +189,13 @@ String CycleHistoryStore::toCsv(const CycleRecord& record) const {
         snprintf(buf, sizeof(buf), "%.2f", static_cast<double>(value));
         return String(buf);
     };
+    char ts_buf[24];
+    snprintf(ts_buf, sizeof(ts_buf), "%llu",
+             static_cast<unsigned long long>(record.timestamp_ms));
     String csv =
-        "id,timestamp_unix,material,target_temp_c,avg_temp_c,max_temp_c,"
+        "id,timestamp_ms,material,target_temp_c,avg_temp_c,max_temp_c,"
         "target_humidity_pct,avg_humidity_pct,duration_sec,stop_reason\n";
-    csv += String(record.id) + "," + String(record.timestamp_unix) + "," +
+    csv += String(record.id) + "," + ts_buf + "," +
            record.material_id + "," + num(record.target_temp_c) + "," +
            num(record.avg_temp_c) + "," + num(record.max_temp_c) + "," +
            num(record.target_humidity_pct) + "," + num(record.avg_humidity_pct) +
@@ -209,7 +212,7 @@ bool CycleHistoryStore::fillExportJson(const CycleRecord& record,
                                        JsonObject obj) const {
     obj["topic"] = "history/export";
     obj["id"] = record.id;
-    obj["timestamp_unix"] = record.timestamp_unix;
+    obj["timestamp_ms"] = record.timestamp_ms;
     obj["material_id"] = record.material_id;
     obj["target_temp_c"] = record.target_temp_c;
     obj["avg_temp_c"] = record.avg_temp_c;
@@ -265,8 +268,18 @@ bool CycleHistoryStore::load() {
     for (JsonObject obj : doc.as<JsonArray>()) {
         CycleRecord record;
         record.id = obj["id"] | 0u;
-        record.timestamp_unix =
-            obj["timestamp_unix"] | (obj["timestamp_ms"] | 0u);
+        const uint64_t raw_ms = obj["timestamp_ms"] | static_cast<uint64_t>(0);
+        const uint64_t raw_unix = obj["timestamp_unix"] | static_cast<uint64_t>(0);
+        if (raw_ms > 0) {
+            record.timestamp_ms = raw_ms;
+        } else if (raw_unix >= 1000000000000ULL) {
+            // Legacy mis-stored milliseconds under timestamp_unix.
+            record.timestamp_ms = raw_unix;
+        } else if (raw_unix > 0) {
+            record.timestamp_ms = raw_unix * 1000ULL;
+        } else {
+            record.timestamp_ms = 0;
+        }
         record.material_id = obj["material_id"] | "";
         record.target_temp_c = obj["target_temp_c"] | 0.0f;
         record.avg_temp_c = obj["avg_temp_c"] | 0.0f;
@@ -311,7 +324,7 @@ bool CycleHistoryStore::persist() const {
     for (const CycleRecord& record : records_) {
         JsonObject obj = array.add<JsonObject>();
         obj["id"] = record.id;
-        obj["timestamp_unix"] = record.timestamp_unix;
+        obj["timestamp_ms"] = record.timestamp_ms;
         obj["material_id"] = record.material_id;
         obj["target_temp_c"] =
             std::isfinite(record.target_temp_c) ? record.target_temp_c : 0.0f;

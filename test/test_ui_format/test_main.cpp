@@ -32,11 +32,18 @@ void test_fahrenheit_conversion_and_suffix() {
 }
 
 void test_result_icon_and_rssi_bars() {
-    TEST_ASSERT_EQUAL_STRING("✓", ui_format::resultIcon("completed"));
-    TEST_ASSERT_EQUAL_STRING("✗", ui_format::resultIcon("safety_cutoff"));
-    TEST_ASSERT_EQUAL_STRING("⚠", ui_format::resultIcon("user_stopped"));
+    TEST_ASSERT_EQUAL_STRING("OK", ui_format::resultIcon("completed"));
+    TEST_ASSERT_EQUAL_STRING("X", ui_format::resultIcon("safety_cutoff"));
+    TEST_ASSERT_EQUAL_STRING("!", ui_format::resultIcon("user_stopped"));
     TEST_ASSERT_EQUAL_STRING("----", ui_format::rssiBars(-40, false).c_str());
-    TEST_ASSERT_EQUAL_STRING("████", ui_format::rssiBars(-40, true).c_str());
+    TEST_ASSERT_EQUAL_STRING("####", ui_format::rssiBars(-40, true).c_str());
+}
+
+void test_unix_ms_date_formatting() {
+    TEST_ASSERT_EQUAL_STRING("--", ui_format::formatUnixDateMs(0).c_str());
+    // 2021-01-01 00:00:00 UTC
+    const String formatted = ui_format::formatUnixDateMs(1609459200000ULL);
+    TEST_ASSERT_TRUE(formatted.indexOf("2021-01-01") == 0);
 }
 
 void test_i18n_tables_resolve_start_label() {
@@ -54,6 +61,7 @@ int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_fahrenheit_conversion_and_suffix);
     RUN_TEST(test_result_icon_and_rssi_bars);
+    RUN_TEST(test_unix_ms_date_formatting);
     RUN_TEST(test_i18n_tables_resolve_start_label);
     RUN_TEST(test_orientation_mapping_and_active_cycle);
     return UNITY_END();

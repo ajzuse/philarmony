@@ -32,7 +32,7 @@ struct CycleRecord {
     static constexpr size_t kMaxSamples = 32;
 
     uint32_t id = 0;
-    uint32_t timestamp_unix = 0;
+    uint64_t timestamp_ms = 0;
     String material_id;
     float target_temp_c = 0.0f;
     float avg_temp_c = 0.0f;

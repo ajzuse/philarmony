@@ -33,7 +33,7 @@ lv_obj_t* buildHistoryDetail(UiApp& app) {
 
     app.addTitle(root, "#" + String(record.id) + " [" + record.material_id +
                            "] " + ui_format::resultIcon(record.stop_reason));
-    app.addLabel(root, ui_format::formatUnixDate(record.timestamp_unix));
+    app.addLabel(root, ui_format::formatUnixDateMs(record.timestamp_ms));
     app.addLabel(root, String(app.tr("label_target")) + ": " +
                            app.formatTemp(record.target_temp_c) + " / " +
                            String(record.target_humidity_pct, 1) + "%");
