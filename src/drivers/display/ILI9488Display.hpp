@@ -43,6 +43,10 @@ public:
     String getName() const override { return "ILI9488 TFT"; }
     bool isConnected() override;
     void setBrightness(uint8_t brightness) override;
+    uint8_t getBrightness() const override { return current_brightness_; }
+    void setRotation(uint8_t rotation) override;
+    void pushRgb565(int16_t x, int16_t y, uint16_t w, uint16_t h,
+                    const uint16_t* data) override;
     void sleep() override;
     void wake() override;
 

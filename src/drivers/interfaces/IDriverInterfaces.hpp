@@ -161,10 +161,40 @@ public:
     
     // Set brightness (0-255)
     virtual void setBrightness(uint8_t brightness) = 0;
+    virtual uint8_t getBrightness() const { return 255; }
+
+    // Push an RGB565 region (used by LVGL partial-buffer flush).
+    virtual void pushRgb565(int16_t x, int16_t y, uint16_t w, uint16_t h,
+                            const uint16_t* data) {}
+
+    virtual void setRotation(uint8_t rotation) { (void)rotation; }
     
     // Sleep/wake for power saving
     virtual void sleep() = 0;
     virtual void wake() = 0;
+
+protected:
+    String last_error_;
+};
+
+// ============================================================
+// ITouchDriver - Touch Controller Interface
+// ============================================================
+struct TouchPoint {
+    bool pressed = false;
+    int16_t x = 0;
+    int16_t y = 0;
+    uint32_t timestamp_ms = 0;
+};
+
+class ITouchDriver {
+public:
+    virtual ~ITouchDriver() = default;
+    virtual bool begin(const JsonObject& config) = 0;
+    virtual TouchPoint read() = 0;
+    virtual bool isConnected() = 0;
+    virtual String getType() const = 0;
+    virtual void setSensitivity(const String& level) = 0; // low|medium|high
 
 protected:
     String last_error_;

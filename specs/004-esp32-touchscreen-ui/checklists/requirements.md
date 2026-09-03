@@ -31,11 +31,11 @@
 
 ## Notes
 
-- All checklist items pass - specification is ready for planning phase
-- Zero [NEEDS CLARIFICATION] markers - all assumptions documented in Assumptions section
-- Success criteria use measurable, technology-agnostic metrics
-- Edge cases cover touch noise, calibration drift, gloved hands, power loss, WebSocket sync conflicts
-- Scope bounded by "Out of Scope" section (multi-touch, TTS, remote mirroring, etc.)
+- All checklist items pass after Clarifications Session 2026-08-19 (5 Qs locked)
+- Zero [NEEDS CLARIFICATION] markers - decisions in Clarifications + Assumptions
+- Success criteria use measurable metrics; history = 50 stored / list 10 + Mais
+- Edge cases: touch noise, calibration, gloves, power-loss auto-resume, pause 30 min timeout, WS sync
+- Scope bounded by Out of Scope; v0.1 acceptance includes Settings/History/mid-cycle
 - Firmware-UI coupling documented as key dependency
-- Touch controller support for both resistive and capacitive
-- Synchronization with WebSocket/app control documented
+- Touch resistive + capacitive; mid-cycle targets broadcast to WS
+- Plan/research/contracts amended to match clarify (ran after initial plan)

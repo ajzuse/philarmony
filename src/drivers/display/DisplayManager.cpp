@@ -139,6 +139,24 @@ void DisplayManager::showBootScreen(const String& firmware_version) {
     if (active_display_) active_display_->showBootScreen(firmware_version);
 }
 
+void DisplayManager::pushRgb565(int16_t x, int16_t y, uint16_t w, uint16_t h,
+                                const uint16_t* data) {
+    if (!active_display_ || !data || w == 0 || h == 0) return;
+    active_display_->pushRgb565(x, y, w, h, data);
+}
+
+void DisplayManager::setBrightness(uint8_t brightness) {
+    if (active_display_) active_display_->setBrightness(brightness);
+}
+
+void DisplayManager::setRotation(uint8_t rotation) {
+    if (active_display_) active_display_->setRotation(rotation);
+}
+
+uint8_t DisplayManager::getBrightness() const {
+    return active_display_ ? active_display_->getBrightness() : 0;
+}
+
 bool DisplayManager::isAnyConnected() const {
     return active_display_ && active_display_->isConnected();
 }

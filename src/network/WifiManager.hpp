@@ -78,7 +78,11 @@ public:
     using StatusCallback = void(*)(Status);
     void setStatusCallback(StatusCallback cb) { status_cb_ = cb; }
 
+    /** True after SNTP has been started (clock may still be converging). */
+    bool isNtpStarted() const { return ntp_started_; }
+
 private:
+    void startNtpSync();
     ConfigManager* config_mgr_ = nullptr;
     WifiConfig current_config_;
     Status status_ = Status::DISCONNECTED;
@@ -92,6 +96,7 @@ private:
     StatusCallback status_cb_ = nullptr;
     DNSServer dns_server_;
     bool dns_active_ = false;
+    bool ntp_started_ = false;
 
     void loadConfig();
     bool saveConfig();

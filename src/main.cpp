@@ -45,6 +45,10 @@
 #include "utils/SystemMetrics.hpp"
 #include "drivers/interfaces/IDriverInterfaces.hpp"
 #include "drivers/display/DisplayManager.hpp"
+#include "drivers/touch/TouchManager.hpp"
+#include "ui/TouchUiController.hpp"
+#include "ui/UiApp.hpp"
+#include "ui/history/CycleHistoryStore.hpp"
 #include "plugins/IPlugin.hpp"
 
 using namespace filament_dryer;
@@ -61,6 +65,11 @@ HardwareConfigParser hwParser;
 ProfileManager profileMgr(configMgr);
 ControlEngine controlEngine;
 DisplayManager displayManager;
+TouchManager touchManager;
+TouchUiController touchUiController(stateMachine, profileMgr, configMgr,
+                                    &safetyEngine);
+CycleHistoryStore cycleHistory;
+UiApp* uiApp = nullptr;
 PluginManager pluginMgr;
 WifiManager wifiMgr;
 WebServer webServer(80);
@@ -86,6 +95,7 @@ static volatile float g_liveChamberTemp = NAN;
 static volatile float g_liveChamberHumidity = NAN;
 static volatile float g_liveHeaterPowerPct = 0.0f;
 static volatile float g_liveFanPowerPct = 0.0f;
+static volatile bool g_touchUiOwnsDisplay = false;
 
 static void cutActuatorPower() {
     if (heaterActuator) {
@@ -206,6 +216,7 @@ static void beginCooldown(DryingStopReason reason) {
 TaskHandle_t controlLoopTaskHandle = nullptr;
 TaskHandle_t networkTaskHandle = nullptr;
 TaskHandle_t displayTaskHandle = nullptr;
+TaskHandle_t uiTaskHandle = nullptr;
 
 // ============================================================
 // Control Loop (Core 1) - 50Hz = 20ms period
@@ -331,6 +342,14 @@ void controlLoopTask(void* pvParameters) {
 
         if (pidAutotune.isRunning()) {
             pidAutotune.update(chamberTemp, heaterPower);
+        }
+
+        if (stateMachine.isPaused()) {
+            cutActuatorPower();
+            if (stateMachine.tickPauseTimeout()) {
+                cutActuatorPower();
+            }
+            continue;
         }
 
         if (stateMachine.isDrying()) {
@@ -497,6 +516,19 @@ void networkTask(void* pvParameters) {
 // ============================================================
 // Display Task (Core 0) - Independent rendering
 // ============================================================
+void uiTask(void* pvParameters) {
+    (void)pvParameters;
+    const TickType_t period = pdMS_TO_TICKS(33); // ~30fps
+    TickType_t lastWakeTime = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&lastWakeTime, period);
+        if (uiApp) {
+            uiApp->setLiveReadings(g_liveChamberTemp, g_liveChamberHumidity);
+            uiApp->loop();
+        }
+    }
+}
+
 void displayTask(void* pvParameters) {
     const TickType_t period = pdMS_TO_TICKS(200);
     TickType_t lastWakeTime = xTaskGetTickCount();
@@ -506,6 +538,7 @@ void displayTask(void* pvParameters) {
 
         DisplayConfig dispConfig = configMgr.getDisplayConfig();
         if (!dispConfig.enabled) continue;
+        if (g_touchUiOwnsDisplay) continue;
         if (!displayManager.isRefreshDue()) continue;
 
         JsonDocument statusDoc;
@@ -549,6 +582,7 @@ void onStateChange(SystemState oldState, SystemState newState) {
         case SystemState::COOLDOWN: newStr = "COOLDOWN"; break;
         case SystemState::STOPPED: newStr = "STOPPED"; break;
         case SystemState::FAULT_STOPPED: newStr = "FAULT_STOPPED"; break;
+        case SystemState::PAUSED: newStr = "PAUSED"; break;
     }
     logMgr.logSystem(LogLevel::INFO, LogModule::SYSTEM, 
                      "State transition: %s -> %s", oldStr.c_str(), newStr.c_str());
@@ -557,6 +591,33 @@ void onStateChange(SystemState oldState, SystemState newState) {
     if (newState == SystemState::FAULT_STOPPED || newState == SystemState::STOPPED) {
         cooldownActive = false;
         cutActuatorPower();
+        if (newState == SystemState::STOPPED) {
+            cycleHistory.appendFromSession(stateMachine.getCurrentSession());
+        }
+        if (uiApp && wsServer.getUiSource() == "websocket") {
+            uiApp->notifyRemoteStateChange();
+        }
+    }
+    if (newState == SystemState::DRYING || newState == SystemState::PAUSED) {
+        if (newState == SystemState::DRYING && oldState != SystemState::PAUSED) {
+            cycleHistory.resetSampler();
+        }
+        if (uiApp && wsServer.getUiSource() == "websocket") {
+            uiApp->notifyRemoteStateChange();
+        }
+        DryingSession interrupted;
+        if (stateMachine.captureInterruptedSession(interrupted)) {
+            configMgr.saveInterruptedSession(interrupted, newState);
+        }
+    } else if (newState == SystemState::STOPPED ||
+               newState == SystemState::FAULT_STOPPED ||
+               (newState == SystemState::READY &&
+                (oldState == SystemState::STOPPED ||
+                 oldState == SystemState::FAULT_STOPPED))) {
+        configMgr.clearInterruptedSession();
+    }
+    if (newState == SystemState::PAUSED) {
+        cutActuatorPower();
     }
     if (newState == SystemState::DRYING) {
         pluginMgr.callOnSessionStart(stateMachine.getCurrentSession());
@@ -564,7 +625,18 @@ void onStateChange(SystemState oldState, SystemState newState) {
 }
 
 void onSessionUpdate(const DryingSession& session) {
-    // Update display, log, etc.
+    static uint32_t last_persist_ms = 0;
+    static uint32_t last_sample_ms = 0;
+    if (stateMachine.isDrying() && millis() - last_sample_ms >= 1000) {
+        last_sample_ms = millis();
+        cycleHistory.recordSample(session.current_temp_c,
+                                  session.current_humidity_pct);
+    }
+    if ((stateMachine.isDrying() || stateMachine.isPaused()) &&
+        millis() - last_persist_ms >= 5000) {
+        last_persist_ms = millis();
+        configMgr.saveInterruptedSession(session, stateMachine.getState());
+    }
 }
 
 void onSafetyFault(FaultCode fault, const String& message) {
@@ -828,6 +900,7 @@ void initializeActuators() {
 void initializeDisplays() {
     DisplayConfig displayCfg = configMgr.getDisplayConfig();
     if (!displayCfg.enabled) {
+        g_touchUiOwnsDisplay = false;
         displayManager.end();
         return;
     }
@@ -871,7 +944,7 @@ void initializeDisplays() {
         layout["compact_mode"] = displayCfg.compact_mode;
         displayManager.setLayout(layout);
 
-        activeDisplay = nullptr;
+        activeDisplay = displayManager.getActiveDriver();
         logMgr.logSystem(LogLevel::INFO, LogModule::DISPLAY_MODULE,
                          "Display %s initialized", displayManager.getActiveType().c_str());
     }
@@ -916,7 +989,7 @@ void initializeControlAlgorithm() {
 void reloadHardwareFromConfig() {
     // Belt-and-suspenders: API should reject reload during drying/cooldown;
     // if called anyway, e-stop before tearing down live drivers.
-    if (stateMachine.isDrying() || stateMachine.isCoolingDown()) {
+    if (stateMachine.isDrying() || stateMachine.isCoolingDown() || stateMachine.isPaused()) {
         cutActuatorPower();
         stateMachine.stopDrying(DryingStopReason::SAFETY_CUTOFF);
     }
@@ -936,6 +1009,10 @@ void initializeNetwork() {
         if (s == WifiManager::Status::CONNECTED) {
             logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
                              "WiFi connected: %s", wifiMgr.getLocalIP().c_str());
+            if (wifiMgr.isNtpStarted()) {
+                logMgr.logSystem(LogLevel::INFO, LogModule::NETWORK,
+                                 "SNTP time sync started");
+            }
             stateMachine.transitionTo(SystemState::READY);
         } else if (s == WifiManager::Status::AP_ACTIVE) {
             stateMachine.transitionTo(SystemState::HOTSPOT);
@@ -967,6 +1044,7 @@ void setup() {
     // Initialize LittleFS
     if (!LittleFS.begin()) {
     }
+    cycleHistory.begin();
     
     // Initialize ConfigManager (loads all NVS configs)
     if (!configMgr.begin()) {
@@ -1021,6 +1099,14 @@ void setup() {
     initializeSensors();
     initializeActuators();
     initializeDisplays();
+
+    DryingSession interruptedSession;
+    SystemState interruptedState = SystemState::READY;
+    if (configMgr.loadInterruptedSession(interruptedSession, interruptedState)) {
+        stateMachine.restoreInterruptedSession(interruptedSession,
+                                               interruptedState);
+    }
+
     initializeControlAlgorithm();
 
     sysMetrics.begin();
@@ -1038,6 +1124,76 @@ void setup() {
     xTaskCreatePinnedToCore(
         displayTask, "DisplayTask", 4096, nullptr, 2, 
         &displayTaskHandle, 0); // Core 0
+
+    // Touch UI task (Core 1, below control priority)
+    {
+        JsonDocument touchDoc;
+        JsonObject touchCfg = touchDoc.to<JsonObject>();
+        TouchConfig savedTouch = configMgr.getTouchConfig();
+        DisplayConfig dc = configMgr.getDisplayConfig();
+        touchCfg["controller_type"] = savedTouch.controller_type;
+        touchCfg["i2c_address"] = savedTouch.i2c_address;
+        touchCfg["spi_cs"] = savedTouch.spi_cs;
+        touchCfg["irq_pin"] = savedTouch.irq_pin;
+        touchCfg["spi_mosi"] = savedTouch.spi_mosi;
+        touchCfg["spi_miso"] = savedTouch.spi_miso;
+        touchCfg["spi_sclk"] = savedTouch.spi_sclk;
+        touchCfg["sensitivity"] = savedTouch.sensitivity;
+        touchCfg["swap_xy"] = savedTouch.swap_xy;
+        touchCfg["invert_x"] = savedTouch.invert_x;
+        touchCfg["invert_y"] = savedTouch.invert_y;
+        touchCfg["display_width"] = dc.width;
+        touchCfg["display_height"] = dc.height;
+        touchCfg["sda_pin"] = dc.i2c_sda;
+        touchCfg["scl_pin"] = dc.i2c_scl;
+        JsonObject calibration = touchCfg["calibration"].to<JsonObject>();
+        calibration["x_min"] = savedTouch.calibration.x_min;
+        calibration["x_max"] = savedTouch.calibration.x_max;
+        calibration["y_min"] = savedTouch.calibration.y_min;
+        calibration["y_max"] = savedTouch.calibration.y_max;
+        calibration["swapped_xy"] = savedTouch.calibration.swapped_xy;
+        const bool touchStarted = touchManager.begin(touchCfg);
+        touchUiController.setBroadcastCallback([](const JsonObject& status) {
+            wsServer.setUiSource("touch");
+            wsServer.broadcastTelemetry(status);
+        });
+        touchUiController.setWifiHotspotCallback([]() {
+            wifiMgr.startAP();
+        });
+        static UiApp ui_instance(touchUiController, touchManager, cycleHistory);
+        uiApp = &ui_instance;
+        uiApp->setWifiStatusCallback([]() {
+            WifiSnapshot snapshot;
+            snapshot.ssid = wifiMgr.getConfig().ssid;
+            if (snapshot.ssid.isEmpty() && wifiMgr.isAPActive()) {
+                snapshot.ssid = WifiManager::AP_SSID;
+            }
+            snapshot.rssi = wifiMgr.getRSSI();
+            snapshot.connected = wifiMgr.isConnected();
+            return snapshot;
+        });
+        const int8_t haptic_pin = configMgr.getActuatorConfig().custom_pin;
+        if (haptic_pin >= 0) {
+            pinMode(haptic_pin, OUTPUT);
+            uiApp->setHapticCallback([]() {
+                const int8_t pin = configMgr.getActuatorConfig().custom_pin;
+                if (pin < 0) {
+                    return;
+                }
+                digitalWrite(pin, HIGH);
+                delayMicroseconds(1500);
+                digitalWrite(pin, LOW);
+            });
+        }
+        uint16_t w = dc.width > 0 ? dc.width : 320;
+        uint16_t h = dc.height > 0 ? dc.height : 240;
+        const bool uiStarted = uiApp->begin(w, h, &displayManager);
+        g_touchUiOwnsDisplay =
+            touchStarted && uiStarted && displayManager.getActiveDriver();
+        xTaskCreatePinnedToCore(
+            uiTask, "UiTask", 8192, nullptr, 3,
+            &uiTaskHandle, 1);
+    }
     
     logMgr.logSystem(LogLevel::INFO, LogModule::SYSTEM, 
                      "Filament Dryer ESP32 v%s started", FIRMWARE_VERSION);

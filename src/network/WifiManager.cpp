@@ -138,6 +138,7 @@ void WifiManager::loop() {
             retry_delay_ms_ = 5000;
             stopAP();
             updateStatus(Status::CONNECTED);
+            startNtpSync();
             return;
         }
 
@@ -242,6 +243,19 @@ void WifiManager::updateStatus(Status new_status) {
         status_ = new_status;
         if (status_cb_) status_cb_(new_status);
     }
+}
+
+void WifiManager::startNtpSync() {
+#if defined(ESP32) && !defined(UNIT_TEST)
+    if (ntp_started_) {
+        return;
+    }
+    // UTC; History formats via gmtime until a locale/TZ setting exists.
+    configTime(0, 0, "pool.ntp.org", "time.google.com", "time.nist.gov");
+    ntp_started_ = true;
+#else
+    ntp_started_ = true;
+#endif
 }
 
 } // namespace filament_dryer
