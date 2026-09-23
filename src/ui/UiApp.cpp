@@ -549,6 +549,20 @@ void UiApp::handleAction(UiAction action, int32_t value) {
             saveUiSettings();
             break;
         }
+        case UiAction::AmbientMarginMinus:
+            settings_.ambient_ventilation_margin_pct =
+                settings_.ambient_ventilation_margin_pct > 0.0f
+                    ? settings_.ambient_ventilation_margin_pct - 1.0f
+                    : 0.0f;
+            saveUiSettings();
+            break;
+        case UiAction::AmbientMarginPlus:
+            settings_.ambient_ventilation_margin_pct =
+                settings_.ambient_ventilation_margin_pct < 10.0f
+                    ? settings_.ambient_ventilation_margin_pct + 1.0f
+                    : 10.0f;
+            saveUiSettings();
+            break;
         case UiAction::CalibrationStart:
             startCalibration();
             break;

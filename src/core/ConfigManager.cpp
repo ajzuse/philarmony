@@ -22,6 +22,7 @@
  * Compatible with ArduinoJson v7
  */
 #include "ConfigManager.hpp"
+#include "AmbientFanLogic.hpp"
 #include "firmware_version.h"
 #include <Arduino.h>
 
@@ -421,7 +422,9 @@ UISettings ConfigManager::getUiSettings() const {
             settings.high_contrast = doc["high_contrast"] | false;
             settings.pin_lock_enabled = doc["pin_lock_enabled"] | false;
             settings.pin_hash = doc["pin_hash"] | "";
-            settings.ambient_ventilation_margin_pct = doc["ambient_ventilation_margin_pct"] | 2.0f;
+            settings.ambient_ventilation_margin_pct =
+                ambient_fan::clampAmbientMarginPct(
+                    doc["ambient_ventilation_margin_pct"] | 2.0f);
         }
     }
     return settings;
@@ -440,7 +443,8 @@ bool ConfigManager::setUiSettings(const UISettings& settings) {
     doc["high_contrast"] = settings.high_contrast;
     doc["pin_lock_enabled"] = settings.pin_lock_enabled;
     doc["pin_hash"] = settings.pin_hash;
-    doc["ambient_ventilation_margin_pct"] = settings.ambient_ventilation_margin_pct;
+    doc["ambient_ventilation_margin_pct"] =
+        ambient_fan::clampAmbientMarginPct(settings.ambient_ventilation_margin_pct);
 
     String json;
     serializeJson(doc, json);

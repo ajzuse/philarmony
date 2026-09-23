@@ -105,11 +105,60 @@ void test_ambient_different_model() {
     TEST_ASSERT_EQUAL_STRING("aht20", config.ambient_type.c_str());
 }
 
+void test_ambient_pin_conflict_rejected() {
+    const char* json = R"({
+      "sensors": [
+        {"id": "chamber", "type": "dht22", "capabilities": ["temperature", "humidity"],
+         "bus": {"type": "onewire", "pin": 4}},
+        {"id": "ambient", "type": "dht22", "role": "ambient",
+         "capabilities": ["temperature", "humidity"],
+         "bus": {"type": "onewire", "pin": 4}}
+      ]
+    })";
+    JsonDocument doc;
+    deserializeJson(doc, json);
+    SensorConfig sensor;
+    ActuatorConfig actuator;
+    DisplayConfig display;
+    ControlConfig control;
+    HardwareConfigParser parser;
+    auto result = parser.parse(doc.as<JsonObject>(), sensor, actuator, display, control);
+    TEST_ASSERT_FALSE(result.valid);
+    bool conflict_reported = false;
+    for (const auto& e : result.errors) {
+        if (e.indexOf("conflict") >= 0) conflict_reported = true;
+    }
+    TEST_ASSERT_TRUE(conflict_reported);
+}
+
+void test_ambient_unsupported_type_rejected() {
+    const char* json = R"({
+      "sensors": [
+        {"id": "chamber", "type": "sht31", "capabilities": ["temperature", "humidity"],
+         "bus": {"type": "i2c", "sda_pin": 21, "scl_pin": 22}},
+        {"id": "ambient", "type": "foo42", "role": "ambient",
+         "capabilities": ["temperature", "humidity"],
+         "bus": {"type": "i2c", "sda_pin": 16, "scl_pin": 17}}
+      ]
+    })";
+    JsonDocument doc;
+    deserializeJson(doc, json);
+    SensorConfig sensor;
+    ActuatorConfig actuator;
+    DisplayConfig display;
+    ControlConfig control;
+    HardwareConfigParser parser;
+    auto result = parser.parse(doc.as<JsonObject>(), sensor, actuator, display, control);
+    TEST_ASSERT_FALSE(result.valid);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_ambient_role_parsed_correctly);
     RUN_TEST(test_no_role_defaults_to_chamber);
     RUN_TEST(test_ambient_without_humidity_ignored);
     RUN_TEST(test_ambient_different_model);
+    RUN_TEST(test_ambient_pin_conflict_rejected);
+    RUN_TEST(test_ambient_unsupported_type_rejected);
     return UNITY_END();
 }

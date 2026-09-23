@@ -38,6 +38,7 @@
 #include "core/ProfileManager.hpp"
 #include "core/HardwareConfigParser.hpp"
 #include "core/DriverRegistry.hpp"
+#include "core/AmbientFanLogic.hpp"
 #include "control/ControlEngine.hpp"
 #include "network/WifiManager.hpp"
 #include "network/WebServer.hpp"
@@ -161,6 +162,25 @@ static SensorReading applySensorCalibration(const SensorReading& reading) {
     return calibrated;
 }
 
+static SensorReading applyAmbientCalibration(const SensorReading& reading) {
+    if (!reading.valid) {
+        return reading;
+    }
+    SensorConfig cfg = configMgr.getSensorConfig();
+    SensorReading calibrated = reading;
+    if (!isnan(calibrated.temperature)) {
+        calibrated.temperature =
+            calibrated.temperature * cfg.ambient_temperature_scale +
+            cfg.ambient_temperature_offset;
+    }
+    if (!isnan(calibrated.humidity)) {
+        calibrated.humidity =
+            calibrated.humidity * cfg.ambient_humidity_scale +
+            cfg.ambient_humidity_offset;
+    }
+    return calibrated;
+}
+
 static float resolveFanDutyPct(float chamber_temp_c) {
     ActuatorConfig ac = configMgr.getActuatorConfig();
     if (!ac.fan_speed_curve.empty()) {
@@ -264,7 +284,7 @@ void controlLoopTask(void* pvParameters) {
         float ambientTemp = NAN;
         float ambientHumidity = NAN;
         if (ambientSensor) {
-            SensorReading ambientReading = applySensorCalibration(ambientSensor->read());
+            SensorReading ambientReading = applyAmbientCalibration(ambientSensor->read());
             if (ambientReading.valid) {
                 ambientTemp = ambientReading.temperature;
                 ambientHumidity = ambientReading.humidity;
@@ -322,6 +342,16 @@ void controlLoopTask(void* pvParameters) {
                 payload["cpu_usage_pct"] = sysMetrics.getCpuUsagePercent();
                 payload["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
                 payload["uptime_sec"] = millis() / 1000;
+                if (ambientSensor) {
+                    SensorReading ambientReading = applyAmbientCalibration(ambientSensor->read());
+                    if (ambientReading.valid) {
+                        payload["ambient_temp_c"] = ambientReading.temperature;
+                        payload["ambient_humidity_pct"] = ambientReading.humidity;
+                    } else {
+                        payload["ambient_temp_c"] = nullptr;
+                        payload["ambient_humidity_pct"] = nullptr;
+                    }
+                }
                 wsServer.broadcastTelemetry(payload);
             }
             continue;
@@ -445,17 +475,16 @@ void controlLoopTask(void* pvParameters) {
                             lastValidAmbientMs = now;
                             ambientHumidityCached = ambientHumidity;
                         }
-                        const bool ambientAvailable =
-                            !isnan(ambientHumidityCached) &&
-                            (now - lastValidAmbientMs < 30000);
-                        if (ambientAvailable) {
-                            const float margin = configMgr.getUiSettings().ambient_ventilation_margin_pct;
-                            if (!isnan(chamberHumidity) &&
-                                chamberHumidity <= ambientHumidityCached + margin) {
-                                fanPower = 0.0f;  // ventilation useless
-                            }
-                        }
+                        const bool ambientAvailable = ambient_fan::ambientIsAvailable(
+                            !isnan(ambientHumidityCached), now, lastValidAmbientMs);
+                        const float margin = ambient_fan::clampAmbientMarginPct(
+                            configMgr.getUiSettings().ambient_ventilation_margin_pct);
                         // When !ambientAvailable, fanPower unchanged → chamber-only fallback
+                        if (ambient_fan::shouldStopFanForAmbient(
+                                ambientAvailable, chamberHumidity,
+                                ambientHumidityCached, margin)) {
+                            fanPower = 0.0f;  // ventilation useless
+                        }
                     }
                     fanActuator->setPower(fanPower);
                 }
@@ -511,7 +540,7 @@ void controlLoopTask(void* pvParameters) {
                 payload["extra_temp_type"] = configMgr.getSensorConfig().extra_temp_type;
             }
             if (ambientSensor) {
-                SensorReading ambientReading = applySensorCalibration(ambientSensor->read());
+                SensorReading ambientReading = applyAmbientCalibration(ambientSensor->read());
                 if (ambientReading.valid) {
                     payload["ambient_temp_c"] = ambientReading.temperature;
                     payload["ambient_humidity_pct"] = ambientReading.humidity;

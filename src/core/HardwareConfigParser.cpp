@@ -874,6 +874,16 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::checkPinConflicts(c
         claimI2cAddress(sensor.extra_temp_i2c_address, "extra_temp");
     }
 
+    if (!sensor.ambient_type.isEmpty()) {
+        if (isI2cSensor(sensor.ambient_type)) {
+            claimI2cBusPin(sensor.ambient_sda_pin, "ambient.sda");
+            claimI2cBusPin(sensor.ambient_scl_pin, "ambient.scl");
+            claimI2cAddress(sensor.ambient_i2c_address, "ambient");
+        } else {
+            claim(sensor.ambient_gpio_pin, "ambient.gpio");
+        }
+    }
+
     claim(actuator.heater_pin, "heater");
     if (actuator.fan_mode != "shared_mosfet" && actuator.fan_type != "shared_mosfet") {
         claim(actuator.fan_pin, "fan");

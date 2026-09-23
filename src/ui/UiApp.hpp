@@ -103,6 +103,8 @@ enum class UiAction {
     LanguageToggle,
     HighContrastToggle,
     SensitivityCycle,
+    AmbientMarginMinus,
+    AmbientMarginPlus,
     CalibrationStart,
     FactoryResetPrompt,
     HistoryMore,

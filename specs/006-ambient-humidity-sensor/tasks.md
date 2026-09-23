@@ -198,3 +198,21 @@ Polish → after US1–US4
 - Ambient sensor reuses existing ISensorDriver — no new driver code
 
 **Constitution compliance:** PROJECT_NAME = Philarmony, provisions per `.specify/memory/constitution.md`
+
+---
+
+## Phase 8: Convergence
+
+- [x] T026 Apply ambient calibration fields (`ambient_temperature_offset/scale`, `ambient_humidity_offset/scale`) to ambient readings in `src/main.cpp` instead of chamber calibration per FR-001 (contradicts)
+- [x] T027 Reject ambient sensor pin / I2C-address conflicts with the chamber sensor at parse time in `HardwareConfigParser::checkPinConflicts()` (`src/core/HardwareConfigParser.cpp`) per contract §1 (missing)
+- [x] T028 Add ambient ventilation margin stepper (0–10%RH) to `src/ui/screens/screen_settings_sensors.cpp` with handler in `src/ui/UiApp.cpp` persisting via `UISettings` per FR-004 (partial)
+- [x] T029 Clamp `ambient_ventilation_margin_pct` to 0–10 on load/use in `src/core/ConfigManager.cpp` and `src/main.cpp` per data-model §3 (partial)
+- [x] T030 Show ambient row as `"--"`/`"N/A"` in `src/ui/screens/screen_monitoring.cpp` when ambient is configured but unavailable per contract §7 (partial)
+- [x] T031 Extract ambient fan-stop decision into a testable unit and cover it from `test/test_ambient_fan_stop/test_main.cpp` and `test/test_ambient_timeout_fallback/test_main.cpp` per research R10 (partial)
+- [x] T032 Add pin-conflict and unsupported-type assertions to `test/test_ambient_config_parser/test_main.cpp` per T014 (partial)
+
+---
+
+## Phase 9: Convergence
+
+- [x] T033 Add `ambient_temp_c` / `ambient_humidity_pct` (null on fallback) to the COOLDOWN `status/update` broadcast in `src/main.cpp` per FR-006 (partial)

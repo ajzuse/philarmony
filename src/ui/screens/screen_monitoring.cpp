@@ -41,11 +41,13 @@ lv_obj_t* buildMonitoring(UiApp& app) {
     app.addLabel(root, String(app.tr("label_remaining")) + ": " +
                            String(session.remaining_sec / 60) + " min");
 
-    // Ambient readings (when configured)
-    if (!isnan(app.liveAmbientTempC()) || !isnan(app.liveAmbientHumidityPct())) {
+    // Ambient readings (when configured; "--" placeholders while unavailable)
+    if (!app.sensorConfig().ambient_type.isEmpty()) {
         String ambLabel = "Amb: ";
         if (!isnan(app.liveAmbientTempC())) {
             ambLabel += app.formatTemp(app.liveAmbientTempC());
+        } else {
+            ambLabel += "--";
         }
         ambLabel += " / ";
         if (!isnan(app.liveAmbientHumidityPct())) {

@@ -18,6 +18,7 @@
 #include <unity.h>
 #include "Preferences.h"
 #include "../../src/core/ConfigManager.hpp"
+#include "../../src/core/AmbientFanLogic.hpp"
 
 using namespace filament_dryer;
 
@@ -28,37 +29,45 @@ void setUp() {
 void tearDown() {}
 
 void test_timeout_triggers_fallback() {
-    // Simulate: last valid reading at t=0, now at t=31000 (>30s)
-    uint32_t lastValidMs = 0;
-    uint32_t now = 31000;
-    bool ambientAvailable = (now - lastValidMs) < 30000;
+    // Simulate: last valid reading at t=1000, now at t=32000 (>30s)
+    uint32_t lastValidMs = 1000;
+    uint32_t now = 32000;
+    bool ambientAvailable =
+        ambient_fan::ambientIsAvailable(true, now, lastValidMs);
     TEST_ASSERT_FALSE(ambientAvailable);
 }
 
 void test_within_timeout_stays_available() {
-    uint32_t lastValidMs = 0;
-    uint32_t now = 29000;
-    bool ambientAvailable = (now - lastValidMs) < 30000;
+    uint32_t lastValidMs = 1000;
+    uint32_t now = 30000;
+    bool ambientAvailable =
+        ambient_fan::ambientIsAvailable(true, now, lastValidMs);
     TEST_ASSERT_TRUE(ambientAvailable);
 }
 
 void test_at_boundary_timeout() {
-    uint32_t lastValidMs = 0;
-    uint32_t now = 30000;
-    bool ambientAvailable = (now - lastValidMs) < 30000;
+    uint32_t lastValidMs = 1000;
+    uint32_t now = 31000;
+    bool ambientAvailable =
+        ambient_fan::ambientIsAvailable(true, now, lastValidMs);
     TEST_ASSERT_FALSE(ambientAvailable);  // exactly 30s = not available
 }
 
 void test_recovery_on_valid_reading() {
-    uint32_t lastValidMs = 0;
-    uint32_t now = 31000;
-    bool ambientAvailable = (now - lastValidMs) < 30000;
+    uint32_t lastValidMs = 1000;
+    uint32_t now = 32000;
+    bool ambientAvailable =
+        ambient_fan::ambientIsAvailable(true, now, lastValidMs);
     TEST_ASSERT_FALSE(ambientAvailable);
     // Simulate new valid reading
     lastValidMs = now;
-    now = 31500;
-    ambientAvailable = (now - lastValidMs) < 30000;
+    now = 32500;
+    ambientAvailable = ambient_fan::ambientIsAvailable(true, now, lastValidMs);
     TEST_ASSERT_TRUE(ambientAvailable);
+}
+
+void test_no_reading_ever_seen_is_unavailable() {
+    TEST_ASSERT_FALSE(ambient_fan::ambientIsAvailable(false, 1000, 0));
 }
 
 void test_fallback_no_device_fault() {
@@ -78,6 +87,7 @@ int main(int, char**) {
     RUN_TEST(test_within_timeout_stays_available);
     RUN_TEST(test_at_boundary_timeout);
     RUN_TEST(test_recovery_on_valid_reading);
+    RUN_TEST(test_no_reading_ever_seen_is_unavailable);
     RUN_TEST(test_fallback_no_device_fault);
     return UNITY_END();
 }

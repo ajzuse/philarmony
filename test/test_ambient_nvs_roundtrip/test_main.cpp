@@ -81,8 +81,13 @@ void test_ventilation_margin_clamp() {
     settings.ambient_ventilation_margin_pct = 15.0f;  // out of range
     config.setUiSettings(settings);
     UISettings loaded = config.getUiSettings();
-    // Value stored as-is (clamping done at use site)
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 15.0f, loaded.ambient_ventilation_margin_pct);
+    // Out-of-range values are clamped to the supported 0-10 %RH window.
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 10.0f, loaded.ambient_ventilation_margin_pct);
+
+    settings.ambient_ventilation_margin_pct = -3.0f;
+    config.setUiSettings(settings);
+    loaded = config.getUiSettings();
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, loaded.ambient_ventilation_margin_pct);
 }
 
 int main(int, char**) {

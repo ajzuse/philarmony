@@ -19,6 +19,7 @@
 #include "Preferences.h"
 #include "../../src/core/ConfigManager.hpp"
 #include "../../src/core/StateMachine.hpp"
+#include "../../src/core/AmbientFanLogic.hpp"
 
 using namespace filament_dryer;
 
@@ -30,8 +31,8 @@ void tearDown() {}
 
 static bool isAmbientFanStop(float chamberHumidity, float ambientHumidity,
                               float margin) {
-    return !isnan(chamberHumidity) && !isnan(ambientHumidity) &&
-           chamberHumidity <= ambientHumidity + margin;
+    return ambient_fan::shouldStopFanForAmbient(true, chamberHumidity,
+                                                ambientHumidity, margin);
 }
 
 void test_fan_stops_when_chamber_within_margin_of_ambient() {

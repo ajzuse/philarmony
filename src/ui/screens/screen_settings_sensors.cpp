@@ -41,10 +41,12 @@ lv_obj_t* buildSettingsSensors(UiApp& app) {
                                String(sensors.ambient_i2c_address, HEX) +
                                "  SDA " + String(sensors.ambient_sda_pin) +
                                " SCL " + String(sensors.ambient_scl_pin));
+        // Ventilation margin setting (0-10 %RH stepper)
+        float margin = app.settings().ambient_ventilation_margin_pct;
+        app.addLabel(root, "Margem: " + String(margin, 1) + "%RH");
+        app.addButton(root, "- 1%", UiAction::AmbientMarginMinus);
+        app.addButton(root, "+ 1%", UiAction::AmbientMarginPlus);
     }
-    // Ventilation margin setting
-    float margin = app.settings().ambient_ventilation_margin_pct;
-    app.addLabel(root, "Margem: " + String(margin, 1) + "%RH");
     app.addButton(root, app.tr("btn_back"), UiAction::BackSettings);
     return root;
 }
