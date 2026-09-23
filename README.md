@@ -65,7 +65,7 @@
 | 3 | `003-filament-dryer-control-app` | Filament Dryer Control App   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 4 | `004-esp32-touchscreen-ui` | ESP32 Touchscreen Interface   | ⚙️ Tasks Geradas | 2026-07-23   |
 | 5 | `005-manual-validation` | Manual Validation Catalog   | ⚙️ Tasks Geradas | 2026-08-04 |
-| 6 | `006-ambient-humidity-sensor` | Ambient Temperature & Humidity Sensor   | 📝 Especificado | 2026-08-19 |
+| 6 | `006-ambient-humidity-sensor` | Ambient Temperature & Humidity Sensor   | ⚙️ Tasks Geradas | 2026-08-19 |
 
 ---
 
@@ -183,30 +183,25 @@
       ↓
  [Monitoring] ←←←←←←←←←←←←←←←←←←
       ↓
-   [Pause] ⇄ [Paused] (max 30 min)
-      ↓
     [Stop] → [Confirm] → [Home]
 ```
-
-**Plano + Tasks**: `plan.md`, `tasks.md` (T001–T066). Stack LVGL+LovyanGFX; DEC-013. Clarify 2026-08-19: full v0.1, auto-resume, history 50/list 10+Mais.
 
 #### Funcionalidades Touch
 
 | Feature | Detalhes |
 |---------|----------|
-| **Start Flow** | Home → Perfil (ProfileManager) → Confirm ou Custom |
-| **Pause/Resume** | `PAUSED` heater off; auto-stop 30 min; WS `control/pause`/`resume` |
-| **Monitoring** | Valores grandes, progress, Pausar/Retomar/Parar, mid-cycle adjust + WS broadcast |
-| **Settings** | WiFi, Display, Units, Language, Touch calib, Advanced — v0.1 required |
-| **History** | 50 stored; list newest 10 + Mais; detail sparklines |
-| **Sync WS** | `ui_source`, last-write-wins, power-loss auto-resume |
-| **Acessibilidade** | Targets 48x48px, high contrast, haptic/beep if present, PIN optional |
+| **Start Flow** | 3 taps: Home → Material → Confirm (preset) ou Home → Custom → Params → Confirm |
+| **Monitoring** | Valores grandes, progress ring, Stop button, tap values para ajustar mid-cycle |
+| **Settings** | WiFi (reconfig→hotspot), Display (brightness, timeout, orientation), Units (°C/°F), Language, Touch (sensibilidade, calibração 4-pontos), Advanced (device name, firmware, reset) |
+| **History** | 50 ciclos circular buffer NVS/SPIFFS, list + detail com sparklines, export via WS/CSV |
+| **Sync WS** | Estado compartilhado, `ui_source` no status, config ack broadcast, last-write-wins |
+| **Acessibilidade** | Targets 48x48px, high contrast mode, haptic/beep feedback, PIN lock opcional |
 
 #### Entidades
 - `TouchConfig` - controller_type, pins, calibration, sensitivity, swap/invert axes
 - `UIScreen` - state machine enum + params
-- `FilamentProfile` - via ProfileManager (no duplicate UI table)
-- `CycleRecord` - 50 circular buffer
+- `MaterialPreset` - 5 built-in + custom (mesmo schema FilamentProfile)
+- `CycleRecord` - 50 entries circular buffer
 - `UISettings` - brightness, timeout, orientation, units, language, touch, contrast, pin_lock
 
 ---
@@ -218,7 +213,7 @@
 │ FASE                       │ STATUS     │ ENTREGÁVEIS            │  %   │
 ├────────────────────────────┼────────────┼────────────────────────┼──────┤
 │ 1. Specification (Speckit) │ ✅ CONCLUÍDO │ 6 Specs completas    │ 100% │
-│ 2. Planning (Speckit)      │ 🔄 EM ANDAMENTO │ Plan.md + Tasks por spec │ 5/6  │
+│ 2. Planning (Speckit)      │ ✅ CONCLUÍDO │ Plan.md + Tasks por spec │ 6/6  │
 │ 3. Firmware Core           │ ⏳ AGUARDANDO │ ESP32 Base + WS + NVS   │ 0%   │
 │ 4. Touch UI                │ ⏳ AGUARDANDO │ LVGL + Touch Driver     │ 0%   │
 │ 5. Desktop Installer       │ ⏳ AGUARDANDO │ Tauri/Flutter + esptool │ 0%   │
@@ -351,4 +346,4 @@ Você deve ter recebido uma cópia da GNU General Public License junto com este 
 ---
 
 *README auto-gerado e sincronizado pela Constituição Philarmony v1.0.0*
-*Última atualização: 2026-08-19 | Trigger: tasks*
+*Última atualização: 2026-09-03 | Trigger: tasks*

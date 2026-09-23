@@ -147,6 +147,15 @@ SensorConfig ConfigManager::getSensorConfig() const {
             config.extra_temp_type = doc["extra_temp_type"] | "";
             config.extra_temp_gpio_pin = doc["extra_temp_gpio_pin"] | -1;
             config.extra_temp_i2c_address = doc["extra_temp_i2c_address"] | 0;
+            config.ambient_type = doc["ambient_type"] | "";
+            config.ambient_i2c_address = doc["ambient_i2c_address"] | 0;
+            config.ambient_gpio_pin = doc["ambient_gpio_pin"] | -1;
+            config.ambient_sda_pin = doc["ambient_sda_pin"] | 21;
+            config.ambient_scl_pin = doc["ambient_scl_pin"] | 22;
+            config.ambient_temperature_offset = doc["ambient_temperature_offset"] | 0.0f;
+            config.ambient_temperature_scale = doc["ambient_temperature_scale"] | 1.0f;
+            config.ambient_humidity_offset = doc["ambient_humidity_offset"] | 0.0f;
+            config.ambient_humidity_scale = doc["ambient_humidity_scale"] | 1.0f;
         }
     }
     return config;
@@ -175,6 +184,15 @@ void ConfigManager::setSensorConfig(const SensorConfig& config) {
     doc["extra_temp_type"] = config.extra_temp_type;
     doc["extra_temp_gpio_pin"] = config.extra_temp_gpio_pin;
     doc["extra_temp_i2c_address"] = config.extra_temp_i2c_address;
+    doc["ambient_type"] = config.ambient_type;
+    doc["ambient_i2c_address"] = config.ambient_i2c_address;
+    doc["ambient_gpio_pin"] = config.ambient_gpio_pin;
+    doc["ambient_sda_pin"] = config.ambient_sda_pin;
+    doc["ambient_scl_pin"] = config.ambient_scl_pin;
+    doc["ambient_temperature_offset"] = config.ambient_temperature_offset;
+    doc["ambient_temperature_scale"] = config.ambient_temperature_scale;
+    doc["ambient_humidity_offset"] = config.ambient_humidity_offset;
+    doc["ambient_humidity_scale"] = config.ambient_humidity_scale;
     
     String json;
     serializeJson(doc, json);
@@ -403,6 +421,7 @@ UISettings ConfigManager::getUiSettings() const {
             settings.high_contrast = doc["high_contrast"] | false;
             settings.pin_lock_enabled = doc["pin_lock_enabled"] | false;
             settings.pin_hash = doc["pin_hash"] | "";
+            settings.ambient_ventilation_margin_pct = doc["ambient_ventilation_margin_pct"] | 2.0f;
         }
     }
     return settings;
@@ -421,6 +440,7 @@ bool ConfigManager::setUiSettings(const UISettings& settings) {
     doc["high_contrast"] = settings.high_contrast;
     doc["pin_lock_enabled"] = settings.pin_lock_enabled;
     doc["pin_hash"] = settings.pin_hash;
+    doc["ambient_ventilation_margin_pct"] = settings.ambient_ventilation_margin_pct;
 
     String json;
     serializeJson(doc, json);

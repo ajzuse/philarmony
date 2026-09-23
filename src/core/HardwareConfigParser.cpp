@@ -132,6 +132,7 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseSensors(const 
     bool primary_set = false;
     bool humidity_set = false;
     bool extra_temp_set = false;
+    bool ambient_set = false;
 
     for (JsonVariant v : sensors) {
         JsonObject sensor = v.as<JsonObject>();
@@ -167,7 +168,21 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseSensors(const 
             gpio = b["pin"] | gpio;
         };
 
-        if (has_temp && has_humidity && !primary_set) {
+        // Ambient sensor: recognized by "role": "ambient" — check BEFORE other branches
+        String role = sensor["role"] | "";
+        if (role == "ambient" && has_temp && has_humidity && !ambient_set) {
+            config.ambient_type = sensor["type"] | "";
+            applyBus(sensor, config.ambient_gpio_pin, config.ambient_sda_pin,
+                     config.ambient_scl_pin, config.ambient_i2c_address, config.i2c_bus);
+            if (sensor["calibration"].is<JsonObject>()) {
+                JsonObject cal = sensor["calibration"].as<JsonObject>();
+                config.ambient_temperature_offset = cal["temperature_offset"] | 0.0f;
+                config.ambient_temperature_scale = cal["temperature_scale"] | 1.0f;
+                config.ambient_humidity_offset = cal["humidity_offset"] | 0.0f;
+                config.ambient_humidity_scale = cal["humidity_scale"] | 1.0f;
+            }
+            ambient_set = true;
+        } else if (has_temp && has_humidity && !primary_set) {
             config.type = sensor["type"] | config.type;
             config.is_integrated = true;
             applyBus(sensor, config.gpio_pin, config.sda_pin, config.scl_pin,

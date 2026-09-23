@@ -141,6 +141,7 @@ public:
         wifi_status_callback_ = callback;
     }
     void setLiveReadings(float temp_c, float humidity_pct);
+    void setLiveAmbientReadings(float ambient_temp_c, float ambient_humidity_pct);
     LvglPort& lvgl() { return lvgl_; }
     bool ownsDisplay() const { return lvgl_ready_ && display_manager_; }
 
@@ -182,6 +183,8 @@ public:
     const char* statusKey() const;
     float liveTemperatureC() const { return live_temp_c_; }
     float liveHumidityPct() const { return live_humidity_pct_; }
+    float liveAmbientTempC() const { return live_ambient_temp_c_; }
+    float liveAmbientHumidityPct() const { return live_ambient_humidity_pct_; }
     float progressPercent() const {
         return controller_.progressPercent();
     }
@@ -223,6 +226,8 @@ private:
     uint16_t draft_duration_min_ = 240;
     float live_temp_c_ = NAN;
     float live_humidity_pct_ = NAN;
+    float live_ambient_temp_c_ = NAN;
+    float live_ambient_humidity_pct_ = NAN;
     size_t history_offset_ = 0;
     uint32_t selected_history_id_ = 0;
     ConfirmMode confirm_mode_ = ConfirmMode::StartProfile;

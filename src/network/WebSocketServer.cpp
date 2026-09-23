@@ -741,6 +741,9 @@ void WebSocketServer::buildStatusPayload(JsonObject& payload) {
         const ActuatorConfig actuator = config_mgr_->getActuatorConfig();
         payload["heater_type"] = actuator.heater_type;
         payload["fan_type"] = actuator.fan_type;
+        if (!sensor.ambient_type.isEmpty()) {
+            payload["ambient_sensor_type"] = sensor.ambient_type;
+        }
     }
 }
 

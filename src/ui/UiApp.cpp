@@ -86,6 +86,11 @@ void UiApp::setLiveReadings(float temp_c, float humidity_pct) {
     live_humidity_pct_ = humidity_pct;
 }
 
+void UiApp::setLiveAmbientReadings(float ambient_temp_c, float ambient_humidity_pct) {
+    live_ambient_temp_c_ = ambient_temp_c;
+    live_ambient_humidity_pct_ = ambient_humidity_pct;
+}
+
 const char* UiApp::statusKey() const {
     switch (controller_.getState()) {
         case SystemState::DRYING:

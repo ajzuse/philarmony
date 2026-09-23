@@ -64,6 +64,16 @@ struct SensorConfig {
     String extra_temp_type;
     int8_t extra_temp_gpio_pin = -1;
     uint8_t extra_temp_i2c_address = 0;
+    // Ambient sensor (optional, outside chamber)
+    String ambient_type;
+    uint8_t ambient_i2c_address = 0;
+    int8_t ambient_gpio_pin = -1;
+    int8_t ambient_sda_pin = 21;
+    int8_t ambient_scl_pin = 22;
+    float ambient_temperature_offset = 0.0f;
+    float ambient_temperature_scale = 1.0f;
+    float ambient_humidity_offset = 0.0f;
+    float ambient_humidity_scale = 1.0f;
 };
 
 struct FanCurvePoint {
@@ -144,6 +154,7 @@ struct UISettings {
     bool high_contrast = false;
     bool pin_lock_enabled = false;
     String pin_hash;
+    float ambient_ventilation_margin_pct = 2.0f;
 };
 
 struct FilamentProfile {

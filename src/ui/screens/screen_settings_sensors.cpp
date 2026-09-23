@@ -36,6 +36,15 @@ lv_obj_t* buildSettingsSensors(UiApp& app) {
     if (!sensors.extra_temp_type.isEmpty()) {
         app.addLabel(root, "T2: " + sensors.extra_temp_type);
     }
+    if (!sensors.ambient_type.isEmpty()) {
+        app.addLabel(root, "Amb: " + sensors.ambient_type + "  0x" +
+                               String(sensors.ambient_i2c_address, HEX) +
+                               "  SDA " + String(sensors.ambient_sda_pin) +
+                               " SCL " + String(sensors.ambient_scl_pin));
+    }
+    // Ventilation margin setting
+    float margin = app.settings().ambient_ventilation_margin_pct;
+    app.addLabel(root, "Margem: " + String(margin, 1) + "%RH");
     app.addButton(root, app.tr("btn_back"), UiAction::BackSettings);
     return root;
 }
