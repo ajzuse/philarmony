@@ -48,7 +48,7 @@ define require_flutter
 	@test -n "$(FLUTTER)" || (echo "fvm/flutter not on PATH — install FVM and run: fvm use 3.44.0"; exit 1)
 endef
 
-.PHONY: help all build compile test flash upload install uploadfs monitor clean \
+.PHONY: help all setup build compile test flash upload install uploadfs monitor clean \
 	sync-installer-firmware bundle-esptool package-installer package-installer-linux \
 	package-installer-linux-appimage package-installer-linux-deb package-installer-linux-rpm \
 	package-installer-windows package-installer-macos \
@@ -63,6 +63,7 @@ help:
 	@echo "Philarmony Make targets"
 	@echo ""
 	@echo "Firmware (PlatformIO):"
+	@echo "  make setup             Install host deps (PlatformIO Core + GNU make + native C++ toolchain)"
 	@echo "  make / make all / make build|compile     Build firmware for ENV (default: $(ENV))"
 	@echo "  make test              Host Unity tests (pio test -e native)"
 	@echo "  make flash|upload|install  Flash app to ESP32 (needs device)"
@@ -98,6 +99,17 @@ help:
 	@echo "Variables: ENV=$(ENV)  PORT / UPLOAD_PORT  DEVICE=$(DEVICE)"
 
 all: build
+
+# Install host dependencies: PlatformIO Core and a host C++ toolchain for
+# `pio test -e native`. Windows uses scripts/setup-native-toolchain.bat
+# (PlatformIO Core + zig-based gcc/g++/ar shims); macOS/Linux use the .sh.
+setup:
+ifeq ($(OS),Windows_NT)
+	cmd //c "scripts\\setup-native-toolchain.bat"
+else
+	@chmod +x scripts/setup-native-toolchain.sh
+	./scripts/setup-native-toolchain.sh
+endif
 
 build compile:
 	$(PIO) run -e $(ENV)
