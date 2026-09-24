@@ -23,6 +23,12 @@ Add optional support for a second temperature/humidity sensor that measures **am
 
 - Q: Must the ambient sensor be the same hardware model as the chamber sensor? → A: No — both draw from the same supported sensor catalog, but each may be a different model (e.g. chamber DHT22 + ambient SHT31). Matching models is allowed, never required.
 
+### Session 2026-09-03
+
+- Q: Should the useless-ventilation margin be configurable by the operator in v1? → A: Yes, configurable in Settings (range 0–10%RH, default 2%RH).
+- Q: How long should the ambient sensor be allowed to return invalid readings before fallback? → A: 30 seconds.
+- Q: Where should ambient temperature/humidity appear to operators? → A: Both touch UI and WebSocket status/update.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Optional Ambient Sensor Improves Fan Stop Decision (Priority: P1)
@@ -93,7 +99,7 @@ If the ambient sensor fails, disconnects, or returns invalid readings while a cy
 
 - Ambient humidity higher than chamber humidity at cycle start: humidity-reduction exhaust should not run (or should stop immediately); drying may still rely on heat/time per existing cycle rules.
 - Ambient and chamber humidity nearly equal (within margin): treat ventilation as useless for humidity reduction.
-- Rapid ambient swings (door open, AC on/off): decisions use recent valid readings with the same validation class as other sensors (timeout, range); no oscillation that chatters the fan faster than existing actuator constraints allow.
+- Rapid ambient swings (door open, AC on/off): decisions use recent valid readings with the same validation class as other sensors (30s timeout, range); no oscillation that chatters the fan faster than existing actuator constraints allow.
 - Ambient temperature present but humidity capability missing (misconfigured sensor): treat ambient humidity as unavailable → chamber-only fan logic.
 - Two integrated sensors on the same bus (e.g. two I2C devices), including two of the same model or two different catalog models: configuration must allow distinct addresses/pins like other multi-sensor setups.
 - Chamber and ambient configured as different catalog models: fully valid; no requirement to pair identical hardware.
@@ -107,10 +113,10 @@ If the ambient sensor fails, disconnects, or returns invalid readings while a cy
 - **FR-001a**: System MUST allow chamber and ambient to use different models from that catalog; identical models are permitted but MUST NOT be required.
 - **FR-002**: System MUST NOT require an ambient sensor for normal operation; chamber-only configurations MUST remain fully supported.
 - **FR-003**: When an ambient humidity reading is available and valid, and the exhaust fan is being used to reduce chamber humidity, the controller MUST consider ambient humidity when deciding to stop (or not continue) that ventilation.
-- **FR-004**: Ventilation for humidity reduction MUST be treated as no longer useful when chamber humidity is less than or equal to ambient humidity, or within a small configured useless-ventilation margin of ambient humidity (default margin: 2 percentage points RH), and the fan used for that purpose MUST stop under those conditions.
+- **FR-004**: Ventilation for humidity reduction MUST be treated as no longer useful when chamber humidity is less than or equal to ambient humidity, or within the configured useless-ventilation margin of ambient humidity (configurable in Settings, range 0–10%RH, default 2%RH), and the fan used for that purpose MUST stop under those conditions.
 - **FR-005**: When ambient humidity is unavailable (not configured, disabled, or invalid), humidity and fan behavior MUST follow existing chamber-only rules from the base firmware (target humidity, max time, safety, completion cooldown).
-- **FR-006**: Status presented to operators MUST expose ambient temperature and humidity when the ambient sensor is configured, clearly distinguishable from chamber readings.
-- **FR-007**: Ambient sensor faults MUST fall back to chamber-only humidity-reduction logic without forcing a device-wide fault solely due to ambient failure; chamber sensor faults continue to follow existing safety rules.
+- **FR-006**: Status presented to operators MUST expose ambient temperature and humidity when the ambient sensor is configured, clearly distinguishable from chamber readings, on both the touchscreen UI and WebSocket status/update broadcast.
+- **FR-007**: Ambient sensor faults MUST fall back to chamber-only humidity-reduction logic within 30 seconds of invalid readings without forcing a device-wide fault solely due to ambient failure; chamber sensor faults continue to follow existing safety rules.
 - **FR-008**: Configuration paths that today set chamber sensors (installer / control surfaces as applicable) MUST be able to set or omit the ambient sensor without breaking existing chamber configuration.
 - **FR-009**: Ambient support MUST reuse the project’s existing sensor compatibility set for temperature/humidity (same catalog accepted for chamber use); no ambient-only exotic sensor requirement, and no rule that ambient model equals chamber model.
 - **FR-010**: Cycle completion rules based on target chamber humidity and max time remain authoritative for ending the drying cycle; ambient-aware fan control adjusts ventilation usefulness and MUST NOT invent a new cycle target based on ambient humidity alone.
@@ -120,7 +126,7 @@ If the ambient sensor fails, disconnects, or returns invalid readings while a cy
 - **Chamber Sensor**: Existing temperature/humidity measurement inside the drying chamber; primary input for cycle control and safety.
 - **Ambient Sensor**: Optional temperature/humidity measurement of room/outside air; same configuration shape and shared catalog as chamber sensors, distinct role/placement (`ambient`); model MAY differ from the chamber sensor.
 - **Supported Sensor Catalog**: The project’s set of accepted temperature/humidity sensor types/families for DIY builds; both chamber and ambient pick independently from this set.
-- **Useless-Ventilation Margin**: Small humidity gap (default 2 %RH) below which chamber vs ambient difference is considered insufficient for useful exhaust drying.
+- **Useless-Ventilation Margin**: Configurable humidity gap (default 2%RH, range 0–10%RH in Settings) below which chamber vs ambient difference is considered insufficient for useful exhaust drying.
 - **Humidity-Reduction Exhaust**: Exhaust fan activity intended to lower chamber humidity during a cycle (distinct from mandatory post-heater safety/completion cooldown when those rules apply).
 - **Drying Cycle**: Unchanged core entity (targets, duration, stop reasons); gains optional ambient-informed ventilation behavior when ambient is present.
 
@@ -131,14 +137,14 @@ If the ambient sensor fails, disconnects, or returns invalid readings while a cy
 - **SC-001**: With dual sensors and chamber humidity within 2 %RH of ambient (or ambient ≥ chamber), humidity-reduction exhaust stops within 5 seconds of that condition being stably met.
 - **SC-002**: Chamber-only devices complete the same drying journeys as before ambient support, with no new mandatory configuration steps for a second sensor.
 - **SC-003**: When ambient is configured, operators can identify ambient temperature and humidity in the live status view within one status update interval of a valid reading.
-- **SC-004**: After ambient sensor loss during a cycle, the system returns to chamber-only fan/humidity decisions within one sensor-timeout interval and continues the cycle unless chamber safety rules require abort.
+- **SC-004**: After ambient sensor loss during a cycle, the system returns to chamber-only fan/humidity decisions within 30 seconds and continues the cycle unless chamber safety rules require abort.
 - **SC-005**: At least 90% of DIY builders who add any second sensor from the supported catalog (same or different model than the chamber sensor) can enable ambient-aware fan stopping without being forced to match the chamber hardware model.
 - **SC-006**: Ambient-aware stopping does not prevent mandatory safety cutoffs: heater still cuts on chamber over-temp / chamber sensor safety faults under existing limits.
 
 ## Assumptions
 
 - “Same style / same compatibility” means the same configuration model and **shared driver catalog** as chamber temperature/humidity sensors (integrated temp+humidity or equivalent capable sensors), distinguished by role/placement — **not** a requirement that ambient and chamber be the same physical model or SKU.
-- Default useless-ventilation margin is **2 percentage points RH**; builders may tighten/loosen later via configuration if exposed, but v1 may ship the default without a user-facing advanced control.
+- Default useless-ventilation margin is **2 percentage points RH**; configurable in Settings with range 0–10%RH.
 - Ambient sensor is optional; absence is the normal case for minimal builds.
 - Ambient-aware logic applies to **humidity-reduction ventilation during drying**, not to replacing target chamber humidity as the cycle success criterion.
 - Post-completion / safety exhaust cooldown from the base firmware remains in force; this feature does not remove required cooldown behavior.

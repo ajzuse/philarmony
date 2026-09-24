@@ -41,6 +41,23 @@ lv_obj_t* buildMonitoring(UiApp& app) {
     app.addLabel(root, String(app.tr("label_remaining")) + ": " +
                            String(session.remaining_sec / 60) + " min");
 
+    // Ambient readings (when configured; "--" placeholders while unavailable)
+    if (!app.sensorConfig().ambient_type.isEmpty()) {
+        String ambLabel = "Amb: ";
+        if (!isnan(app.liveAmbientTempC())) {
+            ambLabel += app.formatTemp(app.liveAmbientTempC());
+        } else {
+            ambLabel += "--";
+        }
+        ambLabel += " / ";
+        if (!isnan(app.liveAmbientHumidityPct())) {
+            ambLabel += String(app.liveAmbientHumidityPct(), 1) + "%";
+        } else {
+            ambLabel += "--";
+        }
+        app.addLabel(root, ambLabel);
+    }
+
     lv_obj_t* arc = lv_arc_create(root);
     lv_obj_set_size(arc, 120, 120);
     lv_arc_set_rotation(arc, 270);

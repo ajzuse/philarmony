@@ -38,6 +38,7 @@
 #include "core/ProfileManager.hpp"
 #include "core/HardwareConfigParser.hpp"
 #include "core/DriverRegistry.hpp"
+#include "core/AmbientFanLogic.hpp"
 #include "control/ControlEngine.hpp"
 #include "network/WifiManager.hpp"
 #include "network/WebServer.hpp"
@@ -79,6 +80,7 @@ SystemMetrics sysMetrics;
 ISensorDriver* activeTempSensor = nullptr;
 ISensorDriver* activeHumiditySensor = nullptr;
 ISensorDriver* extraTempSensor = nullptr;
+ISensorDriver* ambientSensor = nullptr;
 IActuatorDriver* heaterActuator = nullptr;
 IActuatorDriver* fanActuator = nullptr;
 IActuatorDriver* customActuator = nullptr;
@@ -93,6 +95,8 @@ static DryingStopReason pendingCooldownReason = DryingStopReason::COMPLETED;
 // Shared live readings for display/telemetry (written by control loop)
 static volatile float g_liveChamberTemp = NAN;
 static volatile float g_liveChamberHumidity = NAN;
+static volatile float g_liveAmbientTemp = NAN;
+static volatile float g_liveAmbientHumidity = NAN;
 static volatile float g_liveHeaterPowerPct = 0.0f;
 static volatile float g_liveFanPowerPct = 0.0f;
 static volatile bool g_touchUiOwnsDisplay = false;
@@ -123,6 +127,8 @@ static void teardownDrivers() {
     }
     delete extraTempSensor;
     extraTempSensor = nullptr;
+    delete ambientSensor;
+    ambientSensor = nullptr;
 
     if (actuatorsShareInstance) {
         delete heaterActuator;
@@ -152,6 +158,25 @@ static SensorReading applySensorCalibration(const SensorReading& reading) {
     if (!isnan(calibrated.humidity)) {
         calibrated.humidity =
             calibrated.humidity * cfg.humidity_scale + cfg.humidity_offset;
+    }
+    return calibrated;
+}
+
+static SensorReading applyAmbientCalibration(const SensorReading& reading) {
+    if (!reading.valid) {
+        return reading;
+    }
+    SensorConfig cfg = configMgr.getSensorConfig();
+    SensorReading calibrated = reading;
+    if (!isnan(calibrated.temperature)) {
+        calibrated.temperature =
+            calibrated.temperature * cfg.ambient_temperature_scale +
+            cfg.ambient_temperature_offset;
+    }
+    if (!isnan(calibrated.humidity)) {
+        calibrated.humidity =
+            calibrated.humidity * cfg.ambient_humidity_scale +
+            cfg.ambient_humidity_offset;
     }
     return calibrated;
 }
@@ -255,6 +280,19 @@ void controlLoopTask(void* pvParameters) {
         g_liveChamberTemp = chamberTemp;
         g_liveChamberHumidity = chamberHumidity;
 
+        // Read ambient sensor (once per tick, used by fan logic and telemetry)
+        float ambientTemp = NAN;
+        float ambientHumidity = NAN;
+        if (ambientSensor) {
+            SensorReading ambientReading = applyAmbientCalibration(ambientSensor->read());
+            if (ambientReading.valid) {
+                ambientTemp = ambientReading.temperature;
+                ambientHumidity = ambientReading.humidity;
+            }
+        }
+        g_liveAmbientTemp = ambientTemp;
+        g_liveAmbientHumidity = ambientHumidity;
+
         // Periodic I2C bus recovery when sensor reads fail
         if (now - lastBusCheckMs >= 1000) {
             lastBusCheckMs = now;
@@ -304,6 +342,16 @@ void controlLoopTask(void* pvParameters) {
                 payload["cpu_usage_pct"] = sysMetrics.getCpuUsagePercent();
                 payload["memory_free_bytes"] = sysMetrics.getFreeHeapBytes();
                 payload["uptime_sec"] = millis() / 1000;
+                if (ambientSensor) {
+                    SensorReading ambientReading = applyAmbientCalibration(ambientSensor->read());
+                    if (ambientReading.valid) {
+                        payload["ambient_temp_c"] = ambientReading.temperature;
+                        payload["ambient_humidity_pct"] = ambientReading.humidity;
+                    } else {
+                        payload["ambient_temp_c"] = nullptr;
+                        payload["ambient_humidity_pct"] = nullptr;
+                    }
+                }
                 wsServer.broadcastTelemetry(payload);
             }
             continue;
@@ -418,8 +466,27 @@ void controlLoopTask(void* pvParameters) {
                 }
                 if (fanActuator && fanActuator != heaterActuator) {
                     const float fanDuty = resolveFanDutyPct(chamberTemp);
-                    fanActuator->setPower(
-                        (controlOutput > 0 || chamberTemp > 40.0f) ? fanDuty : 0.0f);
+                    float fanPower = (controlOutput > 0 || chamberTemp > 40.0f) ? fanDuty : 0.0f;
+                    // Ambient-aware fan stop: override fan power when ventilation is useless
+                    if (fanPower > 0.0f && ambientSensor && stateMachine.isDrying()) {
+                        static uint32_t lastValidAmbientMs = 0;
+                        static float ambientHumidityCached = NAN;
+                        if (!isnan(ambientHumidity)) {
+                            lastValidAmbientMs = now;
+                            ambientHumidityCached = ambientHumidity;
+                        }
+                        const bool ambientAvailable = ambient_fan::ambientIsAvailable(
+                            !isnan(ambientHumidityCached), now, lastValidAmbientMs);
+                        const float margin = ambient_fan::clampAmbientMarginPct(
+                            configMgr.getUiSettings().ambient_ventilation_margin_pct);
+                        // When !ambientAvailable, fanPower unchanged → chamber-only fallback
+                        if (ambient_fan::shouldStopFanForAmbient(
+                                ambientAvailable, chamberHumidity,
+                                ambientHumidityCached, margin)) {
+                            fanPower = 0.0f;  // ventilation useless
+                        }
+                    }
+                    fanActuator->setPower(fanPower);
                 }
             }
         }
@@ -471,6 +538,16 @@ void controlLoopTask(void* pvParameters) {
                     payload["external_temp_c"] = extra.temperature;
                 }
                 payload["extra_temp_type"] = configMgr.getSensorConfig().extra_temp_type;
+            }
+            if (ambientSensor) {
+                SensorReading ambientReading = applyAmbientCalibration(ambientSensor->read());
+                if (ambientReading.valid) {
+                    payload["ambient_temp_c"] = ambientReading.temperature;
+                    payload["ambient_humidity_pct"] = ambientReading.humidity;
+                } else {
+                    payload["ambient_temp_c"] = nullptr;
+                    payload["ambient_humidity_pct"] = nullptr;
+                }
             }
 
             StatusPayload pluginTelemetry;
@@ -524,6 +601,7 @@ void uiTask(void* pvParameters) {
         vTaskDelayUntil(&lastWakeTime, period);
         if (uiApp) {
             uiApp->setLiveReadings(g_liveChamberTemp, g_liveChamberHumidity);
+            uiApp->setLiveAmbientReadings(g_liveAmbientTemp, g_liveAmbientHumidity);
             uiApp->loop();
         }
     }
@@ -805,6 +883,27 @@ void initializeSensors() {
             logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR,
                              "Failed to create extra temp sensor '%s'",
                              sensorCfg.extra_temp_type.c_str());
+        }
+    }
+
+    ambientSensor = nullptr;
+    if (!sensorCfg.ambient_type.isEmpty()) {
+        JsonDocument ambientDoc;
+        JsonObject ambientConfig = ambientDoc.to<JsonObject>();
+        ambientConfig["type"] = sensorCfg.ambient_type;
+        ambientConfig["i2c_address"] = sensorCfg.ambient_i2c_address;
+        ambientConfig["gpio_pin"] = sensorCfg.ambient_gpio_pin;
+        ambientConfig["sda_pin"] = sensorCfg.ambient_sda_pin;
+        ambientConfig["scl_pin"] = sensorCfg.ambient_scl_pin;
+        ambientSensor =
+            DriverRegistry::instance().createSensor(sensorCfg.ambient_type, ambientConfig);
+        if (!ambientSensor) {
+            logMgr.logSystem(LogLevel::ERROR, LogModule::SENSOR,
+                             "Failed to create ambient sensor '%s'",
+                             sensorCfg.ambient_type.c_str());
+        } else {
+            logMgr.logSystem(LogLevel::INFO, LogModule::SENSOR,
+                             "Ambient sensor %s initialized", sensorCfg.ambient_type.c_str());
         }
     }
 

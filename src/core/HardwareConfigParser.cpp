@@ -132,6 +132,7 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseSensors(const 
     bool primary_set = false;
     bool humidity_set = false;
     bool extra_temp_set = false;
+    bool ambient_set = false;
 
     for (JsonVariant v : sensors) {
         JsonObject sensor = v.as<JsonObject>();
@@ -167,7 +168,28 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseSensors(const 
             gpio = b["pin"] | gpio;
         };
 
-        if (has_temp && has_humidity && !primary_set) {
+        // Ambient sensor: recognized by "role": "ambient" — check BEFORE other branches
+        String role = sensor["role"] | "";
+        if (role == "ambient" && has_temp && has_humidity && !ambient_set) {
+            config.ambient_type = sensor["type"] | "";
+            // Ambient shares the chamber I2C bus; sink the bus number so an
+            // ambient "bus" key cannot overwrite the chamber i2c_bus.
+            uint8_t ambient_bus_sink = config.i2c_bus;
+            applyBus(sensor, config.ambient_gpio_pin, config.ambient_sda_pin,
+                     config.ambient_scl_pin, config.ambient_i2c_address, ambient_bus_sink);
+            if (sensor["calibration"].is<JsonObject>()) {
+                JsonObject cal = sensor["calibration"].as<JsonObject>();
+                config.ambient_temperature_offset =
+                    clampAmbientCalibrationOffset(cal["temperature_offset"] | 0.0f);
+                config.ambient_temperature_scale =
+                    clampAmbientCalibrationScale(cal["temperature_scale"] | 1.0f);
+                config.ambient_humidity_offset =
+                    clampAmbientCalibrationOffset(cal["humidity_offset"] | 0.0f);
+                config.ambient_humidity_scale =
+                    clampAmbientCalibrationScale(cal["humidity_scale"] | 1.0f);
+            }
+            ambient_set = true;
+        } else if (has_temp && has_humidity && !primary_set) {
             config.type = sensor["type"] | config.type;
             config.is_integrated = true;
             applyBus(sensor, config.gpio_pin, config.sda_pin, config.scl_pin,
@@ -857,6 +879,16 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::checkPinConflicts(c
     claim(sensor.extra_temp_gpio_pin, "extra_temp.gpio");
     if (sensor.extra_temp_i2c_address > 0) {
         claimI2cAddress(sensor.extra_temp_i2c_address, "extra_temp");
+    }
+
+    if (!sensor.ambient_type.isEmpty()) {
+        if (isI2cSensor(sensor.ambient_type)) {
+            claimI2cBusPin(sensor.ambient_sda_pin, "ambient.sda");
+            claimI2cBusPin(sensor.ambient_scl_pin, "ambient.scl");
+            claimI2cAddress(sensor.ambient_i2c_address, "ambient");
+        } else {
+            claim(sensor.ambient_gpio_pin, "ambient.gpio");
+        }
     }
 
     claim(actuator.heater_pin, "heater");

@@ -86,6 +86,11 @@ void UiApp::setLiveReadings(float temp_c, float humidity_pct) {
     live_humidity_pct_ = humidity_pct;
 }
 
+void UiApp::setLiveAmbientReadings(float ambient_temp_c, float ambient_humidity_pct) {
+    live_ambient_temp_c_ = ambient_temp_c;
+    live_ambient_humidity_pct_ = ambient_humidity_pct;
+}
+
 const char* UiApp::statusKey() const {
     switch (controller_.getState()) {
         case SystemState::DRYING:
@@ -544,6 +549,20 @@ void UiApp::handleAction(UiAction action, int32_t value) {
             saveUiSettings();
             break;
         }
+        case UiAction::AmbientMarginMinus:
+            settings_.ambient_ventilation_margin_pct =
+                settings_.ambient_ventilation_margin_pct > 0.0f
+                    ? settings_.ambient_ventilation_margin_pct - 1.0f
+                    : 0.0f;
+            saveUiSettings();
+            break;
+        case UiAction::AmbientMarginPlus:
+            settings_.ambient_ventilation_margin_pct =
+                settings_.ambient_ventilation_margin_pct < 10.0f
+                    ? settings_.ambient_ventilation_margin_pct + 1.0f
+                    : 10.0f;
+            saveUiSettings();
+            break;
         case UiAction::CalibrationStart:
             startCalibration();
             break;

@@ -34,3 +34,4 @@
 - Validation iteration 1 (2026-08-19): All items pass. Defaults documented for optional ambient hardware, 2 %RH useless-ventilation margin, and soft-fail on ambient loss. Ready for `/speckit-clarify` or `/speckit-plan`.
 - Roadmap note: product priority before remaining `005-manual-validation` focus; numbering is `006` per sequential feature_numbering.
 - Clarify session 2026-08-19: Recorded that chamber and ambient share the supported catalog but need not be the same model (FR-001a). Checklist still fully passing (16/16).
+- Clarify session 2026-09-03: Margin configurable (0–10%RH), 30s ambient timeout, status on both touch UI and WebSocket. Checklist still fully passing (16/16).

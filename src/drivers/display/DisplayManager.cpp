@@ -210,7 +210,8 @@ void DisplayManager::autoConfigureLayout(const DisplayMetrics& m) {
         "target_humidity_pct", "heater_power_pct", "exhaust_fan_power_pct",
         "heater_on", "exhaust_fan_on", "status",
         "elapsed_time_sec", "remaining_time_sec", "uptime_sec",
-        "cpu_usage_pct", "memory_free_bytes"
+        "cpu_usage_pct", "memory_free_bytes",
+        "ambient_temp_c", "ambient_humidity_pct"
     };
 
     if (active_type_ == "hd44780") {
