@@ -90,11 +90,31 @@ void test_ventilation_margin_clamp() {
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, loaded.ambient_ventilation_margin_pct);
 }
 
+void test_ambient_calibration_clamp() {
+    ConfigManager config;
+    TEST_ASSERT_TRUE(config.begin());
+
+    SensorConfig sensor = config.getSensorConfig();
+    sensor.ambient_type = "sht31";
+    sensor.ambient_temperature_offset = 25.0f;   // > +10
+    sensor.ambient_temperature_scale = 0.1f;     // < 0.5
+    sensor.ambient_humidity_offset = -30.0f;     // < -10
+    sensor.ambient_humidity_scale = 5.0f;        // > 2.0
+    config.setSensorConfig(sensor);
+
+    SensorConfig loaded = config.getSensorConfig();
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 10.0f, loaded.ambient_temperature_offset);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.5f, loaded.ambient_temperature_scale);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -10.0f, loaded.ambient_humidity_offset);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 2.0f, loaded.ambient_humidity_scale);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_ambient_fields_persist_and_load);
     RUN_TEST(test_defaults_when_ambient_not_configured);
     RUN_TEST(test_ventilation_margin_persist_and_load);
     RUN_TEST(test_ventilation_margin_clamp);
+    RUN_TEST(test_ambient_calibration_clamp);
     return UNITY_END();
 }

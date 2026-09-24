@@ -131,6 +131,27 @@ void test_ambient_pin_conflict_rejected() {
     TEST_ASSERT_TRUE(conflict_reported);
 }
 
+void test_ambient_bus_does_not_override_chamber_bus() {
+    const char* json = R"({
+      "sensors": [
+        {"id": "chamber", "type": "sht31", "capabilities": ["temperature", "humidity"],
+         "bus": {"type": "i2c", "sda_pin": 21, "scl_pin": 22, "bus": 1}},
+        {"id": "ambient", "type": "dht22", "role": "ambient",
+         "capabilities": ["temperature", "humidity"],
+         "bus": {"type": "onewire", "pin": 4, "bus": 2}}
+      ]
+    })";
+    JsonDocument doc;
+    deserializeJson(doc, json);
+    SensorConfig config;
+    HardwareConfigParser parser;
+    auto result = parser.parseSensors(doc["sensors"].as<JsonArray>(), config);
+    TEST_ASSERT_TRUE(result.valid);
+    TEST_ASSERT_EQUAL_STRING("dht22", config.ambient_type.c_str());
+    // Ambient bus key must not mutate the chamber i2c_bus.
+    TEST_ASSERT_EQUAL_UINT8(1, config.i2c_bus);
+}
+
 void test_ambient_unsupported_type_rejected() {
     const char* json = R"({
       "sensors": [
@@ -159,6 +180,7 @@ int main(int, char**) {
     RUN_TEST(test_ambient_without_humidity_ignored);
     RUN_TEST(test_ambient_different_model);
     RUN_TEST(test_ambient_pin_conflict_rejected);
+    RUN_TEST(test_ambient_bus_does_not_override_chamber_bus);
     RUN_TEST(test_ambient_unsupported_type_rejected);
     return UNITY_END();
 }

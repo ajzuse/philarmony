@@ -216,3 +216,11 @@ Polish → after US1–US4
 ## Phase 9: Convergence
 
 - [x] T033 Add `ambient_temp_c` / `ambient_humidity_pct` (null on fallback) to the COOLDOWN `status/update` broadcast in `src/main.cpp` per FR-006 (partial)
+
+---
+
+## Phase 10: Convergence
+
+- [x] T034 CRITICAL Register the 006 ambient-humidity-sensor research and decisions in the shared memory catalog (new `.specify/memory/catalog/entries/DEC-014-ambient-humidity-sensor.md` plus index row in `.specify/memory/catalog/README.md`) per Constitution: Memória Compartilhada de Pesquisa e Conhecimento (missing)
+- [x] T035 Bind ambient sensor `bus` parsing to an isolated ambient-specific field instead of passing the chamber `config.i2c_bus` by reference in `HardwareConfigParser::parseSensors()` (`src/core/HardwareConfigParser.cpp`) per data-model §2.1 (partial)
+- [x] T036 Validate/clamp ambient calibration fields (`ambient_temperature_offset/scale`, `ambient_humidity_offset/scale`) to the data-model §2.1 ranges on parse and load in `src/core/HardwareConfigParser.cpp` / `src/core/ConfigManager.cpp` per data-model §2.1 (partial)

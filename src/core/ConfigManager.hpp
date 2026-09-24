@@ -25,6 +25,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
+#include <cmath>
 #include <string>
 #include <vector>
 #include "StateMachine.hpp"
@@ -75,6 +76,21 @@ struct SensorConfig {
     float ambient_humidity_offset = 0.0f;
     float ambient_humidity_scale = 1.0f;
 };
+
+// Ambient calibration range guards (data-model.md §2.1)
+inline float clampAmbientCalibrationOffset(float value) {
+    if (std::isnan(value)) return 0.0f;
+    if (value < -10.0f) return -10.0f;
+    if (value > 10.0f) return 10.0f;
+    return value;
+}
+
+inline float clampAmbientCalibrationScale(float value) {
+    if (std::isnan(value)) return 1.0f;
+    if (value < 0.5f) return 0.5f;
+    if (value > 2.0f) return 2.0f;
+    return value;
+}
 
 struct FanCurvePoint {
     float temp_c = 0.0f;

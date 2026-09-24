@@ -172,14 +172,21 @@ HardwareConfigParser::ValidationResult HardwareConfigParser::parseSensors(const 
         String role = sensor["role"] | "";
         if (role == "ambient" && has_temp && has_humidity && !ambient_set) {
             config.ambient_type = sensor["type"] | "";
+            // Ambient shares the chamber I2C bus; sink the bus number so an
+            // ambient "bus" key cannot overwrite the chamber i2c_bus.
+            uint8_t ambient_bus_sink = config.i2c_bus;
             applyBus(sensor, config.ambient_gpio_pin, config.ambient_sda_pin,
-                     config.ambient_scl_pin, config.ambient_i2c_address, config.i2c_bus);
+                     config.ambient_scl_pin, config.ambient_i2c_address, ambient_bus_sink);
             if (sensor["calibration"].is<JsonObject>()) {
                 JsonObject cal = sensor["calibration"].as<JsonObject>();
-                config.ambient_temperature_offset = cal["temperature_offset"] | 0.0f;
-                config.ambient_temperature_scale = cal["temperature_scale"] | 1.0f;
-                config.ambient_humidity_offset = cal["humidity_offset"] | 0.0f;
-                config.ambient_humidity_scale = cal["humidity_scale"] | 1.0f;
+                config.ambient_temperature_offset =
+                    clampAmbientCalibrationOffset(cal["temperature_offset"] | 0.0f);
+                config.ambient_temperature_scale =
+                    clampAmbientCalibrationScale(cal["temperature_scale"] | 1.0f);
+                config.ambient_humidity_offset =
+                    clampAmbientCalibrationOffset(cal["humidity_offset"] | 0.0f);
+                config.ambient_humidity_scale =
+                    clampAmbientCalibrationScale(cal["humidity_scale"] | 1.0f);
             }
             ambient_set = true;
         } else if (has_temp && has_humidity && !primary_set) {

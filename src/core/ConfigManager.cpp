@@ -153,10 +153,14 @@ SensorConfig ConfigManager::getSensorConfig() const {
             config.ambient_gpio_pin = doc["ambient_gpio_pin"] | -1;
             config.ambient_sda_pin = doc["ambient_sda_pin"] | 21;
             config.ambient_scl_pin = doc["ambient_scl_pin"] | 22;
-            config.ambient_temperature_offset = doc["ambient_temperature_offset"] | 0.0f;
-            config.ambient_temperature_scale = doc["ambient_temperature_scale"] | 1.0f;
-            config.ambient_humidity_offset = doc["ambient_humidity_offset"] | 0.0f;
-            config.ambient_humidity_scale = doc["ambient_humidity_scale"] | 1.0f;
+            config.ambient_temperature_offset =
+                clampAmbientCalibrationOffset(doc["ambient_temperature_offset"] | 0.0f);
+            config.ambient_temperature_scale =
+                clampAmbientCalibrationScale(doc["ambient_temperature_scale"] | 1.0f);
+            config.ambient_humidity_offset =
+                clampAmbientCalibrationOffset(doc["ambient_humidity_offset"] | 0.0f);
+            config.ambient_humidity_scale =
+                clampAmbientCalibrationScale(doc["ambient_humidity_scale"] | 1.0f);
         }
     }
     return config;
@@ -190,10 +194,14 @@ void ConfigManager::setSensorConfig(const SensorConfig& config) {
     doc["ambient_gpio_pin"] = config.ambient_gpio_pin;
     doc["ambient_sda_pin"] = config.ambient_sda_pin;
     doc["ambient_scl_pin"] = config.ambient_scl_pin;
-    doc["ambient_temperature_offset"] = config.ambient_temperature_offset;
-    doc["ambient_temperature_scale"] = config.ambient_temperature_scale;
-    doc["ambient_humidity_offset"] = config.ambient_humidity_offset;
-    doc["ambient_humidity_scale"] = config.ambient_humidity_scale;
+    doc["ambient_temperature_offset"] =
+        clampAmbientCalibrationOffset(config.ambient_temperature_offset);
+    doc["ambient_temperature_scale"] =
+        clampAmbientCalibrationScale(config.ambient_temperature_scale);
+    doc["ambient_humidity_offset"] =
+        clampAmbientCalibrationOffset(config.ambient_humidity_offset);
+    doc["ambient_humidity_scale"] =
+        clampAmbientCalibrationScale(config.ambient_humidity_scale);
     
     String json;
     serializeJson(doc, json);
