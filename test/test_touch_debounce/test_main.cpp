@@ -5,6 +5,9 @@
 static constexpr uint32_t kPressDebounceMs = 50;
 static constexpr uint32_t kReleaseDebounceMs = 100;
 
+void setUp() {}
+void tearDown() {}
+
 void test_debounce_constants() {
     TEST_ASSERT_EQUAL_UINT32(50, kPressDebounceMs);
     TEST_ASSERT_EQUAL_UINT32(100, kReleaseDebounceMs);
